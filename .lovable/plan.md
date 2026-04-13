@@ -1,59 +1,58 @@
 
-# DLAX — Daily Labour Attendance & Tracking System
 
-## Overview
-A workforce tracking application for construction projects that digitizes the paper-based manpower register shown in your images. It captures day-to-day headcount and attendance by Project, Contractor, and Department, with role-based access for Admin, Supervisors, and Managers.
+# Plan: Seed DLAX with Sample Data from KPC Manpower Registers
 
----
+Based on your paper registers, KPC is the **principal company** (the organization using this app), NOT a contractor. Contractors are the parties KPC hires. I will insert realistic sample data matching your sheets.
 
-## 1. Authentication & Roles
-- Email/password login using Supabase Auth
-- Three roles: **Admin** (manages master data + reports), **Supervisor** (enters daily data), **Manager** (view-only reports)
-- Role-based navigation — supervisors see the daily entry form, managers see dashboards
+## Data to Insert
 
-## 2. Master Data Management (Admin)
-Four master data modules, each with add/edit/delete and search:
-- **Projects** — Name, location, start date, status (Active/Completed)
-- **Contractors** — Company name, contact person, phone, license number
-- **Departments** — Department/trade name (Civil, Electrical, Plumbing, Mechanical, etc.)
-- **Worker Categories** — Category name (Skilled, Unskilled, Supervisor, Helper, etc.)
+### Project (1)
+- **Construction of Integrated Township at BTPS, Manuguru** — Active, started 2024-01-15
 
-## 3. Daily Manpower Entry (Core Feature)
-- **Date picker** at the top (defaults to today)
-- **Select Project** → then see a grid/form to enter data
-- For each **Contractor + Department + Worker Category** combination:
-  - Number of workers (headcount)
-  - Hours worked (regular + overtime)
-  - Remarks/notes
-- Option to also log **individual worker attendance** (name, check-in/out time) for detailed tracking
-- **Copy previous day** button for quick entry when workforce doesn't change much
-- Validation to prevent duplicate entries for same date/project/contractor/department
+### Contractors (12) — from your manpower register
+1. Aarna Engineering Constructions
+2. KAR Engineers and Contractors
+3. Jai Mata Di Constructions
+4. Mangalam Infratech
+5. Abdur Rani & Co.
+6. Pavan Kumar Gadhe
+7. Padma Constructions
+8. Sri Laxmi Constructions
+9. SRI SRI Civil Works
+10. Ravindra Reddy & Associates
+11. Prashant Al Adam Contractor
+12. S.S Engineers
 
-## 4. Dashboard (Home Page)
-- **Today's summary cards**: Total workers across all projects, by project, by contractor
-- **Trend chart**: Worker count over last 7/30 days
-- Quick links to enter today's data or view reports
+### Departments (10) — work types from your sheet
+1. Shuttering & Civil
+2. Electrical
+3. Painting
+4. Plumbing
+5. Water Proofing & Expansion Treatment
+6. SITC Automation
+7. Steel Structural Fabrication
+8. Fire Fighting
+9. MEP
+10. Miscellaneous
 
-## 5. Reports
-- **Daily Summary**: All projects' manpower for a selected date (similar to your paper sheet layout)
-- **Project-wise Report**: Filter by project, date range — see contractor and department breakdown
-- **Contractor-wise Report**: Filter by contractor — see how many workers deployed across projects
-- **Department-wise Report**: Filter by department/trade
-- **Export to Excel**: Download any report as .xlsx file
+### Worker Categories (7) — from your Daily Labor Report columns
+1. Carpenter
+2. Fitter/Rigger
+3. Welder
+4. Helper
+5. Skilled Worker
+6. Supervisor
+7. Mason
 
-## 6. Database Design (Supabase)
-- `projects`, `contractors`, `departments`, `worker_categories` — master tables
-- `daily_manpower` — transactional table (project_id, contractor_id, department_id, category_id, date, headcount, hours_worked, overtime_hours, remarks)
-- `worker_attendance` — optional individual tracking (worker_name, date, project_id, contractor_id, check_in, check_out)
-- `user_roles` — separate roles table (admin, supervisor, manager)
-- RLS policies to secure data access
+### Daily Manpower Entries (~50-60 rows)
+Entries for the last 7 days with realistic headcounts (matching the scale in your sheets — total ~400-600 workers/day across all contractors), covering various contractor + department + category combinations.
 
-## 7. Pages/Routes
-- `/login` — Login page
-- `/` — Dashboard with summary cards and charts
-- `/daily-entry` — Daily manpower entry form
-- `/masters/projects` — Project master CRUD
-- `/masters/contractors` — Contractor master CRUD
-- `/masters/departments` — Department master CRUD
-- `/masters/categories` — Worker category master CRUD
-- `/reports` — Reports page with filters and export
+## Technical Approach
+- Single database migration with INSERT statements using fixed UUIDs
+- Master data first, then daily_manpower referencing those UUIDs
+- Dashboard and reports will immediately show populated data
+
+## What Will NOT Change
+- KPC will not appear in the contractors table — it is the principal organization
+- No code changes needed — only database inserts
+
