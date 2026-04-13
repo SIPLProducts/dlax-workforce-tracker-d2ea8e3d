@@ -1,10 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { ClientOnly } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/AppLayout";
 import type { ReactNode } from "react";
 
-export function AuthGuard({ children }: { children: ReactNode }) {
+function AuthGuardInner({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -18,4 +19,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   if (!user) return null;
 
   return <AppLayout>{children}</AppLayout>;
+}
+
+export function AuthGuard({ children }: { children: ReactNode }) {
+  return (
+    <ClientOnly fallback={<div className="flex min-h-screen items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>}>
+      <AuthGuardInner>{children}</AuthGuardInner>
+    </ClientOnly>
+  );
 }
