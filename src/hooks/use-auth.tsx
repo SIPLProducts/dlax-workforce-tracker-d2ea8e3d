@@ -22,31 +22,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
 
   const fetchRoles = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    if (data) {
-      setRoles(data.map((r) => r.role as AppRole));
+    try {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      if (data) {
+        setRoles(data.map((r) => r.role as AppRole));
+      }
+    } catch (e) {
+      console.error("Failed to fetch roles:", e);
     }
   };
 
   useEffect(() => {
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchRoles(session.user.id);
+          // Use setTimeout to avoid blocking the callback
+          setTimeout(() => fetchRoles(session.user.id), 0);
         } else {
           setRoles([]);
         }
-        setLoading(false);
       }
     );
 
+    // Then restore session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -54,6 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchRoles(session.user.id);
       }
       setLoading(false);
+      setIsReady(true);
+    }).catch(() => {
+      setLoading(false);
+      setIsReady(true);
     });
 
     return () => subscription.unsubscribe();
