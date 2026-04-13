@@ -14,16 +14,295 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contractors: {
+        Row: {
+          company_name: string
+          contact_person: string | null
+          created_at: string
+          id: string
+          license_number: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_name: string
+          contact_person?: string | null
+          created_at?: string
+          id?: string
+          license_number?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string
+          contact_person?: string | null
+          created_at?: string
+          id?: string
+          license_number?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      daily_manpower: {
+        Row: {
+          category_id: string
+          contractor_id: string
+          created_at: string
+          created_by: string | null
+          department_id: string
+          entry_date: string
+          headcount: number
+          hours_worked: number | null
+          id: string
+          overtime_hours: number | null
+          project_id: string
+          remarks: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          contractor_id: string
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          entry_date: string
+          headcount?: number
+          hours_worked?: number | null
+          id?: string
+          overtime_hours?: number | null
+          project_id: string
+          remarks?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          contractor_id?: string
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          entry_date?: string
+          headcount?: number
+          hours_worked?: number | null
+          id?: string
+          overtime_hours?: number | null
+          project_id?: string
+          remarks?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_manpower_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "worker_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_manpower_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "contractors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_manpower_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_manpower_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          location: string | null
+          name: string
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      worker_attendance: {
+        Row: {
+          category_id: string | null
+          check_in: string | null
+          check_out: string | null
+          contractor_id: string
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          entry_date: string
+          id: string
+          project_id: string
+          remarks: string | null
+          worker_name: string
+        }
+        Insert: {
+          category_id?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          contractor_id: string
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          entry_date: string
+          id?: string
+          project_id: string
+          remarks?: string | null
+          worker_name: string
+        }
+        Update: {
+          category_id?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          contractor_id?: string
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          entry_date?: string
+          id?: string
+          project_id?: string
+          remarks?: string | null
+          worker_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_attendance_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "worker_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_attendance_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "contractors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_attendance_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_attendance_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "supervisor" | "manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +429,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "supervisor", "manager"],
+    },
   },
 } as const
