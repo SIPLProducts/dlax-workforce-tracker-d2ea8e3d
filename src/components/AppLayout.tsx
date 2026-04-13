@@ -1,8 +1,8 @@
-import { Outlet } from "@tanstack/react-router";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import type { ReactNode } from "react";
 
-export function AppLayout() {
+export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -13,7 +13,7 @@ export function AppLayout() {
             <span className="font-bold text-foreground">DLAX</span>
           </div>
           <div className="p-4 md:p-6 lg:p-8">
-            <Outlet />
+            {children}
           </div>
         </main>
       </div>
