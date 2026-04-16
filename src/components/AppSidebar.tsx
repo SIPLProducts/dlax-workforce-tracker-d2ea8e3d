@@ -122,7 +122,26 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-      </SidebarContent>
+
+        {adminItems.some((i) => canSee(i.roles)) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminItems.filter((i) => canSee(i.roles)).map((item) => (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton asChild isActive={location.pathname === item.to}>
+                      <Link to={item.to as any}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
       <SidebarFooter className="p-4">
         <div className="flex flex-col gap-2">
