@@ -1,34 +1,30 @@
 
 
-# Link Departments to Worker Categories
+# Import Excel Data into Daily Manpower Table
 
 ## What
-Create a many-to-many relationship between departments and worker categories so that when creating/editing a department, you can select which categories belong to it. The departments table will show the linked categories, and during daily entry, category dropdowns can be filtered by the selected department.
+Parse the uploaded Excel file (GENMNGR-Daily_Labour_Report_new-2.xlsx), extract date-wise manpower data per contractor/department/category, and insert it into the `daily_manpower` table. This will populate the Reports page with real data.
 
-## Database Changes
+## Approach
 
-**New junction table**: `department_categories`
-- `id` (uuid, PK)
-- `department_id` (uuid, FK -> departments)
-- `category_id` (uuid, FK -> worker_categories)
-- `created_at` (timestamptz)
-- Unique constraint on (department_id, category_id)
-- RLS: admins can manage, authenticated can view
+1. **Read the Excel file** with pandas to understand its structure (sheets, columns, date-wise layout)
+2. **Map Excel data to master tables** — match contractor names, department names, and worker categories to their UUIDs in the database. Create any missing departments if needed (departments table is currently empty).
+3. **Transform rows** into `daily_manpower` insert format: `entry_date`, `project_id`, `contractor_id`, `department_id`, `category_id`, `headcount`, `hours_worked`, `overtime_hours`, `nmr_mason`, `nmr_male_helpers`, `nmr_female_helpers`, `security_count`, `remarks`
+4. **Insert data** into `daily_manpower` using the database insert tool
 
-## UI Changes
+## Steps
 
-**Departments page** (`src/routes/masters.departments.tsx`):
-1. Add/Edit dialog gets a multi-select checkbox list of all worker categories
-2. On save, insert selected category links into `department_categories`
-3. Table shows a "Categories" column with badge chips for linked categories
+1. **Copy and inspect Excel** — read all sheets with pandas to understand the exact column layout and date structure
+2. **Create missing departments** — if the Excel references departments not yet in the DB, create them via migration or insert
+3. **Build a Python script** to:
+   - Parse each sheet/row
+   - Fuzzy-match contractor and category names to existing DB records
+   - Generate SQL INSERT statements
+4. **Execute inserts** using the database insert tool
+5. **Verify** by querying `daily_manpower` count and checking the Reports page
 
-**Daily Entry** (`src/routes/daily-entry.tsx`):
-- When a department is selected, filter the category dropdown to only show categories linked to that department (fall back to all categories if none are linked)
-
-## Technical Steps
-
-1. **Migration**: Create `department_categories` table with foreign keys, unique constraint, and RLS policies
-2. **Update `masters.departments.tsx`**: Fetch categories, add checkbox multi-select in dialog, save/load linked categories, display category badges in the table
-3. **Update `daily-entry.tsx`**: Query `department_categories` to filter the category dropdown based on selected department
-4. **Types**: Will be auto-updated after migration
+## Notes
+- The project has only one project in the DB ("Construction of Integrated Township at BTPS, Manuguru") — all data will be linked to it
+- Departments table is empty — will need to create departments from the Excel data first
+- Worker categories exist (Electrician, Fitter/Rigger, Helper, etc.) — will map from Excel
 
