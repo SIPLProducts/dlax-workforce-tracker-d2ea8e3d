@@ -142,6 +142,7 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+      </SidebarContent>
 
       <SidebarFooter className="p-4">
         <div className="flex flex-col gap-2">
