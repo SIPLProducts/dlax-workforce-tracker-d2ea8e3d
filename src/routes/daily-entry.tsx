@@ -55,16 +55,23 @@ function DailyEntryPage() {
   }, [projectId, date]);
 
   const loadMasters = async () => {
-    const [p, c, d, cat] = await Promise.all([
+    const [p, c, d, cat, dcLinks] = await Promise.all([
       supabase.from("projects").select("*").eq("status", "Active").order("name"),
       supabase.from("contractors").select("*").order("company_name"),
       supabase.from("departments").select("*").order("name"),
       supabase.from("worker_categories").select("*").order("name"),
+      supabase.from("department_categories").select("*"),
     ]);
     setProjects(p.data || []);
     setContractors(c.data || []);
     setDepartments(d.data || []);
     setCategories(cat.data || []);
+    const map: Record<string, string[]> = {};
+    (dcLinks.data || []).forEach((link: any) => {
+      if (!map[link.department_id]) map[link.department_id] = [];
+      map[link.department_id].push(link.category_id);
+    });
+    setDeptCategoryMap(map);
   };
 
   const loadEntries = async () => {
