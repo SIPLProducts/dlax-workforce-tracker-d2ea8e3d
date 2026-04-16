@@ -1,39 +1,34 @@
 
 
-# Enterprise-Grade Login Page for DLAX
+# Link Departments to Worker Categories
 
-## Design
+## What
+Create a many-to-many relationship between departments and worker categories so that when creating/editing a department, you can select which categories belong to it. The departments table will show the linked categories, and during daily entry, category dropdowns can be filtered by the selected department.
 
-A split-screen layout with a branded left panel and login form on the right:
+## Database Changes
 
-```text
-┌─────────────────────┬──────────────────────┐
-│                     │                      │
-│   DLAX BRANDING     │    Login Form        │
-│   HardHat Icon      │    Email / Password  │
-│   Tagline           │    Sign In Button    │
-│   Key Stats         │    Toggle Sign Up    │
-│   (workforce,       │    Forgot Password   │
-│    projects, etc.)  │                      │
-│                     │                      │
-│   Dark gradient     │    Light background  │
-│   background        │                      │
-└─────────────────────┴──────────────────────┘
-```
+**New junction table**: `department_categories`
+- `id` (uuid, PK)
+- `department_id` (uuid, FK -> departments)
+- `category_id` (uuid, FK -> worker_categories)
+- `created_at` (timestamptz)
+- Unique constraint on (department_id, category_id)
+- RLS: admins can manage, authenticated can view
 
-On mobile, the left panel collapses to a compact header above the form.
+## UI Changes
 
-## Features
-- **Split-screen layout**: Left panel with dark gradient, brand logo, tagline, and animated stats/features; right panel with the login form
-- **Password visibility toggle** (Eye/EyeOff icon)
-- **Forgot password link** (placeholder for now)
-- **Loading spinner** on submit button
-- **Professional footer** with "Powered by KPC Infrastructure" and copyright
-- **Responsive**: stacks vertically on mobile with compact branding header
-- **Subtle animations**: fade-in on mount
+**Departments page** (`src/routes/masters.departments.tsx`):
+1. Add/Edit dialog gets a multi-select checkbox list of all worker categories
+2. On save, insert selected category links into `department_categories`
+3. Table shows a "Categories" column with badge chips for linked categories
+
+**Daily Entry** (`src/routes/daily-entry.tsx`):
+- When a department is selected, filter the category dropdown to only show categories linked to that department (fall back to all categories if none are linked)
 
 ## Technical Steps
-1. Rewrite `src/routes/login.tsx` with the new split-screen design
-2. Uses only existing dependencies (lucide-react icons, shadcn components, Tailwind classes)
-3. No new packages needed
+
+1. **Migration**: Create `department_categories` table with foreign keys, unique constraint, and RLS policies
+2. **Update `masters.departments.tsx`**: Fetch categories, add checkbox multi-select in dialog, save/load linked categories, display category badges in the table
+3. **Update `daily-entry.tsx`**: Query `department_categories` to filter the category dropdown based on selected department
+4. **Types**: Will be auto-updated after migration
 
