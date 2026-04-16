@@ -24,6 +24,7 @@ function DepartmentsPage() {
   const [name, setName] = useState("");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -46,6 +47,7 @@ function DepartmentsPage() {
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error("Name is required"); return; }
+    setSaving(true);
     try {
       let deptId: string;
       if (editing) {
@@ -68,7 +70,7 @@ function DepartmentsPage() {
       toast.success(editing ? "Updated" : "Created");
       cancelForm();
       load();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) { toast.error(err.message); } finally { setSaving(false); }
   };
 
   const handleEdit = (d: any) => {
@@ -86,7 +88,7 @@ function DepartmentsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this department?")) return;
     await supabase.from("departments").delete().eq("id", id);
     toast.success("Deleted");
     load();
@@ -108,39 +110,57 @@ function DepartmentsPage() {
   const filtered = items.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
   const isFormVisible = showInlineForm || editing;
 
-  const InlineFormRow = () => (
-    <TableRow className="bg-muted/30">
-      <TableCell>
+  const renderInlineForm = (key?: string) => (
+    <TableRow key={key} className="border-b border-dashed border-primary/30 bg-primary/5">
+      <TableCell className="align-top py-3">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Department name"
-          className="h-8"
+          placeholder="e.g. Civil, Electrical"
+          className="h-9 max-w-[200px]"
           autoFocus
-          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") cancelForm(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") cancelForm();
+          }}
         />
       </TableCell>
-      <TableCell>
-        <div className="flex flex-wrap gap-1.5">
+      <TableCell className="align-top py-3">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
           {allCategories.map((cat) => (
-            <label key={cat.id} className="flex items-center gap-1 cursor-pointer text-xs">
+            <label key={cat.id} className="flex items-center gap-1.5 cursor-pointer text-sm select-none">
               <Checkbox
                 checked={selectedCategoryIds.includes(cat.id)}
                 onCheckedChange={() => toggleCategory(cat.id)}
-                className="h-3.5 w-3.5"
+                className="h-4 w-4"
               />
-              {cat.name}
+              <span>{cat.name}</span>
             </label>
           ))}
-          {allCategories.length === 0 && <span className="text-xs text-muted-foreground">No categories yet</span>}
+          {allCategories.length === 0 && (
+            <span className="text-sm text-muted-foreground italic">No categories created yet</span>
+          )}
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="align-top py-3">
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={handleSave} className="h-8 w-8 text-green-600">
+          <Button
+            variant="default"
+            size="icon"
+            onClick={handleSave}
+            disabled={saving}
+            className="h-8 w-8"
+            title="Save"
+          >
             <Check className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={cancelForm} className="h-8 w-8">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={cancelForm}
+            className="h-8 w-8"
+            title="Cancel"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -151,38 +171,70 @@ function DepartmentsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Departments</h1><p className="text-sm text-muted-foreground">Manage departments / trades and their worker categories</p></div>
-        <Button onClick={startAdd} disabled={!!isFormVisible}><Plus className="mr-2 h-4 w-4" />Add Department</Button>
+        <div>
+          <h1 className="text-2xl font-bold">Departments</h1>
+          <p className="text-sm text-muted-foreground">Manage departments / trades and their worker categories</p>
+        </div>
+        <Button onClick={startAdd} disabled={!!isFormVisible}>
+          <Plus className="mr-2 h-4 w-4" />Add Department
+        </Button>
       </div>
+
       <Input placeholder="Search departments..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-      <Card><CardContent className="p-0">
-        <Table>
-          <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Categories</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {showInlineForm && !editing && <InlineFormRow />}
-            {filtered.map((d) => (
-              editing?.id === d.id ? (
-                <InlineFormRow key={d.id} />
-              ) : (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.name}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(deptCategoryMap[d.id] || []).map((catId) => {
-                        const cat = allCategories.find((c) => c.id === catId);
-                        return cat ? <Badge key={catId} variant="secondary" className="text-xs">{cat.name}</Badge> : null;
-                      })}
-                      {(!deptCategoryMap[d.id] || deptCategoryMap[d.id].length === 0) && <span className="text-xs text-muted-foreground">All categories</span>}
-                    </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[200px]">Name</TableHead>
+                <TableHead>Categories</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {showInlineForm && !editing && renderInlineForm("new-row")}
+              {filtered.map((d) =>
+                editing?.id === d.id ? (
+                  renderInlineForm(d.id)
+                ) : (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium">{d.name}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(deptCategoryMap[d.id] || []).map((catId) => {
+                          const cat = allCategories.find((c) => c.id === catId);
+                          return cat ? <Badge key={catId} variant="secondary" className="text-xs">{cat.name}</Badge> : null;
+                        })}
+                        {(!deptCategoryMap[d.id] || deptCategoryMap[d.id].length === 0) && (
+                          <span className="text-xs text-muted-foreground">All categories</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(d)} disabled={!!isFormVisible}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(d.id)} disabled={!!isFormVisible}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              )}
+              {filtered.length === 0 && !showInlineForm && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                    No departments found
                   </TableCell>
-                  <TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => handleEdit(d)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
                 </TableRow>
-              )
-            ))}
-            {filtered.length === 0 && !showInlineForm && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No departments found</TableCell></TableRow>}
-          </TableBody>
-        </Table>
-      </CardContent></Card>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
