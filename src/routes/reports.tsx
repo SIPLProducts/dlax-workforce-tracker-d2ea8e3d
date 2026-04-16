@@ -4,93 +4,29 @@ import { supabase } from "@/integrations/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, Download, FileSpreadsheet } from "lucide-react";
+import { CalendarIcon, Download } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClientOnly } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/reports")({
-  component: () => <AuthGuard><ReportsPage /></AuthGuard>,
+  component: () => (
+    <AuthGuard>
+      <ClientOnly fallback={<div className="p-8 text-center text-muted-foreground">Loading reports...</div>}>
+        <ReportsPage />
+      </ClientOnly>
+    </AuthGuard>
+  ),
 });
 
-function ReportsPage() {
-  const [tab, setTab] = useState("daily");
-  const [date, setDate] = useState<Date>(new Date());
-  const [dateFrom, setDateFrom] = useState<Date>(new Date());
-  const [dateTo, setDateTo] = useState<Date>(new Date());
-  const [projectId, setProjectId] = useState("all");
-  const [contractorId, setContractorId] = useState("all");
-  const [projects, setProjects] = useState<any[]>([]);
-  const [contractors, setContractors] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [data, setData] = useState<any[]>([]);
-
-  useEffect(() => {
-    loadMasters();
-  }, []);
-
-  useEffect(() => {
-    loadReport();
-  }, [tab, date, dateFrom, dateTo, projectId, contractorId]);
-
-  const loadMasters = async () => {
-    const [p, c, d, cat] = await Promise.all([
-      supabase.from("projects").select("*").order("name"),
-      supabase.from("contractors").select("*").order("company_name"),
-      supabase.from("departments").select("*").order("name"),
-      supabase.from("worker_categories").select("*").order("name"),
-    ]);
-    setProjects(p.data || []);
-    setContractors(c.data || []);
-    setDepartments(d.data || []);
-    setCategories(cat.data || []);
-  };
-
-  const loadReport = async () => {
-    let query = supabase.from("daily_manpower").select("*, projects(name), contractors(company_name), departments(name), worker_categories(name)");
-
-    if (tab === "daily") {
-      query = query.eq("entry_date", format(date, "yyyy-MM-dd"));
-    } else {
-      query = query.gte("entry_date", format(dateFrom, "yyyy-MM-dd")).lte("entry_date", format(dateTo, "yyyy-MM-dd"));
-    }
-
-    if (projectId !== "all") query = query.eq("project_id", projectId);
-    if (tab === "contractor" && contractorId !== "all") query = query.eq("contractor_id", contractorId);
-
-    const { data: result } = await query.order("entry_date", { ascending: false });
-    setData(result || []);
-  };
-
-  const getName = (obj: any) => obj?.name || obj?.company_name || "—";
-
-  const totalHeadcount = data.reduce((s, r) => s + (r.headcount || 0), 0);
-  const totalHours = data.reduce((s, r) => s + (Number(r.hours_worked) || 0), 0);
-
-  const exportCsv = () => {
-    const headers = ["Date", "Project", "Contractor", "Department", "Category", "Headcount", "Hours", "OT Hours", "Remarks"];
-    const rows = data.map((r) => [
-      r.entry_date, getName(r.projects), getName(r.contractors), getName(r.departments), getName(r.worker_categories),
-      r.headcount, r.hours_worked, r.overtime_hours, r.remarks || ""
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.map((c: any) => `"${c}"`).join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `dlax-report-${format(new Date(), "yyyyMMdd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const DatePicker = ({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) => (
+function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) {
+  return (
     <div className="space-y-1">
       <Label>{label}</Label>
       <Popover>
@@ -106,12 +42,101 @@ function ReportsPage() {
       </Popover>
     </div>
   );
+}
+
+function ReportsPage() {
+  const [tab, setTab] = useState("daily");
+  const [date, setDate] = useState<Date>(new Date());
+  const [dateFrom, setDateFrom] = useState<Date>(new Date());
+  const [dateTo, setDateTo] = useState<Date>(new Date());
+  const [projectId, setProjectId] = useState("all");
+  const [contractorId, setContractorId] = useState("all");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [contractors, setContractors] = useState<any[]>([]);
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadMasters();
+  }, []);
+
+  useEffect(() => {
+    loadReport();
+  }, [tab, date, dateFrom, dateTo, projectId, contractorId]);
+
+  const loadMasters = async () => {
+    const [p, c] = await Promise.all([
+      supabase.from("projects").select("*").order("name"),
+      supabase.from("contractors").select("*").order("company_name"),
+    ]);
+    setProjects(p.data || []);
+    setContractors(c.data || []);
+  };
+
+  const loadReport = async () => {
+    setLoading(true);
+    try {
+      let query = supabase.from("daily_manpower").select("*, projects(name), contractors(company_name), departments(name), worker_categories(name)");
+
+      if (tab === "daily") {
+        query = query.eq("entry_date", format(date, "yyyy-MM-dd"));
+      } else {
+        query = query.gte("entry_date", format(dateFrom, "yyyy-MM-dd")).lte("entry_date", format(dateTo, "yyyy-MM-dd"));
+      }
+
+      if (projectId !== "all") query = query.eq("project_id", projectId);
+      if (tab === "contractor" && contractorId !== "all") query = query.eq("contractor_id", contractorId);
+
+      const { data: result, error } = await query.order("entry_date", { ascending: false });
+      if (error) {
+        console.error("Report query error:", error);
+        setData([]);
+      } else {
+        setData(result || []);
+      }
+    } catch (err) {
+      console.error("Report load error:", err);
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getName = (obj: any) => obj?.name || obj?.company_name || "—";
+
+  const totalHeadcount = data.reduce((s, r) => s + (r.headcount || 0), 0);
+  const totalHours = data.reduce((s, r) => s + (Number(r.hours_worked) || 0), 0);
+  const totalNmrMason = data.reduce((s, r) => s + (r.nmr_mason || 0), 0);
+  const totalNmrMale = data.reduce((s, r) => s + (r.nmr_male_helpers || 0), 0);
+  const totalNmrFemale = data.reduce((s, r) => s + (r.nmr_female_helpers || 0), 0);
+  const totalSecurity = data.reduce((s, r) => s + (r.security_count || 0), 0);
+
+  const exportCsv = () => {
+    const headers = ["Date", "Project", "Contractor", "Department", "Category", "Headcount", "Hours", "OT Hours", "NMR Mason", "NMR Male", "NMR Female", "Security", "Remarks"];
+    const rows = data.map((r) => [
+      r.entry_date, getName(r.projects), getName(r.contractors), getName(r.departments), getName(r.worker_categories),
+      r.headcount, r.hours_worked, r.overtime_hours, r.nmr_mason, r.nmr_male_helpers, r.nmr_female_helpers, r.security_count, r.remarks || ""
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c: any) => `"${c}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `dlax-report-${format(new Date(), "yyyyMMdd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Reports</h1><p className="text-sm text-muted-foreground">View and export workforce reports</p></div>
-        <Button variant="outline" onClick={exportCsv} disabled={data.length === 0}><Download className="mr-2 h-4 w-4" />Export CSV</Button>
+        <div>
+          <h1 className="text-2xl font-bold">Reports</h1>
+          <p className="text-sm text-muted-foreground">View and export workforce reports</p>
+        </div>
+        <Button variant="outline" onClick={exportCsv} disabled={data.length === 0}>
+          <Download className="mr-2 h-4 w-4" />Export CSV
+        </Button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -158,9 +183,11 @@ function ReportsPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Results ({data.length} entries)</CardTitle>
-              <div className="flex gap-4 text-sm">
-                <span>Total Workers: <strong>{totalHeadcount}</strong></span>
-                <span>Total Hours: <strong>{totalHours.toFixed(1)}</strong></span>
+              <div className="flex gap-4 text-sm flex-wrap">
+                <span>Workers: <strong>{totalHeadcount}</strong></span>
+                <span>Hours: <strong>{totalHours.toFixed(1)}</strong></span>
+                <span>NMR: <strong>{totalNmrMason + totalNmrMale + totalNmrFemale}</strong></span>
+                <span>Security: <strong>{totalSecurity}</strong></span>
               </div>
             </div>
           </CardHeader>
@@ -177,11 +204,18 @@ function ReportsPage() {
                     <TableHead className="text-right">Count</TableHead>
                     <TableHead className="text-right">Hours</TableHead>
                     <TableHead className="text-right">OT</TableHead>
+                    <TableHead className="text-right">NMR M</TableHead>
+                    <TableHead className="text-right">NMR MH</TableHead>
+                    <TableHead className="text-right">NMR FH</TableHead>
+                    <TableHead className="text-right">Sec</TableHead>
                     <TableHead>Remarks</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.map((r) => (
+                  {loading && (
+                    <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                  )}
+                  {!loading && data.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>{r.entry_date}</TableCell>
                       <TableCell>{getName(r.projects)}</TableCell>
@@ -191,10 +225,16 @@ function ReportsPage() {
                       <TableCell className="text-right font-medium">{r.headcount}</TableCell>
                       <TableCell className="text-right">{r.hours_worked}</TableCell>
                       <TableCell className="text-right">{r.overtime_hours}</TableCell>
+                      <TableCell className="text-right">{r.nmr_mason}</TableCell>
+                      <TableCell className="text-right">{r.nmr_male_helpers}</TableCell>
+                      <TableCell className="text-right">{r.nmr_female_helpers}</TableCell>
+                      <TableCell className="text-right">{r.security_count}</TableCell>
                       <TableCell className="text-muted-foreground">{r.remarks || "—"}</TableCell>
                     </TableRow>
                   ))}
-                  {data.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>}
+                  {!loading && data.length === 0 && (
+                    <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
