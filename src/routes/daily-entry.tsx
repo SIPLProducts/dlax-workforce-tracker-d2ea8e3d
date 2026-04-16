@@ -257,10 +257,18 @@ function DailyEntryPage() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                        </Select>
+                        {(() => {
+                          const linked = deptCategoryMap[row.department_id];
+                          const filteredCats = linked && linked.length > 0
+                            ? categories.filter((c) => linked.includes(c.id))
+                            : categories;
+                          return (
+                            <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
+                              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                              <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell><Input type="number" min={0} value={row.headcount} onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)} className="w-20" /></TableCell>
                       <TableCell><Input type="number" min={0} step={0.5} value={row.hours_worked} onChange={(e) => updateRow(idx, "hours_worked", parseFloat(e.target.value) || 0)} className="w-20" /></TableCell>
