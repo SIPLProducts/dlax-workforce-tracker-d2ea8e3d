@@ -88,7 +88,7 @@ function LoginPage() {
 
         <div className="relative z-10">
           <div className="border-t border-white/10 pt-4">
-            <p className="text-xs text-slate-500">© 2026 KPC Infrastructure. All rights reserved.</p>
+            <p className="text-xs text-slate-500">© 2026 Sharvi Infotech Pvt Ltd. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -190,7 +190,7 @@ function LoginPage() {
         </Card>
 
         <p className="mt-6 text-xs text-muted-foreground lg:hidden">
-          © 2026 KPC Infrastructure. All rights reserved.
+© 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
         </p>
       </div>
     </div>
