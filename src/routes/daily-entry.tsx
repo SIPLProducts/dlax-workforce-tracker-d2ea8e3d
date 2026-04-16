@@ -42,6 +42,7 @@ function DailyEntryPage() {
   const [contractors, setContractors] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [deptCategoryMap, setDeptCategoryMap] = useState<Record<string, string[]>>({});
   const [rows, setRows] = useState<ManpowerRow[]>([]);
   const [saving, setSaving] = useState(false);
 
