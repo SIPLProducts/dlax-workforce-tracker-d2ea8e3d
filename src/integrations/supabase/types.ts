@@ -17,30 +17,36 @@ export type Database = {
       contractors: {
         Row: {
           company_name: string
+          contact_number: string | null
           contact_person: string | null
           created_at: string
           id: string
           license_number: string | null
           phone: string | null
           updated_at: string
+          work_place: string | null
         }
         Insert: {
           company_name: string
+          contact_number?: string | null
           contact_person?: string | null
           created_at?: string
           id?: string
           license_number?: string | null
           phone?: string | null
           updated_at?: string
+          work_place?: string | null
         }
         Update: {
           company_name?: string
+          contact_number?: string | null
           contact_person?: string | null
           created_at?: string
           id?: string
           license_number?: string | null
           phone?: string | null
           updated_at?: string
+          work_place?: string | null
         }
         Relationships: []
       }
@@ -55,9 +61,13 @@ export type Database = {
           headcount: number
           hours_worked: number | null
           id: string
+          nmr_female_helpers: number
+          nmr_male_helpers: number
+          nmr_mason: number
           overtime_hours: number | null
           project_id: string
           remarks: string | null
+          security_count: number
           updated_at: string
         }
         Insert: {
@@ -70,9 +80,13 @@ export type Database = {
           headcount?: number
           hours_worked?: number | null
           id?: string
+          nmr_female_helpers?: number
+          nmr_male_helpers?: number
+          nmr_mason?: number
           overtime_hours?: number | null
           project_id: string
           remarks?: string | null
+          security_count?: number
           updated_at?: string
         }
         Update: {
@@ -85,9 +99,13 @@ export type Database = {
           headcount?: number
           hours_worked?: number | null
           id?: string
+          nmr_female_helpers?: number
+          nmr_male_helpers?: number
+          nmr_mason?: number
           overtime_hours?: number | null
           project_id?: string
           remarks?: string | null
+          security_count?: number
           updated_at?: string
         }
         Relationships: [
@@ -171,7 +189,9 @@ export type Database = {
       }
       projects: {
         Row: {
+          code: string | null
           created_at: string
+          division: string | null
           id: string
           location: string | null
           name: string
@@ -180,7 +200,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          code?: string | null
           created_at?: string
+          division?: string | null
           id?: string
           location?: string | null
           name: string
@@ -189,7 +211,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          code?: string | null
           created_at?: string
+          division?: string | null
           id?: string
           location?: string | null
           name?: string
