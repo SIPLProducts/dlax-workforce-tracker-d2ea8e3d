@@ -109,7 +109,16 @@ function DailyEntryPage() {
   };
 
   const updateRow = (idx: number, field: keyof ManpowerRow, value: any) => {
-    setRows(rows.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+    setRows(rows.map((r, i) => {
+      if (i !== idx) return r;
+      const updated = { ...r, [field]: value };
+      // Reset category when department changes
+      if (field === "department_id" && value !== r.department_id) {
+        updated.category_id = "";
+      }
+      return updated;
+    }));
+  };
   };
 
   const copyPreviousDay = async () => {
