@@ -10,6 +10,7 @@ import {
   BarChart3,
   LogOut,
   HardHat,
+  UserCog,
 } from "lucide-react";
 import {
   Sidebar,
