@@ -119,7 +119,6 @@ function DailyEntryPage() {
       return updated;
     }));
   };
-  };
 
   const copyPreviousDay = async () => {
     const prevDate = format(subDays(date, 1), "yyyy-MM-dd");
