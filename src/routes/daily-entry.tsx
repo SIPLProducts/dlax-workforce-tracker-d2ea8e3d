@@ -42,6 +42,7 @@ function DailyEntryPage() {
   const [contractors, setContractors] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [deptCategoryMap, setDeptCategoryMap] = useState<Record<string, string[]>>({});
   const [rows, setRows] = useState<ManpowerRow[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -54,16 +55,23 @@ function DailyEntryPage() {
   }, [projectId, date]);
 
   const loadMasters = async () => {
-    const [p, c, d, cat] = await Promise.all([
+    const [p, c, d, cat, dcLinks] = await Promise.all([
       supabase.from("projects").select("*").eq("status", "Active").order("name"),
       supabase.from("contractors").select("*").order("company_name"),
       supabase.from("departments").select("*").order("name"),
       supabase.from("worker_categories").select("*").order("name"),
+      supabase.from("department_categories").select("*"),
     ]);
     setProjects(p.data || []);
     setContractors(c.data || []);
     setDepartments(d.data || []);
     setCategories(cat.data || []);
+    const map: Record<string, string[]> = {};
+    (dcLinks.data || []).forEach((link: any) => {
+      if (!map[link.department_id]) map[link.department_id] = [];
+      map[link.department_id].push(link.category_id);
+    });
+    setDeptCategoryMap(map);
   };
 
   const loadEntries = async () => {
@@ -101,7 +109,15 @@ function DailyEntryPage() {
   };
 
   const updateRow = (idx: number, field: keyof ManpowerRow, value: any) => {
-    setRows(rows.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+    setRows(rows.map((r, i) => {
+      if (i !== idx) return r;
+      const updated = { ...r, [field]: value };
+      // Reset category when department changes
+      if (field === "department_id" && value !== r.department_id) {
+        updated.category_id = "";
+      }
+      return updated;
+    }));
   };
 
   const copyPreviousDay = async () => {
@@ -249,10 +265,18 @@ function DailyEntryPage() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                        </Select>
+                        {(() => {
+                          const linked = deptCategoryMap[row.department_id];
+                          const filteredCats = linked && linked.length > 0
+                            ? categories.filter((c) => linked.includes(c.id))
+                            : categories;
+                          return (
+                            <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
+                              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                              <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell><Input type="number" min={0} value={row.headcount} onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)} className="w-20" /></TableCell>
                       <TableCell><Input type="number" min={0} step={0.5} value={row.hours_worked} onChange={(e) => updateRow(idx, "hours_worked", parseFloat(e.target.value) || 0)} className="w-20" /></TableCell>

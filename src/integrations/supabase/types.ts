@@ -139,6 +139,42 @@ export type Database = {
           },
         ]
       }
+      department_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          department_id: string
+          id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          department_id: string
+          id?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          department_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "worker_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_categories_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           created_at: string
