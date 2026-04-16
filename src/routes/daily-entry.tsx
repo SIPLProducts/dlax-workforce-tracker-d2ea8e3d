@@ -27,6 +27,10 @@ type ManpowerRow = {
   headcount: number;
   hours_worked: number;
   overtime_hours: number;
+  nmr_mason: number;
+  nmr_male_helpers: number;
+  nmr_female_helpers: number;
+  security_count: number;
   remarks: string;
 };
 
@@ -77,6 +81,10 @@ function DailyEntryPage() {
         headcount: r.headcount,
         hours_worked: Number(r.hours_worked) || 0,
         overtime_hours: Number(r.overtime_hours) || 0,
+        nmr_mason: r.nmr_mason || 0,
+        nmr_male_helpers: r.nmr_male_helpers || 0,
+        nmr_female_helpers: r.nmr_female_helpers || 0,
+        security_count: r.security_count || 0,
         remarks: r.remarks || "",
       })));
     } else {
@@ -85,7 +93,7 @@ function DailyEntryPage() {
   };
 
   const addRow = () => {
-    setRows([...rows, { contractor_id: "", department_id: "", category_id: "", headcount: 0, hours_worked: 8, overtime_hours: 0, remarks: "" }]);
+    setRows([...rows, { contractor_id: "", department_id: "", category_id: "", headcount: 0, hours_worked: 8, overtime_hours: 0, nmr_mason: 0, nmr_male_helpers: 0, nmr_female_helpers: 0, security_count: 0, remarks: "" }]);
   };
 
   const removeRow = (idx: number) => {
@@ -111,6 +119,10 @@ function DailyEntryPage() {
         headcount: r.headcount,
         hours_worked: Number(r.hours_worked) || 0,
         overtime_hours: Number(r.overtime_hours) || 0,
+        nmr_mason: r.nmr_mason || 0,
+        nmr_male_helpers: r.nmr_male_helpers || 0,
+        nmr_female_helpers: r.nmr_female_helpers || 0,
+        security_count: r.security_count || 0,
         remarks: r.remarks || "",
       })));
       toast.success("Copied from previous day");
@@ -143,6 +155,10 @@ function DailyEntryPage() {
         headcount: r.headcount,
         hours_worked: r.hours_worked,
         overtime_hours: r.overtime_hours,
+        nmr_mason: r.nmr_mason,
+        nmr_male_helpers: r.nmr_male_helpers,
+        nmr_female_helpers: r.nmr_female_helpers,
+        security_count: r.security_count,
         remarks: r.remarks || null,
         created_by: user?.id,
       }));
@@ -209,6 +225,10 @@ function DailyEntryPage() {
                     <TableHead className="w-20">Count</TableHead>
                     <TableHead className="w-20">Hours</TableHead>
                     <TableHead className="w-20">OT Hrs</TableHead>
+                    <TableHead className="w-16">NMR Mason</TableHead>
+                    <TableHead className="w-16">NMR M</TableHead>
+                    <TableHead className="w-16">NMR F</TableHead>
+                    <TableHead className="w-16">Security</TableHead>
                     <TableHead>Remarks</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
@@ -237,6 +257,10 @@ function DailyEntryPage() {
                       <TableCell><Input type="number" min={0} value={row.headcount} onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)} className="w-20" /></TableCell>
                       <TableCell><Input type="number" min={0} step={0.5} value={row.hours_worked} onChange={(e) => updateRow(idx, "hours_worked", parseFloat(e.target.value) || 0)} className="w-20" /></TableCell>
                       <TableCell><Input type="number" min={0} step={0.5} value={row.overtime_hours} onChange={(e) => updateRow(idx, "overtime_hours", parseFloat(e.target.value) || 0)} className="w-20" /></TableCell>
+                      <TableCell><Input type="number" min={0} value={row.nmr_mason} onChange={(e) => updateRow(idx, "nmr_mason", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
+                      <TableCell><Input type="number" min={0} value={row.nmr_male_helpers} onChange={(e) => updateRow(idx, "nmr_male_helpers", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
+                      <TableCell><Input type="number" min={0} value={row.nmr_female_helpers} onChange={(e) => updateRow(idx, "nmr_female_helpers", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
+                      <TableCell><Input type="number" min={0} value={row.security_count} onChange={(e) => updateRow(idx, "security_count", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
                       <TableCell><Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)} placeholder="Notes..." className="w-[150px]" /></TableCell>
                       <TableCell><Button variant="ghost" size="icon" onClick={() => removeRow(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
