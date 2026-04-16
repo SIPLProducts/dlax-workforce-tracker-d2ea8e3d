@@ -42,6 +42,10 @@ const reportItems = [
   { to: "/reports", label: "Reports", icon: BarChart3, roles: [] },
 ];
 
+const adminItems = [
+  { to: "/users", label: "User Management", icon: UserCog, roles: ["admin"] },
+];
+
 export function AppSidebar() {
   const { user, roles, signOut, hasRole } = useAuth();
   const location = useLocation();
