@@ -1,58 +1,39 @@
 
 
-# Plan: Seed DLAX with Sample Data from KPC Manpower Registers
+# Enterprise-Grade Login Page for DLAX
 
-Based on your paper registers, KPC is the **principal company** (the organization using this app), NOT a contractor. Contractors are the parties KPC hires. I will insert realistic sample data matching your sheets.
+## Design
 
-## Data to Insert
+A split-screen layout with a branded left panel and login form on the right:
 
-### Project (1)
-- **Construction of Integrated Township at BTPS, Manuguru** — Active, started 2024-01-15
+```text
+┌─────────────────────┬──────────────────────┐
+│                     │                      │
+│   DLAX BRANDING     │    Login Form        │
+│   HardHat Icon      │    Email / Password  │
+│   Tagline           │    Sign In Button    │
+│   Key Stats         │    Toggle Sign Up    │
+│   (workforce,       │    Forgot Password   │
+│    projects, etc.)  │                      │
+│                     │                      │
+│   Dark gradient     │    Light background  │
+│   background        │                      │
+└─────────────────────┴──────────────────────┘
+```
 
-### Contractors (12) — from your manpower register
-1. Aarna Engineering Constructions
-2. KAR Engineers and Contractors
-3. Jai Mata Di Constructions
-4. Mangalam Infratech
-5. Abdur Rani & Co.
-6. Pavan Kumar Gadhe
-7. Padma Constructions
-8. Sri Laxmi Constructions
-9. SRI SRI Civil Works
-10. Ravindra Reddy & Associates
-11. Prashant Al Adam Contractor
-12. S.S Engineers
+On mobile, the left panel collapses to a compact header above the form.
 
-### Departments (10) — work types from your sheet
-1. Shuttering & Civil
-2. Electrical
-3. Painting
-4. Plumbing
-5. Water Proofing & Expansion Treatment
-6. SITC Automation
-7. Steel Structural Fabrication
-8. Fire Fighting
-9. MEP
-10. Miscellaneous
+## Features
+- **Split-screen layout**: Left panel with dark gradient, brand logo, tagline, and animated stats/features; right panel with the login form
+- **Password visibility toggle** (Eye/EyeOff icon)
+- **Forgot password link** (placeholder for now)
+- **Loading spinner** on submit button
+- **Professional footer** with "Powered by KPC Infrastructure" and copyright
+- **Responsive**: stacks vertically on mobile with compact branding header
+- **Subtle animations**: fade-in on mount
 
-### Worker Categories (7) — from your Daily Labor Report columns
-1. Carpenter
-2. Fitter/Rigger
-3. Welder
-4. Helper
-5. Skilled Worker
-6. Supervisor
-7. Mason
-
-### Daily Manpower Entries (~50-60 rows)
-Entries for the last 7 days with realistic headcounts (matching the scale in your sheets — total ~400-600 workers/day across all contractors), covering various contractor + department + category combinations.
-
-## Technical Approach
-- Single database migration with INSERT statements using fixed UUIDs
-- Master data first, then daily_manpower referencing those UUIDs
-- Dashboard and reports will immediately show populated data
-
-## What Will NOT Change
-- KPC will not appear in the contractors table — it is the principal organization
-- No code changes needed — only database inserts
+## Technical Steps
+1. Rewrite `src/routes/login.tsx` with the new split-screen design
+2. Uses only existing dependencies (lucide-react icons, shadcn components, Tailwind classes)
+3. No new packages needed
 
