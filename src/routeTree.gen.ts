@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DailyEntryRouteImport } from './routes/daily-entry'
@@ -18,6 +19,11 @@ import { Route as MastersDepartmentsRouteImport } from './routes/masters.departm
 import { Route as MastersContractorsRouteImport } from './routes/masters.contractors'
 import { Route as MastersCategoriesRouteImport } from './routes/masters.categories'
 
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
+  '/users': typeof UsersRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
+  '/users': typeof UsersRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
+  '/users': typeof UsersRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/daily-entry'
     | '/login'
     | '/reports'
+    | '/users'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/daily-entry'
     | '/login'
     | '/reports'
+    | '/users'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/daily-entry'
     | '/login'
     | '/reports'
+    | '/users'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   DailyEntryRoute: typeof DailyEntryRoute
   LoginRoute: typeof LoginRoute
   ReportsRoute: typeof ReportsRoute
+  UsersRoute: typeof UsersRoute
   MastersCategoriesRoute: typeof MastersCategoriesRoute
   MastersContractorsRoute: typeof MastersContractorsRoute
   MastersDepartmentsRoute: typeof MastersDepartmentsRoute
@@ -136,6 +149,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   DailyEntryRoute: DailyEntryRoute,
   LoginRoute: LoginRoute,
   ReportsRoute: ReportsRoute,
+  UsersRoute: UsersRoute,
   MastersCategoriesRoute: MastersCategoriesRoute,
   MastersContractorsRoute: MastersContractorsRoute,
   MastersDepartmentsRoute: MastersDepartmentsRoute,

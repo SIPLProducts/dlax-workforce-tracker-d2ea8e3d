@@ -10,6 +10,7 @@ import {
   BarChart3,
   LogOut,
   HardHat,
+  UserCog,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,10 @@ const masterItems = [
 
 const reportItems = [
   { to: "/reports", label: "Reports", icon: BarChart3, roles: [] },
+];
+
+const adminItems = [
+  { to: "/users", label: "User Management", icon: UserCog, roles: ["admin"] },
 ];
 
 export function AppSidebar() {
@@ -117,6 +122,26 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {adminItems.some((i) => canSee(i.roles)) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminItems.filter((i) => canSee(i.roles)).map((item) => (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton asChild isActive={location.pathname === item.to}>
+                      <Link to={item.to as any}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4">
