@@ -100,11 +100,22 @@ function ContractorsPage() {
       .slice(0, 5);
   }, [rows, items]);
 
+  const contractorsByNature = useMemo(() => {
+    const map = new Map<string, number>();
+    items.forEach((c) => {
+      const key = (c.nature_of_work || "").trim() || "Unspecified";
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [items]);
+
   const cards = [
-    { title: "Total Workers", value: stats.totalWorkers, icon: Users, color: "text-primary" },
-    { title: "Avg Workers/Day", value: stats.avgPerDay, icon: Users, color: "text-accent" },
-    { title: "Active Contractors", value: stats.activeContractors, icon: HardHat, color: "text-chart-3" },
-    { title: "Total Entries", value: stats.totalEntries, icon: ClipboardList, color: "text-chart-4" },
+    { title: "Total Contractors", value: items.length, icon: HardHat, color: "text-primary" },
+    { title: "Nature of Work Types", value: contractorsByNature.length, icon: ClipboardList, color: "text-accent" },
+    { title: "Total Workers (period)", value: stats.totalWorkers, icon: Users, color: "text-chart-3" },
+    { title: "Avg Workers/Day", value: stats.avgPerDay, icon: Users, color: "text-chart-4" },
   ];
 
   const resetFilters = () => {
