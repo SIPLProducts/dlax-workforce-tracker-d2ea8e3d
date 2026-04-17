@@ -172,7 +172,7 @@ function DailyEntryPage() {
         <p className="text-sm text-muted-foreground">Record daily workforce data</p>
       </div>
 
-      <div className="flex flex-wrap gap-4 items-end">
+      <div className="flex flex-wrap gap-2 items-end">
         <div className="space-y-1">
           <label className="text-sm font-medium">Date</label>
           <Popover>
