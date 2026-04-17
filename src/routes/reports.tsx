@@ -297,6 +297,13 @@ function ReportsPage() {
           ))}
         </div>
 
+        {/* Breakdown boxes */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <BreakdownCard title="By Department" icon={Users} rows={byDepartment} total={stats.total} accent="text-primary" />
+          <BreakdownCard title="By Project" icon={HardHat} rows={byProject} total={stats.total} accent="text-accent" />
+          <BreakdownCard title="By Category" icon={TrendingUp} rows={byCategory} total={stats.total} accent="text-chart-3" />
+        </div>
+
         {/* Results */}
         <Card>
           <CardHeader className="pb-2">
