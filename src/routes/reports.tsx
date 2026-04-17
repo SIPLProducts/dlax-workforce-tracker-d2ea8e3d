@@ -186,14 +186,12 @@ function ReportsPage() {
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {tab !== "daily" && (
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => applyPreset("today")}>Today</Button>
-                <Button size="sm" variant="outline" onClick={() => applyPreset("7d")}>Last 7 days</Button>
-                <Button size="sm" variant="outline" onClick={() => applyPreset("30d")}>Last 30 days</Button>
-                <Button size="sm" variant="outline" onClick={() => applyPreset("mtd")}>Month to date</Button>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => applyPreset("today")}>Today</Button>
+              <Button size="sm" variant="outline" onClick={() => applyPreset("7d")}>Last 7 days</Button>
+              <Button size="sm" variant="outline" onClick={() => applyPreset("30d")}>Last 30 days</Button>
+              <Button size="sm" variant="outline" onClick={() => applyPreset("mtd")}>Month to date</Button>
+            </div>
             <div className="flex flex-wrap gap-3 items-end">
               <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
               <DatePicker value={dateTo} onChange={setDateTo} label="To" />
