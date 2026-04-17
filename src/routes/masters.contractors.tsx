@@ -44,7 +44,7 @@ function ContractorsPage() {
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "" });
+  const [form, setForm] = useState({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" });
   const [search, setSearch] = useState("");
 
   // Dashboard state
