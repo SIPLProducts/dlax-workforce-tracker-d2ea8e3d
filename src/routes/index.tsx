@@ -403,9 +403,23 @@ function DashboardContent() {
 
       {/* Leaderboards */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total} />
-        <Leaderboard title="Top Projects" icon={Briefcase} rows={topProjects} total={stats.total} />
+        <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total}
+          onSelect={(r) => setDrill({ type: "contractor", id: r.id, label: r.name })} />
+        <Leaderboard title="Top Projects" icon={Briefcase} rows={topProjects} total={stats.total}
+          onSelect={(r) => setDrill({ type: "project", id: r.id, label: r.name })} />
       </div>
+
+      <DrillDialog
+        drill={drill}
+        onClose={() => setDrill(null)}
+        rows={rows}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        projectMap={projectMap}
+        contractorMap={contractorMap}
+        departmentMap={departmentMap}
+        categoryMap={categoryMap}
+      />
 
       {/* Breakdowns */}
       <Tabs defaultValue="department">
