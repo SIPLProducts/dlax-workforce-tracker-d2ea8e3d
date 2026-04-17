@@ -110,14 +110,27 @@ function ReportsPage() {
 
   const getName = (obj: any) => obj?.name || obj?.company_name || "—";
 
+  const projectGroups = useMemo(() => {
+    const set = new Set<string>();
+    projects.forEach((p) => p.project_group && set.add(p.project_group));
+    return Array.from(set).sort();
+  }, [projects]);
+
+  const visibleProjects = useMemo(
+    () => projectGroup === "all" ? projects : projects.filter((p) => p.project_group === projectGroup),
+    [projects, projectGroup]
+  );
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return data;
+    let arr = data;
+    if (projectGroup !== "all") arr = arr.filter((r) => r.projects?.project_group === projectGroup);
+    if (!search.trim()) return arr;
     const q = search.toLowerCase();
-    return data.filter((r) =>
-      [getName(r.projects), getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
+    return arr.filter((r) =>
+      [getName(r.projects), r.projects?.code, r.projects?.project_group, getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
         .some((v) => (v || "").toString().toLowerCase().includes(q))
     );
-  }, [data, search]);
+  }, [data, search, projectGroup]);
 
   const stats = useMemo(() => {
     const total = filtered.reduce((s, r) => s + (r.headcount || 0), 0);
