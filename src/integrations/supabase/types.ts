@@ -59,15 +59,9 @@ export type Database = {
           department_id: string
           entry_date: string
           headcount: number
-          hours_worked: number | null
           id: string
-          nmr_female_helpers: number
-          nmr_male_helpers: number
-          nmr_mason: number
-          overtime_hours: number | null
           project_id: string
           remarks: string | null
-          security_count: number
           updated_at: string
         }
         Insert: {
@@ -78,15 +72,9 @@ export type Database = {
           department_id: string
           entry_date: string
           headcount?: number
-          hours_worked?: number | null
           id?: string
-          nmr_female_helpers?: number
-          nmr_male_helpers?: number
-          nmr_mason?: number
-          overtime_hours?: number | null
           project_id: string
           remarks?: string | null
-          security_count?: number
           updated_at?: string
         }
         Update: {
@@ -97,15 +85,9 @@ export type Database = {
           department_id?: string
           entry_date?: string
           headcount?: number
-          hours_worked?: number | null
           id?: string
-          nmr_female_helpers?: number
-          nmr_male_helpers?: number
-          nmr_mason?: number
-          overtime_hours?: number | null
           project_id?: string
           remarks?: string | null
-          security_count?: number
           updated_at?: string
         }
         Relationships: [
