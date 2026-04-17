@@ -20,7 +20,7 @@ function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", code: "", division: "", location: "", start_date: "", status: "Active" });
+  const [form, setForm] = useState({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" });
   const [search, setSearch] = useState("");
 
   useEffect(() => { load(); }, []);
@@ -44,14 +44,14 @@ function ProjectsPage() {
       }
       setOpen(false);
       setEditing(null);
-      setForm({ name: "", code: "", division: "", location: "", start_date: "", status: "Active" });
+      setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" });
       load();
     } catch (err: any) { toast.error(err.message); }
   };
 
   const handleEdit = (p: any) => {
     setEditing(p);
-    setForm({ name: p.name, code: p.code || "", division: p.division || "", location: p.location || "", start_date: p.start_date || "", status: p.status });
+    setForm({ name: p.name, code: p.code || "", division: p.division || "", project_group: p.project_group || "", location: p.location || "", start_date: p.start_date || "", status: p.status });
     setOpen(true);
   };
 
@@ -71,13 +71,14 @@ function ProjectsPage() {
           <h1 className="text-2xl font-bold">Projects</h1>
           <p className="text-sm text-muted-foreground">Manage project master data</p>
         </div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ name: "", code: "", division: "", location: "", start_date: "", status: "Active" }); } }}>
+        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" }); } }}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Project</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Project</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div><Label>Code</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. GENMNGR" /></div>
+              <div><Label>Project Group</Label><Input value={form.project_group} onChange={(e) => setForm({ ...form, project_group: e.target.value })} placeholder="e.g. Township, Refinery" /></div>
               <div><Label>Division</Label><Input value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} placeholder="e.g. MD(KAK)" /></div>
               <div><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
               <div><Label>Start Date</Label><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></div>
@@ -105,6 +106,7 @@ function ProjectsPage() {
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Group</TableHead>
                 <TableHead>Division</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Start Date</TableHead>
@@ -117,6 +119,7 @@ function ProjectsPage() {
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-sm">{p.code || "—"}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell>{p.project_group || "—"}</TableCell>
                   <TableCell>{p.division || "—"}</TableCell>
                   <TableCell>{p.location || "—"}</TableCell>
                   <TableCell>{p.start_date || "—"}</TableCell>
@@ -129,7 +132,7 @@ function ProjectsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No projects found</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No projects found</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>

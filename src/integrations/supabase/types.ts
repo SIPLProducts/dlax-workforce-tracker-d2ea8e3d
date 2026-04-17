@@ -216,6 +216,7 @@ export type Database = {
           id: string
           location: string | null
           name: string
+          project_group: string | null
           start_date: string | null
           status: string
           updated_at: string
@@ -227,6 +228,7 @@ export type Database = {
           id?: string
           location?: string | null
           name: string
+          project_group?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
@@ -238,6 +240,7 @@ export type Database = {
           id?: string
           location?: string | null
           name?: string
+          project_group?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
