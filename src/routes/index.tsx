@@ -107,6 +107,7 @@ function DashboardContent() {
   const [prevRows, setPrevRows] = useState<any[]>([]);
   const [todayRows, setTodayRows] = useState<any[]>([]);
   const [yesterdayRows, setYesterdayRows] = useState<any[]>([]);
+  const [drill, setDrill] = useState<{ type: "project" | "contractor"; id: string; label: string } | null>(null);
 
   // persist filters
   useEffect(() => {
