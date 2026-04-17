@@ -435,8 +435,12 @@ function ReportsPage() {
                       const avg = days ? Math.round(row.headcount / days) : 0;
                       const pct = stats.total ? Math.round((row.headcount / stats.total) * 100) : 0;
                       return (
-                        <TableRow key={row.key}>
-                          <TableCell className="font-medium">{row.label}</TableCell>
+                        <TableRow
+                          key={row.key}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setDrill({ type: tab as "project" | "contractor", key: row.key, label: row.label })}
+                        >
+                          <TableCell className="font-medium text-primary underline-offset-2 hover:underline">{row.label}</TableCell>
                           <TableCell className="text-muted-foreground text-sm">{row.sub || "—"}</TableCell>
                           <TableCell className="text-right font-semibold tabular-nums">{row.headcount}</TableCell>
                           <TableCell className="text-right tabular-nums">{days}</TableCell>
