@@ -1,0 +1,1 @@
+ALTER TABLE public.contractors ADD COLUMN nature_of_work text;
