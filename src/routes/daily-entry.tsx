@@ -192,7 +192,7 @@ function DailyEntryPage() {
           <Select value={projectId} onValueChange={setProjectId}>
             <SelectTrigger className="w-[250px]"><SelectValue placeholder="Select project" /></SelectTrigger>
             <SelectContent>
-              {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

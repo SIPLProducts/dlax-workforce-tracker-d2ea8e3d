@@ -54,6 +54,7 @@ function ReportsPage() {
   const [contractorId, setContractorId] = useState("all");
   const [departmentId, setDepartmentId] = useState("all");
   const [categoryId, setCategoryId] = useState("all");
+  const [projectGroup, setProjectGroup] = useState("all");
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -63,7 +64,7 @@ function ReportsPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId]);
+  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup]);
 
   const loadMasters = async () => {
     const [p, c, d, cat] = await Promise.all([
@@ -81,7 +82,7 @@ function ReportsPage() {
   const loadReport = async () => {
     setLoading(true);
     try {
-      let query = supabase.from("daily_manpower").select("*, projects(name), contractors(company_name), departments(name), worker_categories(name)");
+      let query = supabase.from("daily_manpower").select("*, projects(name, code, project_group), contractors(company_name), departments(name), worker_categories(name)");
 
       query = query
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
@@ -109,14 +110,27 @@ function ReportsPage() {
 
   const getName = (obj: any) => obj?.name || obj?.company_name || "—";
 
+  const projectGroups = useMemo(() => {
+    const set = new Set<string>();
+    projects.forEach((p) => p.project_group && set.add(p.project_group));
+    return Array.from(set).sort();
+  }, [projects]);
+
+  const visibleProjects = useMemo(
+    () => projectGroup === "all" ? projects : projects.filter((p) => p.project_group === projectGroup),
+    [projects, projectGroup]
+  );
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return data;
+    let arr = data;
+    if (projectGroup !== "all") arr = arr.filter((r) => r.projects?.project_group === projectGroup);
+    if (!search.trim()) return arr;
     const q = search.toLowerCase();
-    return data.filter((r) =>
-      [getName(r.projects), getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
+    return arr.filter((r) =>
+      [getName(r.projects), r.projects?.code, r.projects?.project_group, getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
         .some((v) => (v || "").toString().toLowerCase().includes(q))
     );
-  }, [data, search]);
+  }, [data, search, projectGroup]);
 
   const stats = useMemo(() => {
     const total = filtered.reduce((s, r) => s + (r.headcount || 0), 0);
@@ -135,13 +149,14 @@ function ReportsPage() {
   };
 
   const resetFilters = () => {
-    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setSearch("");
+    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setProjectGroup("all"); setSearch("");
   };
 
   const exportCsv = () => {
-    const headers = ["Date", "Project", "Contractor", "Department", "Category", "Headcount", "Remarks"];
+    const headers = ["Date", "Project Code", "Project", "Project Group", "Contractor", "Department", "Category", "Headcount", "Remarks"];
     const rows = filtered.map((r) => [
-      r.entry_date, getName(r.projects), getName(r.contractors), getName(r.departments), getName(r.worker_categories),
+      r.entry_date, r.projects?.code || "", getName(r.projects), r.projects?.project_group || "",
+      getName(r.contractors), getName(r.departments), getName(r.worker_categories),
       r.headcount, r.remarks || ""
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.map((c: any) => `"${c}"`).join(","))].join("\n");
@@ -196,12 +211,22 @@ function ReportsPage() {
               <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
               <DatePicker value={dateTo} onChange={setDateTo} label="To" />
               <div className="space-y-1">
+                <Label>Project Group</Label>
+                <Select value={projectGroup} onValueChange={(v) => { setProjectGroup(v); setProjectId("all"); }}>
+                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Groups</SelectItem>
+                    {projectGroups.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
                 <Label>Project</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    {visibleProjects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -275,7 +300,9 @@ function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead>Project</TableHead>
+                    <TableHead>Group</TableHead>
                     <TableHead>Contractor</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Category</TableHead>
@@ -285,12 +312,14 @@ function ReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {loading && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
                   )}
                   {!loading && filtered.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>{r.entry_date}</TableCell>
+                      <TableCell className="font-mono text-xs">{r.projects?.code || "—"}</TableCell>
                       <TableCell>{getName(r.projects)}</TableCell>
+                      <TableCell>{r.projects?.project_group || "—"}</TableCell>
                       <TableCell>{getName(r.contractors)}</TableCell>
                       <TableCell>{getName(r.departments)}</TableCell>
                       <TableCell>{getName(r.worker_categories)}</TableCell>
@@ -299,7 +328,7 @@ function ReportsPage() {
                     </TableRow>
                   ))}
                   {!loading && filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
