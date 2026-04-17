@@ -105,11 +105,6 @@ function ReportsPage() {
   const getName = (obj: any) => obj?.name || obj?.company_name || "—";
 
   const totalHeadcount = data.reduce((s, r) => s + (r.headcount || 0), 0);
-  const totalHours = data.reduce((s, r) => s + (Number(r.hours_worked) || 0), 0);
-  const totalNmrMason = data.reduce((s, r) => s + (r.nmr_mason || 0), 0);
-  const totalNmrMale = data.reduce((s, r) => s + (r.nmr_male_helpers || 0), 0);
-  const totalNmrFemale = data.reduce((s, r) => s + (r.nmr_female_helpers || 0), 0);
-  const totalSecurity = data.reduce((s, r) => s + (r.security_count || 0), 0);
 
   const exportCsv = () => {
     const headers = ["Date", "Project", "Contractor", "Department", "Category", "Headcount", "Remarks"];
