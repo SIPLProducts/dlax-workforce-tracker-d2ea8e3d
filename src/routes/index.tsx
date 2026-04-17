@@ -494,17 +494,17 @@ function TopList({ title, icon: Icon, data, total }: { title: string; icon: any;
 }
 
 function KpiCard({
-  title, value, icon: Icon, delta, deltaLabel, subtitle, tone = "primary",
+  title, value, icon: Icon, delta, deltaLabel, subtitle, tint,
 }: {
-  title: string; value: number; icon: any; delta?: number; deltaLabel?: string; subtitle?: string; tone?: string;
+  title: string; value: number; icon: any; delta?: number; deltaLabel?: string; subtitle?: string; tint?: string;
 }) {
   const showDelta = typeof delta === "number" && isFinite(delta) && delta !== 0;
   const positive = (delta || 0) >= 0;
   return (
-    <Card>
+    <Card className={tint}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className={`h-5 w-5 text-${tone}`} />
+        <Icon className="h-5 w-5 text-foreground/70" />
       </CardHeader>
       <CardContent>
         <p className="text-3xl font-bold">{value.toLocaleString()}</p>
