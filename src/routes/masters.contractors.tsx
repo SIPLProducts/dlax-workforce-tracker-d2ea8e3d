@@ -236,6 +236,7 @@ function ContractorsPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Dashboard Filters */}
