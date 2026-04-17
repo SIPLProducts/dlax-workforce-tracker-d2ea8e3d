@@ -119,6 +119,7 @@ function ProjectsPage() {
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-sm">{p.code || "—"}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell>{p.project_group || "—"}</TableCell>
                   <TableCell>{p.division || "—"}</TableCell>
                   <TableCell>{p.location || "—"}</TableCell>
                   <TableCell>{p.start_date || "—"}</TableCell>
