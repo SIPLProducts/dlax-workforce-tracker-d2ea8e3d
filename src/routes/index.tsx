@@ -12,13 +12,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Users, ClipboardList, HardHat, CalendarIcon, TrendingUp, TrendingDown,
   AlertTriangle, Building2, Layers, Trophy, Activity, Briefcase,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
-  Legend, PieChart, Pie, Cell, BarChart, Bar,
+  Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
 } from "recharts";
 import {
   format, subDays, eachDayOfInterval, differenceInCalendarDays,
@@ -106,6 +107,7 @@ function DashboardContent() {
   const [prevRows, setPrevRows] = useState<any[]>([]);
   const [todayRows, setTodayRows] = useState<any[]>([]);
   const [yesterdayRows, setYesterdayRows] = useState<any[]>([]);
+  const [drill, setDrill] = useState<{ type: "project" | "contractor"; id: string; label: string } | null>(null);
 
   // persist filters
   useEffect(() => {
@@ -402,9 +404,23 @@ function DashboardContent() {
 
       {/* Leaderboards */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total} />
-        <Leaderboard title="Top Projects" icon={Briefcase} rows={topProjects} total={stats.total} />
+        <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total}
+          onSelect={(r) => setDrill({ type: "contractor", id: r.id, label: r.name })} />
+        <Leaderboard title="Top Projects" icon={Briefcase} rows={topProjects} total={stats.total}
+          onSelect={(r) => setDrill({ type: "project", id: r.id, label: r.name })} />
       </div>
+
+      <DrillDialog
+        drill={drill}
+        onClose={() => setDrill(null)}
+        rows={rows}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        projectMap={projectMap}
+        contractorMap={contractorMap}
+        departmentMap={departmentMap}
+        categoryMap={categoryMap}
+      />
 
       {/* Breakdowns */}
       <Tabs defaultValue="department">
@@ -451,7 +467,7 @@ function KpiCard({
   );
 }
 
-function Leaderboard({ title, icon: Icon, rows, total }: { title: string; icon: any; rows: { id: string; name: string; total: number }[]; total: number }) {
+function Leaderboard({ title, icon: Icon, rows, total, onSelect }: { title: string; icon: any; rows: { id: string; name: string; total: number }[]; total: number; onSelect?: (r: { id: string; name: string; total: number }) => void }) {
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-2 pb-3">
@@ -466,7 +482,12 @@ function Leaderboard({ title, icon: Icon, rows, total }: { title: string; icon: 
             {rows.map((r, i) => {
               const pct = total ? (r.total / total) * 100 : 0;
               return (
-                <div key={r.id}>
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => onSelect?.(r)}
+                  className="w-full text-left rounded-md p-1.5 -m-1.5 hover:bg-muted/50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                >
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="flex items-center gap-2 truncate">
                       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-semibold">{i + 1}</span>
@@ -479,13 +500,125 @@ function Leaderboard({ title, icon: Icon, rows, total }: { title: string; icon: 
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function DrillDialog({
+  drill, onClose, rows, dateFrom, dateTo,
+  projectMap, contractorMap, departmentMap, categoryMap,
+}: {
+  drill: { type: "project" | "contractor"; id: string; label: string } | null;
+  onClose: () => void;
+  rows: any[];
+  dateFrom: Date;
+  dateTo: Date;
+  projectMap: Map<string, any>;
+  contractorMap: Map<string, any>;
+  departmentMap: Map<string, any>;
+  categoryMap: Map<string, any>;
+}) {
+  const filtered = useMemo(() => {
+    if (!drill) return [];
+    const key = drill.type === "project" ? "project_id" : "contractor_id";
+    return rows.filter((r) => r[key] === drill.id);
+  }, [drill, rows]);
+
+  const total = filtered.reduce((s, r) => s + (r.headcount || 0), 0);
+
+  const trend = useMemo(() => {
+    if (!drill) return [];
+    const days = eachDayOfInterval({ start: dateFrom, end: dateTo });
+    return days.map((d) => {
+      const k = format(d, "yyyy-MM-dd");
+      return {
+        date: format(d, "dd MMM"),
+        workers: filtered.filter((r) => r.entry_date === k).reduce((s, r) => s + (r.headcount || 0), 0),
+      };
+    });
+  }, [filtered, drill, dateFrom, dateTo]);
+
+  const peak = trend.reduce((m, p) => Math.max(m, p.workers), 0);
+
+  const sorted = useMemo(() =>
+    [...filtered].sort((a, b) => b.entry_date.localeCompare(a.entry_date)),
+    [filtered]
+  );
+
+  return (
+    <Dialog open={!!drill} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {drill?.type === "project" ? <Briefcase className="h-5 w-5" /> : <HardHat className="h-5 w-5" />}
+            {drill?.label}
+          </DialogTitle>
+          <DialogDescription>
+            {format(dateFrom, "dd MMM yyyy")} – {format(dateTo, "dd MMM yyyy")} · {filtered.length} entries · {total.toLocaleString()} workers · peak {peak.toLocaleString()}/day
+          </DialogDescription>
+        </DialogHeader>
+
+        {filtered.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">No entries in this period.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trend}>
+                  <defs>
+                    <linearGradient id="drillFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="oklch(0.55 0.18 250)" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="oklch(0.55 0.18 250)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="date" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <RTooltip />
+                  <Area type="monotone" dataKey="workers" stroke="oklch(0.55 0.18 250)" strokeWidth={2} fill="url(#drillFill)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="border rounded-md max-h-[340px] overflow-y-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background">
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>{drill?.type === "project" ? "Contractor" : "Project"}</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Workers</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sorted.map((r) => {
+                    const other = drill?.type === "project"
+                      ? contractorMap.get(r.contractor_id)?.company_name
+                      : (() => { const p = projectMap.get(r.project_id); return p ? [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ") : "—"; })();
+                    return (
+                      <TableRow key={r.id ?? `${r.entry_date}-${r.contractor_id}-${r.department_id}-${r.category_id}`}>
+                        <TableCell className="font-mono text-xs">{format(new Date(r.entry_date), "dd MMM yyyy")}</TableCell>
+                        <TableCell className="font-medium">{other || "—"}</TableCell>
+                        <TableCell>{departmentMap.get(r.department_id)?.name || "—"}</TableCell>
+                        <TableCell>{categoryMap.get(r.category_id)?.name || "—"}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{(r.headcount || 0).toLocaleString()}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
