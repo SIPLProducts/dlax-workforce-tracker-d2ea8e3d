@@ -521,9 +521,9 @@ function KpiCard({
   );
 }
 
-function Leaderboard({ title, icon: Icon, rows, total, onSelect }: { title: string; icon: any; rows: { id: string; name: string; total: number }[]; total: number; onSelect?: (r: { id: string; name: string; total: number }) => void }) {
+function Leaderboard({ title, icon: Icon, rows, total, onSelect, tint }: { title: string; icon: any; rows: { id: string; name: string; total: number }[]; total: number; onSelect?: (r: { id: string; name: string; total: number }) => void; tint?: string }) {
   return (
-    <Card>
+    <Card className={tint}>
       <CardHeader className="flex-row items-center gap-2 pb-3">
         <Trophy className="h-4 w-4 text-amber-500" />
         <CardTitle className="text-base flex items-center gap-2"><Icon className="h-4 w-4" />{title}</CardTitle>
