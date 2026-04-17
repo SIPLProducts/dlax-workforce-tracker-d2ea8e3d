@@ -53,6 +53,30 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_roles: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_manpower: {
         Row: {
           category_id: string
@@ -247,6 +271,70 @@ export type Database = {
         }
         Relationships: []
       }
+      role_screen_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          permission: Database["public"]["Enums"]["permission_level"]
+          role_id: string
+          screen_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          permission?: Database["public"]["Enums"]["permission_level"]
+          role_id: string
+          screen_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          permission?: Database["public"]["Enums"]["permission_level"]
+          role_id?: string
+          screen_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_screen_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_custom_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_custom_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -368,6 +456,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_screen_permission: {
+        Args: { _screen_key: string; _user_id: string }
+        Returns: Database["public"]["Enums"]["permission_level"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -378,6 +470,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "supervisor" | "manager"
+      permission_level: "none" | "view" | "edit"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -506,6 +599,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "supervisor", "manager"],
+      permission_level: ["none", "view", "edit"],
     },
   },
 } as const
