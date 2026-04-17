@@ -45,6 +45,36 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
   );
 }
 
+function BreakdownCard({ title, icon: Icon, rows, total, accent }: { title: string; icon: any; rows: [string, number][]; total: number; accent: string }) {
+  const top = rows.slice(0, 6);
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className={`h-5 w-5 ${accent}`} />
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {top.length === 0 && <p className="text-sm text-muted-foreground">No data</p>}
+        {top.map(([label, count]) => {
+          const pct = total ? Math.round((count / total) * 100) : 0;
+          return (
+            <div key={label} className="space-y-1">
+              <div className="flex items-center justify-between text-sm gap-2">
+                <span className="truncate" title={label}>{label}</span>
+                <span className="font-semibold tabular-nums shrink-0">{count} <span className="text-muted-foreground font-normal">({pct}%)</span></span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className={`h-full bg-current ${accent}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })}
+        {rows.length > 6 && <p className="text-xs text-muted-foreground pt-1">+{rows.length - 6} more</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
   
@@ -139,6 +169,19 @@ function ReportsPage() {
     const avg = days ? Math.round(total / days) : 0;
     return { total, days, conts, avg };
   }, [filtered]);
+
+  const groupBy = (keyFn: (r: any) => string) => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => {
+      const k = keyFn(r) || "—";
+      map.set(k, (map.get(k) || 0) + (r.headcount || 0));
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  };
+
+  const byDepartment = useMemo(() => groupBy((r) => getName(r.departments)), [filtered]);
+  const byProject = useMemo(() => groupBy((r) => r.projects?.code ? `[${r.projects.code}] ${getName(r.projects)}` : getName(r.projects)), [filtered]);
+  const byCategory = useMemo(() => groupBy((r) => getName(r.worker_categories)), [filtered]);
 
   const applyPreset = (preset: string) => {
     const today = new Date();
@@ -282,6 +325,13 @@ function ReportsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Breakdown boxes */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <BreakdownCard title="By Department" icon={Users} rows={byDepartment} total={stats.total} accent="text-primary" />
+          <BreakdownCard title="By Project" icon={HardHat} rows={byProject} total={stats.total} accent="text-accent" />
+          <BreakdownCard title="By Category" icon={TrendingUp} rows={byCategory} total={stats.total} accent="text-chart-3" />
         </div>
 
         {/* Results */}
