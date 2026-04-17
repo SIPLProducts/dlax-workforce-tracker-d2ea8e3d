@@ -1,19 +1,44 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Pencil, Trash2, CalendarIcon, Users, HardHat, ClipboardList } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { format, subDays, eachDayOfInterval } from "date-fns";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/contractors")({
   component: () => <AuthGuard><ContractorsPage /></AuthGuard>,
 });
+
+function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) {
+  return (
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className={cn("w-[170px] justify-start text-left font-normal")}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {format(value, "dd MMM yyyy")}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar mode="single" selected={value} onSelect={(d) => d && onChange(d)} className="p-3 pointer-events-auto" />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 function ContractorsPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -22,11 +47,70 @@ function ContractorsPage() {
   const [form, setForm] = useState({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "" });
   const [search, setSearch] = useState("");
 
+  // Dashboard state
+  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 29));
+  const [dateTo, setDateTo] = useState<Date>(new Date());
+  const [contractorId, setContractorId] = useState("all");
+  const [rows, setRows] = useState<any[]>([]);
+
   useEffect(() => { load(); }, []);
+  useEffect(() => { loadManpower(); }, [dateFrom, dateTo, contractorId]);
 
   const load = async () => {
     const { data } = await supabase.from("contractors").select("*").order("company_name");
     setItems(data || []);
+  };
+
+  const loadManpower = async () => {
+    let q = supabase
+      .from("daily_manpower")
+      .select("entry_date, headcount, contractor_id")
+      .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+      .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
+    if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
+    const { data } = await q;
+    setRows(data || []);
+  };
+
+  const stats = useMemo(() => {
+    const totalWorkers = rows.reduce((s, r) => s + (r.headcount || 0), 0);
+    const uniqueContractors = new Set(rows.map((r) => r.contractor_id)).size;
+    const uniqueDays = new Set(rows.map((r) => r.entry_date)).size;
+    const avgPerDay = uniqueDays ? Math.round(totalWorkers / uniqueDays) : 0;
+    return { totalWorkers, activeContractors: uniqueContractors, avgPerDay, totalEntries: rows.length };
+  }, [rows]);
+
+  const chartData = useMemo(() => {
+    const days = eachDayOfInterval({ start: dateFrom, end: dateTo });
+    return days.map((d) => {
+      const key = format(d, "yyyy-MM-dd");
+      return {
+        date: format(d, "dd MMM"),
+        workers: rows.filter((r) => r.entry_date === key).reduce((s, r) => s + (r.headcount || 0), 0),
+      };
+    });
+  }, [rows, dateFrom, dateTo]);
+
+  const topContractors = useMemo(() => {
+    const map = new Map<string, number>();
+    rows.forEach((r) => map.set(r.contractor_id, (map.get(r.contractor_id) || 0) + (r.headcount || 0)));
+    return Array.from(map.entries())
+      .map(([id, total]) => ({ name: items.find((c) => c.id === id)?.company_name || "—", total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  }, [rows, items]);
+
+  const cards = [
+    { title: "Total Workers", value: stats.totalWorkers, icon: Users, color: "text-primary" },
+    { title: "Avg Workers/Day", value: stats.avgPerDay, icon: Users, color: "text-accent" },
+    { title: "Active Contractors", value: stats.activeContractors, icon: HardHat, color: "text-chart-3" },
+    { title: "Total Entries", value: stats.totalEntries, icon: ClipboardList, color: "text-chart-4" },
+  ];
+
+  const resetFilters = () => {
+    setDateFrom(subDays(new Date(), 29));
+    setDateTo(new Date());
+    setContractorId("all");
   };
 
   const handleSave = async () => {
@@ -51,7 +135,7 @@ function ContractorsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Contractors</h1><p className="text-sm text-muted-foreground">Manage contractor master data</p></div>
+        <div><h1 className="text-2xl font-bold">Contractors</h1><p className="text-sm text-muted-foreground">Manage contractors and view workforce overview</p></div>
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "" }); } }}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
           <DialogContent>
@@ -68,6 +152,80 @@ function ContractorsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Dashboard Filters */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 items-end">
+            <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
+            <DatePicker value={dateTo} onChange={setDateTo} label="To" />
+            <div className="space-y-1">
+              <Label>Contractor</Label>
+              <Select value={contractorId} onValueChange={setContractorId}>
+                <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Contractors</SelectItem>
+                  {items.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" onClick={resetFilters}>Reset</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((c) => (
+          <Card key={c.title}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{c.title}</CardTitle>
+              <c.icon className={`h-5 w-5 ${c.color}`} />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{c.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Worker Trend</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="date" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip />
+                  <Bar dataKey="workers" fill="oklch(0.45 0.18 250)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Top Contractors</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topContractors} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis type="number" className="text-xs" />
+                  <YAxis type="category" dataKey="name" width={120} className="text-xs" />
+                  <Tooltip />
+                  <Bar dataKey="total" fill="oklch(0.65 0.18 160)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Contractors List */}
       <Input placeholder="Search contractors..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       <Card><CardContent className="p-0">
         <Table>
