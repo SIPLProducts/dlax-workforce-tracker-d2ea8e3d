@@ -195,14 +195,8 @@ function ReportsPage() {
               </div>
             )}
             <div className="flex flex-wrap gap-3 items-end">
-              {tab === "daily" ? (
-                <DatePicker value={date} onChange={setDate} label="Date" />
-              ) : (
-                <>
-                  <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
-                  <DatePicker value={dateTo} onChange={setDateTo} label="To" />
-                </>
-              )}
+              <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
+              <DatePicker value={dateTo} onChange={setDateTo} label="To" />
               <div className="space-y-1">
                 <Label>Project</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
