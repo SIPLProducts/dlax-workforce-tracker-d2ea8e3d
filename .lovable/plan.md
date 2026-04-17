@@ -1,30 +1,37 @@
 
+User wants the pre-sales PPT branded with **Sharvi Infotech Pvt Ltd** and marked **Confidential**. I'll fold this into the existing pre-sales deck plan.
 
-# Import Excel Data into Daily Manpower Table
+## Plan: DLAX Pre-Sales Deck — Sharvi Branded & Confidential
 
-## What
-Parse the uploaded Excel file (GENMNGR-Daily_Labour_Report_new-2.xlsx), extract date-wise manpower data per contractor/department/category, and insert it into the `daily_manpower` table. This will populate the Reports page with real data.
+**Format**: Downloadable `.pptx`, generated via `pptxgenjs`, saved to `/mnt/documents/DLAX_PreSales_Deck.pptx`.
 
-## Approach
+**Branding additions**:
+- **Cover slide**: "Prepared by Sharvi Infotech Pvt Ltd" line under DLAX title; small "CONFIDENTIAL" tag top-right corner.
+- **Master footer on every content slide**: left = "© 2026 Sharvi Infotech Pvt Ltd"; center = "DLAX — Pre-Sales Deck"; right = "CONFIDENTIAL · Page X".
+- **Diagonal "CONFIDENTIAL" watermark** (light grey, ~15% opacity, rotated -30°) behind content on every slide.
+- **Closing slide**: Sharvi Infotech contact block + reaffirmed confidentiality notice ("This document contains proprietary information of Sharvi Infotech Pvt Ltd. Not for redistribution.").
 
-1. **Read the Excel file** with pandas to understand its structure (sheets, columns, date-wise layout)
-2. **Map Excel data to master tables** — match contractor names, department names, and worker categories to their UUIDs in the database. Create any missing departments if needed (departments table is currently empty).
-3. **Transform rows** into `daily_manpower` insert format: `entry_date`, `project_id`, `contractor_id`, `department_id`, `category_id`, `headcount`, `hours_worked`, `overtime_hours`, `nmr_mason`, `nmr_male_helpers`, `nmr_female_helpers`, `security_count`, `remarks`
-4. **Insert data** into `daily_manpower` using the database insert tool
+**Theme**: Midnight Executive — navy `#1E2761`, ice blue `#CADCFC`, safety-orange accent `#F59E0B`. Georgia headers, Calibri body.
 
-## Steps
+**Slide outline (~15 slides)**:
+1. Cover — DLAX hardhat icon, tagline, "Prepared by Sharvi Infotech Pvt Ltd", CONFIDENTIAL tag
+2. Confidentiality & Disclaimer notice (full slide)
+3. The Problem — paper registers, missing data, billing disputes
+4. Introducing DLAX — Capture · Track · Report
+5. Who It's For — KPC-style principals, EPC contractors, PMs, supervisors
+6. Key Capabilities — 6-tile grid
+7. Live Dashboard *(screenshot)*
+8. Daily Entry Workflow *(screenshot)*
+9. Master Data Management *(screenshot)*
+10. Reports & Drill-Down *(screenshot)*
+11. Role-Based Security — Admin / Supervisor / Manager + RLS
+12. Tech & Deployment — Cloud, mobile-responsive, secure
+13. Business Value — 80% faster reporting · 100% audit trail · Zero paper
+14. Implementation & Onboarding — 4-step timeline
+15. Contact / CTA — Sharvi Infotech contact block + confidentiality reaffirmation
 
-1. **Copy and inspect Excel** — read all sheets with pandas to understand the exact column layout and date structure
-2. **Create missing departments** — if the Excel references departments not yet in the DB, create them via migration or insert
-3. **Build a Python script** to:
-   - Parse each sheet/row
-   - Fuzzy-match contractor and category names to existing DB records
-   - Generate SQL INSERT statements
-4. **Execute inserts** using the database insert tool
-5. **Verify** by querying `daily_manpower` count and checking the Reports page
+**Screenshots**: Capture Dashboard, Daily Entry, Masters/Projects, Reports from preview URL via browser tools. Fallback to icon-only design if auth blocks capture.
 
-## Notes
-- The project has only one project in the DB ("Construction of Integrated Township at BTPS, Manuguru") — all data will be linked to it
-- Departments table is empty — will need to create departments from the Excel data first
-- Worker categories exist (Electrician, Fitter/Rigger, Helper, etc.) — will map from Excel
+**QA**: Convert each slide to image, inspect for overflow/overlap/contrast issues, fix and re-render until clean.
 
+**Deliverable**: `<lov-artifact>` tag pointing to `/mnt/documents/DLAX_PreSales_Deck.pptx`.
