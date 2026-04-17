@@ -44,7 +44,7 @@ function ProjectsPage() {
       }
       setOpen(false);
       setEditing(null);
-      setForm({ name: "", code: "", division: "", location: "", start_date: "", status: "Active" });
+      setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" });
       load();
     } catch (err: any) { toast.error(err.message); }
   };
