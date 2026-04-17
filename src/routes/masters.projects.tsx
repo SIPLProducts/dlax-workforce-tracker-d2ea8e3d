@@ -17,6 +17,29 @@ export const Route = createFileRoute("/masters/projects")({
   component: () => <AuthGuard><ProjectsPage /></AuthGuard>,
 });
 
+const TONE: Record<string, string> = {
+  primary: "bg-primary/10 text-primary",
+  accent: "bg-accent/20 text-accent",
+  muted: "bg-muted text-muted-foreground",
+  chart3: "bg-chart-3/20 text-chart-3",
+};
+
+function StatBox({ icon: Icon, label, value, tone }: { icon: any; label: string; value: number; tone: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${TONE[tone]}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-xl font-bold">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const TEMPLATE_HEADERS = ["name", "code", "project_group", "division", "location", "start_date", "status"];
 
 function ProjectsPage() {
