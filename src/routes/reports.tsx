@@ -45,6 +45,36 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
   );
 }
 
+function BreakdownCard({ title, icon: Icon, rows, total, accent }: { title: string; icon: any; rows: [string, number][]; total: number; accent: string }) {
+  const top = rows.slice(0, 6);
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className={`h-5 w-5 ${accent}`} />
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {top.length === 0 && <p className="text-sm text-muted-foreground">No data</p>}
+        {top.map(([label, count]) => {
+          const pct = total ? Math.round((count / total) * 100) : 0;
+          return (
+            <div key={label} className="space-y-1">
+              <div className="flex items-center justify-between text-sm gap-2">
+                <span className="truncate" title={label}>{label}</span>
+                <span className="font-semibold tabular-nums shrink-0">{count} <span className="text-muted-foreground font-normal">({pct}%)</span></span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className={`h-full bg-current ${accent}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })}
+        {rows.length > 6 && <p className="text-xs text-muted-foreground pt-1">+{rows.length - 6} more</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
   
