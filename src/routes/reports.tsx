@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CalendarIcon, Download, Users, CalendarDays, HardHat, TrendingUp } from "lucide-react";
 import { format, subDays, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,7 @@ function ReportsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [drill, setDrill] = useState<{ type: "project" | "contractor"; key: string; label: string } | null>(null);
 
   useEffect(() => { loadMasters(); }, []);
   useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup]);
@@ -433,8 +435,12 @@ function ReportsPage() {
                       const avg = days ? Math.round(row.headcount / days) : 0;
                       const pct = stats.total ? Math.round((row.headcount / stats.total) * 100) : 0;
                       return (
-                        <TableRow key={row.key}>
-                          <TableCell className="font-medium">{row.label}</TableCell>
+                        <TableRow
+                          key={row.key}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setDrill({ type: tab as "project" | "contractor", key: row.key, label: row.label })}
+                        >
+                          <TableCell className="font-medium text-primary underline-offset-2 hover:underline">{row.label}</TableCell>
                           <TableCell className="text-muted-foreground text-sm">{row.sub || "—"}</TableCell>
                           <TableCell className="text-right font-semibold tabular-nums">{row.headcount}</TableCell>
                           <TableCell className="text-right tabular-nums">{days}</TableCell>
@@ -454,6 +460,56 @@ function ReportsPage() {
           </CardContent>
         </Card>
       </Tabs>
+
+      <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {drill?.type === "project" ? "Project" : "Contractor"} Detail — {drill?.label}
+            </DialogTitle>
+          </DialogHeader>
+          {drill && (() => {
+            const rows = filtered.filter((r) =>
+              drill.type === "project" ? r.project_id === drill.key : r.contractor_id === drill.key
+            );
+            const total = rows.reduce((s, r) => s + (r.headcount || 0), 0);
+            return (
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  {rows.length} entries · <strong className="text-foreground">{total}</strong> total workers
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      {drill.type === "project" ? <TableHead>Contractor</TableHead> : <TableHead>Project</TableHead>}
+                      <TableHead>Department</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Count</TableHead>
+                      <TableHead>Remarks</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{r.entry_date}</TableCell>
+                        <TableCell>{drill.type === "project" ? getName(r.contractors) : getName(r.projects)}</TableCell>
+                        <TableCell>{getName(r.departments)}</TableCell>
+                        <TableCell>{getName(r.worker_categories)}</TableCell>
+                        <TableCell className="text-right font-medium">{r.headcount}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.remarks || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                    {rows.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
