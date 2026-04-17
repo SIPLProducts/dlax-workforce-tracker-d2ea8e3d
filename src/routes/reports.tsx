@@ -181,7 +181,35 @@ function ReportsPage() {
 
   const byDepartment = useMemo(() => groupBy((r) => getName(r.departments)), [filtered]);
   const byProject = useMemo(() => groupBy((r) => r.projects?.code ? `[${r.projects.code}] ${getName(r.projects)}` : getName(r.projects)), [filtered]);
+  const byContractor = useMemo(() => groupBy((r) => getName(r.contractors)), [filtered]);
   const byCategory = useMemo(() => groupBy((r) => getName(r.worker_categories)), [filtered]);
+
+  // Aggregated rows for Project-wise / Contractor-wise tabs
+  type AggRow = { key: string; label: string; sub?: string; headcount: number; days: Set<string>; entries: number };
+  const aggregate = (keyFn: (r: any) => { key: string; label: string; sub?: string }) => {
+    const map = new Map<string, AggRow>();
+    filtered.forEach((r) => {
+      const { key, label, sub } = keyFn(r);
+      if (!map.has(key)) map.set(key, { key, label, sub, headcount: 0, days: new Set(), entries: 0 });
+      const row = map.get(key)!;
+      row.headcount += r.headcount || 0;
+      row.days.add(r.entry_date);
+      row.entries += 1;
+    });
+    return Array.from(map.values()).sort((a, b) => b.headcount - a.headcount);
+  };
+
+  const projectAgg = useMemo(() => aggregate((r) => ({
+    key: r.project_id || "—",
+    label: getName(r.projects),
+    sub: r.projects?.code || r.projects?.project_group || "",
+  })), [filtered]);
+
+  const contractorAgg = useMemo(() => aggregate((r) => ({
+    key: r.contractor_id || "—",
+    label: getName(r.contractors),
+    sub: r.contractors?.nature_of_work || "",
+  })), [filtered]);
 
   const applyPreset = (preset: string) => {
     const today = new Date();
