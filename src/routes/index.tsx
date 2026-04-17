@@ -68,7 +68,7 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
   );
 }
 
-const FILTER_KEY = "dlax.dashboard.filters.v1";
+const FILTER_KEY = "dlax.dashboard.filters.v2";
 
 type SavedFilters = {
   rangeDays: number;
