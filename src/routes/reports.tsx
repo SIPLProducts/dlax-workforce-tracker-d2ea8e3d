@@ -474,11 +474,39 @@ function ReportsPage() {
               drill.type === "project" ? r.project_id === drill.key : r.contractor_id === drill.key
             );
             const total = rows.reduce((s, r) => s + (r.headcount || 0), 0);
+            const trendMap = new Map<string, number>();
+            rows.forEach((r) => trendMap.set(r.entry_date, (trendMap.get(r.entry_date) || 0) + (r.headcount || 0)));
+            const trend = Array.from(trendMap.entries())
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
+            const peak = trend.reduce((m, p) => Math.max(m, p.count), 0);
             return (
               <div className="space-y-3">
                 <div className="text-sm text-muted-foreground">
-                  {rows.length} entries · <strong className="text-foreground">{total}</strong> total workers
+                  {rows.length} entries · <strong className="text-foreground">{total}</strong> total workers · Peak day: <strong className="text-foreground">{peak}</strong>
                 </div>
+                {trend.length > 0 && (
+                  <div className="h-48 w-full rounded-md border bg-muted/20 p-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trend} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={32} />
+                        <RTooltip
+                          contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 12 }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                        />
+                        <Area type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#trendFill)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow>
