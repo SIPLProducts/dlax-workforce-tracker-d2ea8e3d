@@ -141,3 +141,40 @@
     color: var(--color-foreground);
   }
 }
+
+@layer utilities {
+  /* Tinted stat / KPI cards — subtle gradient + colored left border */
+  .stat-tint-blue {
+    background-image: linear-gradient(135deg, oklch(0.96 0.04 250) 0%, oklch(0.99 0.01 250) 100%);
+    border-left: 4px solid oklch(0.55 0.18 250);
+  }
+  .stat-tint-green {
+    background-image: linear-gradient(135deg, oklch(0.95 0.06 150) 0%, oklch(0.99 0.01 150) 100%);
+    border-left: 4px solid oklch(0.6 0.18 150);
+  }
+  .stat-tint-amber {
+    background-image: linear-gradient(135deg, oklch(0.96 0.07 85) 0%, oklch(0.99 0.01 85) 100%);
+    border-left: 4px solid oklch(0.7 0.17 75);
+  }
+  .stat-tint-purple {
+    background-image: linear-gradient(135deg, oklch(0.95 0.05 310) 0%, oklch(0.99 0.01 310) 100%);
+    border-left: 4px solid oklch(0.6 0.18 310);
+  }
+  .stat-tint-rose {
+    background-image: linear-gradient(135deg, oklch(0.95 0.05 20) 0%, oklch(0.99 0.01 20) 100%);
+    border-left: 4px solid oklch(0.62 0.2 20);
+  }
+  .stat-tint-teal {
+    background-image: linear-gradient(135deg, oklch(0.95 0.05 195) 0%, oklch(0.99 0.01 195) 100%);
+    border-left: 4px solid oklch(0.6 0.13 195);
+  }
+
+  .dark .stat-tint-blue,
+  .dark .stat-tint-green,
+  .dark .stat-tint-amber,
+  .dark .stat-tint-purple,
+  .dark .stat-tint-rose,
+  .dark .stat-tint-teal {
+    background-image: linear-gradient(135deg, oklch(0.25 0.04 265) 0%, oklch(0.21 0.04 265) 100%);
+  }
+}

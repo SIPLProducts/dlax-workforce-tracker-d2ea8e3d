@@ -345,30 +345,32 @@ function DashboardContent() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Workers Today" value={stats.todayTotal} icon={Activity}
-          delta={stats.dayChangePct} deltaLabel="vs yesterday" tone="primary"
+          delta={stats.dayChangePct} deltaLabel="vs yesterday" tint="stat-tint-blue"
         />
         <KpiCard
           title="Period Total" value={stats.total} icon={Users}
-          delta={stats.periodChangePct} deltaLabel="vs prev period" tone="accent"
+          delta={stats.periodChangePct} deltaLabel="vs prev period" tint="stat-tint-green"
         />
         <KpiCard
-          title="Avg Workers/Day" value={stats.avgPerDay} icon={TrendingUp} tone="chart-3"
+          title="Avg Workers/Day" value={stats.avgPerDay} icon={TrendingUp} tint="stat-tint-amber"
         />
         <KpiCard
           title="Active Projects" value={stats.activeProjects} icon={Briefcase}
-          subtitle={`${stats.activeContractors} contractors • ${stats.entries} entries`} tone="chart-4"
+          subtitle={`${stats.activeContractors} contractors • ${stats.entries} entries`} tint="stat-tint-purple"
         />
       </div>
 
       {/* Top summaries — directly after KPI boxes */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total}
+          tint="stat-tint-blue"
           onSelect={(r) => setDrill({ type: "contractor", id: r.id, label: r.name })} />
-        <TopList title="Top Departments" icon={Layers} data={deptBreakdown.slice(0, 5)} total={stats.total} />
-        <TopList title="Top Categories" icon={ClipboardList} data={categoryBreakdown.slice(0, 5)} total={stats.total} />
-        <TopList title="Top Project Groups" icon={Building2} data={groupRollup.slice(0, 5)} total={stats.total} />
-        <TopList title="Top Divisions" icon={Building2} data={divisionRollup.slice(0, 5)} total={stats.total} />
+        <TopList title="Top Departments" icon={Layers} data={deptBreakdown.slice(0, 5)} total={stats.total} tint="stat-tint-green" />
+        <TopList title="Top Categories" icon={ClipboardList} data={categoryBreakdown.slice(0, 5)} total={stats.total} tint="stat-tint-amber" />
+        <TopList title="Top Project Groups" icon={Building2} data={groupRollup.slice(0, 5)} total={stats.total} tint="stat-tint-purple" />
+        <TopList title="Top Divisions" icon={Building2} data={divisionRollup.slice(0, 5)} total={stats.total} tint="stat-tint-teal" />
         <Leaderboard title="Top Projects" icon={Briefcase} rows={topProjects} total={stats.total}
+          tint="stat-tint-rose"
           onSelect={(r) => setDrill({ type: "project", id: r.id, label: r.name })} />
       </div>
 
@@ -453,9 +455,9 @@ function DashboardContent() {
   );
 }
 
-function TopList({ title, icon: Icon, data, total }: { title: string; icon: any; data: { name: string; value: number }[]; total: number }) {
+function TopList({ title, icon: Icon, data, total, tint }: { title: string; icon: any; data: { name: string; value: number }[]; total: number; tint?: string }) {
   return (
-    <Card>
+    <Card className={tint}>
       <CardHeader className="flex-row items-center gap-2 pb-3">
         <Trophy className="h-4 w-4 text-amber-500" />
         <CardTitle className="text-base flex items-center gap-2"><Icon className="h-4 w-4" />{title}</CardTitle>
@@ -492,17 +494,17 @@ function TopList({ title, icon: Icon, data, total }: { title: string; icon: any;
 }
 
 function KpiCard({
-  title, value, icon: Icon, delta, deltaLabel, subtitle, tone = "primary",
+  title, value, icon: Icon, delta, deltaLabel, subtitle, tint,
 }: {
-  title: string; value: number; icon: any; delta?: number; deltaLabel?: string; subtitle?: string; tone?: string;
+  title: string; value: number; icon: any; delta?: number; deltaLabel?: string; subtitle?: string; tint?: string;
 }) {
   const showDelta = typeof delta === "number" && isFinite(delta) && delta !== 0;
   const positive = (delta || 0) >= 0;
   return (
-    <Card>
+    <Card className={tint}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className={`h-5 w-5 text-${tone}`} />
+        <Icon className="h-5 w-5 text-foreground/70" />
       </CardHeader>
       <CardContent>
         <p className="text-3xl font-bold">{value.toLocaleString()}</p>
@@ -519,9 +521,9 @@ function KpiCard({
   );
 }
 
-function Leaderboard({ title, icon: Icon, rows, total, onSelect }: { title: string; icon: any; rows: { id: string; name: string; total: number }[]; total: number; onSelect?: (r: { id: string; name: string; total: number }) => void }) {
+function Leaderboard({ title, icon: Icon, rows, total, onSelect, tint }: { title: string; icon: any; rows: { id: string; name: string; total: number }[]; total: number; onSelect?: (r: { id: string; name: string; total: number }) => void; tint?: string }) {
   return (
-    <Card>
+    <Card className={tint}>
       <CardHeader className="flex-row items-center gap-2 pb-3">
         <Trophy className="h-4 w-4 text-amber-500" />
         <CardTitle className="text-base flex items-center gap-2"><Icon className="h-4 w-4" />{title}</CardTitle>
