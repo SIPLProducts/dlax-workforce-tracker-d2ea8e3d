@@ -83,11 +83,9 @@ function ReportsPage() {
     try {
       let query = supabase.from("daily_manpower").select("*, projects(name), contractors(company_name), departments(name), worker_categories(name)");
 
-      if (tab === "daily") {
-        query = query.eq("entry_date", format(date, "yyyy-MM-dd"));
-      } else {
-        query = query.gte("entry_date", format(dateFrom, "yyyy-MM-dd")).lte("entry_date", format(dateTo, "yyyy-MM-dd"));
-      }
+      query = query
+        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
 
       if (projectId !== "all") query = query.eq("project_id", projectId);
       if (contractorId !== "all") query = query.eq("contractor_id", contractorId);
