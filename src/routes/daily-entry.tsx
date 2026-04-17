@@ -25,12 +25,6 @@ type ManpowerRow = {
   department_id: string;
   category_id: string;
   headcount: number;
-  hours_worked: number;
-  overtime_hours: number;
-  nmr_mason: number;
-  nmr_male_helpers: number;
-  nmr_female_helpers: number;
-  security_count: number;
   remarks: string;
 };
 
@@ -87,12 +81,6 @@ function DailyEntryPage() {
         department_id: r.department_id,
         category_id: r.category_id,
         headcount: r.headcount,
-        hours_worked: Number(r.hours_worked) || 0,
-        overtime_hours: Number(r.overtime_hours) || 0,
-        nmr_mason: r.nmr_mason || 0,
-        nmr_male_helpers: r.nmr_male_helpers || 0,
-        nmr_female_helpers: r.nmr_female_helpers || 0,
-        security_count: r.security_count || 0,
         remarks: r.remarks || "",
       })));
     } else {
@@ -101,7 +89,7 @@ function DailyEntryPage() {
   };
 
   const addRow = () => {
-    setRows([...rows, { contractor_id: "", department_id: "", category_id: "", headcount: 0, hours_worked: 8, overtime_hours: 0, nmr_mason: 0, nmr_male_helpers: 0, nmr_female_helpers: 0, security_count: 0, remarks: "" }]);
+    setRows([...rows, { contractor_id: "", department_id: "", category_id: "", headcount: 0, remarks: "" }]);
   };
 
   const removeRow = (idx: number) => {
@@ -133,12 +121,6 @@ function DailyEntryPage() {
         department_id: r.department_id,
         category_id: r.category_id,
         headcount: r.headcount,
-        hours_worked: Number(r.hours_worked) || 0,
-        overtime_hours: Number(r.overtime_hours) || 0,
-        nmr_mason: r.nmr_mason || 0,
-        nmr_male_helpers: r.nmr_male_helpers || 0,
-        nmr_female_helpers: r.nmr_female_helpers || 0,
-        security_count: r.security_count || 0,
         remarks: r.remarks || "",
       })));
       toast.success("Copied from previous day");
@@ -169,12 +151,6 @@ function DailyEntryPage() {
         department_id: r.department_id,
         category_id: r.category_id,
         headcount: r.headcount,
-        hours_worked: r.hours_worked,
-        overtime_hours: r.overtime_hours,
-        nmr_mason: r.nmr_mason,
-        nmr_male_helpers: r.nmr_male_helpers,
-        nmr_female_helpers: r.nmr_female_helpers,
-        security_count: r.security_count,
         remarks: r.remarks || null,
         created_by: user?.id,
       }));
