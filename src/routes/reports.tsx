@@ -63,7 +63,7 @@ function ReportsPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadReport(); }, [tab, date, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId]);
+  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId]);
 
   const loadMasters = async () => {
     const [p, c, d, cat] = await Promise.all([
