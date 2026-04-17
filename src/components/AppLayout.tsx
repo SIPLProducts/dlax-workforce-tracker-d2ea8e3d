@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import type { ReactNode } from "react";
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -12,10 +13,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <SidebarTrigger />
             <span className="font-bold text-foreground">DLAX</span>
           </div>
-          <div className="p-3 sm:p-4 md:p-6 lg:p-8">
+          <div className="p-3 sm:p-4 md:p-6 lg:p-8 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-8">
             {children}
           </div>
         </main>
+        <MobileTabBar />
       </div>
     </SidebarProvider>
   );
