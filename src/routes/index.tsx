@@ -369,11 +369,21 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {projectsWithoutToday.map((p: any) => (
-                <Badge key={p.id} variant="outline" className="text-xs">
-                  {p.code ? `[${p.code}] ` : ""}{p.name}
-                </Badge>
-              ))}
+              {projectsWithoutToday.map((p: any) => {
+                const label = `${p.code ? `[${p.code}] ` : ""}${p.name}`;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setDrill({ type: "project", id: p.id, label })}
+                    className="focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
+                  >
+                    <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted transition-colors">
+                      {label}
+                    </Badge>
+                  </button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
