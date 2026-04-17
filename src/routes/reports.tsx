@@ -299,7 +299,9 @@ function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead>Project</TableHead>
+                    <TableHead>Group</TableHead>
                     <TableHead>Contractor</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Category</TableHead>
@@ -309,12 +311,14 @@ function ReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {loading && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
                   )}
                   {!loading && filtered.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>{r.entry_date}</TableCell>
+                      <TableCell className="font-mono text-xs">{r.projects?.code || "—"}</TableCell>
                       <TableCell>{getName(r.projects)}</TableCell>
+                      <TableCell>{r.projects?.project_group || "—"}</TableCell>
                       <TableCell>{getName(r.contractors)}</TableCell>
                       <TableCell>{getName(r.departments)}</TableCell>
                       <TableCell>{getName(r.worker_categories)}</TableCell>
@@ -323,7 +327,7 @@ function ReportsPage() {
                     </TableRow>
                   ))}
                   {!loading && filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
