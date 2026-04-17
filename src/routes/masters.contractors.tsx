@@ -318,6 +318,51 @@ function ContractorsPage() {
         ))}
       </div>
 
+      {/* Contractors by Nature of Work */}
+      <Card>
+        <CardHeader><CardTitle className="text-lg">Contractors by Nature of Work</CardTitle></CardHeader>
+        <CardContent>
+          {contractorsByNature.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">No contractors yet</p>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={contractorsByNature} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" allowDecimals={false} className="text-xs" />
+                    <YAxis type="category" dataKey="name" width={160} className="text-xs" />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="oklch(0.55 0.2 280)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="overflow-auto max-h-[300px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nature of Work</TableHead>
+                      <TableHead className="text-right">Contractors</TableHead>
+                      <TableHead className="text-right">Share</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {contractorsByNature.map((n) => (
+                      <TableRow key={n.name}>
+                        <TableCell className="font-medium">{n.name}</TableCell>
+                        <TableCell className="text-right">{n.count}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {items.length ? Math.round((n.count / items.length) * 100) : 0}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
