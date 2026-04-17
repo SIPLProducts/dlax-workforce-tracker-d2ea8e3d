@@ -47,7 +47,7 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
 
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
-  const [date, setDate] = useState<Date>(new Date());
+  
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 6));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [projectId, setProjectId] = useState("all");
