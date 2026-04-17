@@ -112,7 +112,7 @@ function ReportsPage() {
   const loadReport = async () => {
     setLoading(true);
     try {
-      let query = supabase.from("daily_manpower").select("*, projects(name, code, project_group), contractors(company_name), departments(name), worker_categories(name)");
+      let query = supabase.from("daily_manpower").select("*, projects(name, code, project_group), contractors(company_name, nature_of_work), departments(name), worker_categories(name)");
 
       query = query
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
