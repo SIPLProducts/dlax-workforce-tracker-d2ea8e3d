@@ -169,11 +169,142 @@ function DailyEntryPage() {
     }
   };
 
+  const downloadTemplate = () => {
+    const sampleDate = format(new Date(), "yyyy-MM-dd");
+    const sampleProject = projects[0]?.code || "PROJ-001";
+    const sampleContractor = contractors[0]?.company_name || "Contractor Name";
+    const sampleDept = departments[0]?.name || "Civil";
+    const sampleCat = categories[0]?.name || "Helper";
+    const data = [
+      {
+        entry_date: sampleDate,
+        project_code: sampleProject,
+        contractor: sampleContractor,
+        department: sampleDept,
+        category: sampleCat,
+        headcount: 10,
+        remarks: "Optional notes",
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(data, {
+      header: ["entry_date", "project_code", "contractor", "department", "category", "headcount", "remarks"],
+    });
+    ws["!cols"] = [{ wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "DailyEntry");
+    // Reference sheet
+    const ref: any[] = [];
+    ref.push({ Type: "Project Codes", Values: projects.map((p) => p.code).filter(Boolean).join(", ") });
+    ref.push({ Type: "Contractors", Values: contractors.map((c) => c.company_name).join(", ") });
+    ref.push({ Type: "Departments", Values: departments.map((d) => d.name).join(", ") });
+    ref.push({ Type: "Categories", Values: categories.map((c) => c.name).join(", ") });
+    const refWs = XLSX.utils.json_to_sheet(ref);
+    refWs["!cols"] = [{ wch: 18 }, { wch: 100 }];
+    XLSX.utils.book_append_sheet(wb, refWs, "Reference");
+    XLSX.writeFile(wb, "daily_entry_template.xlsx");
+    toast.success("Template downloaded");
+  };
+
+  const parseExcelDate = (v: any): string | null => {
+    if (!v) return null;
+    if (typeof v === "number") {
+      const d = XLSX.SSF.parse_date_code(v);
+      if (!d) return null;
+      return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
+    }
+    const s = String(v).trim();
+    // Try common formats
+    for (const fmt of ["yyyy-MM-dd", "dd-MM-yyyy", "dd/MM/yyyy", "MM/dd/yyyy", "d-MMM-yyyy", "dd-MMM-yyyy"]) {
+      try {
+        const d = parseDate(s, fmt, new Date());
+        if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+      } catch {}
+    }
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
+    return null;
+  };
+
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      if (json.length === 0) { toast.error("Sheet is empty"); return; }
+
+      // Build lookup maps (case-insensitive)
+      const projByCode = new Map(projects.filter((p) => p.code).map((p) => [String(p.code).toLowerCase().trim(), p]));
+      const projByName = new Map(projects.map((p) => [String(p.name).toLowerCase().trim(), p]));
+      const contMap = new Map(contractors.map((c) => [String(c.company_name).toLowerCase().trim(), c]));
+      const deptMap = new Map(departments.map((d) => [String(d.name).toLowerCase().trim(), d]));
+      const catMap = new Map(categories.map((c) => [String(c.name).toLowerCase().trim(), c]));
+
+      const inserts: any[] = [];
+      const errors: string[] = [];
+
+      json.forEach((row, idx) => {
+        const lineNo = idx + 2;
+        const dateStr = parseExcelDate(row.entry_date ?? row.date ?? row.Date);
+        if (!dateStr) { errors.push(`Row ${lineNo}: invalid date`); return; }
+        const projKey = String(row.project_code ?? row.project ?? "").toLowerCase().trim();
+        const proj = projByCode.get(projKey) || projByName.get(projKey);
+        if (!proj) { errors.push(`Row ${lineNo}: project not found "${row.project_code ?? row.project}"`); return; }
+        const cont = contMap.get(String(row.contractor ?? "").toLowerCase().trim());
+        if (!cont) { errors.push(`Row ${lineNo}: contractor not found "${row.contractor}"`); return; }
+        const dept = deptMap.get(String(row.department ?? "").toLowerCase().trim());
+        if (!dept) { errors.push(`Row ${lineNo}: department not found "${row.department}"`); return; }
+        const cat = catMap.get(String(row.category ?? "").toLowerCase().trim());
+        if (!cat) { errors.push(`Row ${lineNo}: category not found "${row.category}"`); return; }
+        const hc = parseInt(String(row.headcount ?? 0)) || 0;
+        inserts.push({
+          entry_date: dateStr,
+          project_id: proj.id,
+          contractor_id: cont.id,
+          department_id: dept.id,
+          category_id: cat.id,
+          headcount: hc,
+          remarks: row.remarks ? String(row.remarks) : null,
+          created_by: user?.id,
+        });
+      });
+
+      if (errors.length > 0 && inserts.length === 0) {
+        toast.error(`Upload failed. ${errors.length} error(s). First: ${errors[0]}`);
+        console.error("Bulk upload errors:", errors);
+        return;
+      }
+
+      const { error } = await supabase.from("daily_manpower").insert(inserts);
+      if (error) throw error;
+      toast.success(`Uploaded ${inserts.length} entries${errors.length ? ` (${errors.length} skipped)` : ""}`);
+      if (errors.length) console.warn("Skipped rows:", errors);
+      if (projectId && date) loadEntries();
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+    } finally {
+      setBulkUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Daily Manpower Entry</h1>
-        <p className="text-sm text-muted-foreground">Record daily workforce data</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Daily Manpower Entry</h1>
+          <p className="text-sm text-muted-foreground">Record daily workforce data</p>
+        </div>
+        <div className="flex gap-2">
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkUpload} className="hidden" />
+          <Button variant="outline" onClick={downloadTemplate}><FileDown className="mr-2 h-4 w-4" />Template</Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
+            <Upload className="mr-2 h-4 w-4" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 items-end">
