@@ -206,6 +206,17 @@ function DailyEntryPage() {
 
       {projectId && rows.length > 0 && (
         <Card>
+          {(() => {
+            const sel = projects.find((p) => p.id === projectId);
+            if (!sel) return null;
+            return (
+              <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 py-3 border-b text-sm">
+                <span><span className="text-muted-foreground">Code:</span> <span className="font-mono font-medium">{sel.code || "—"}</span></span>
+                <span><span className="text-muted-foreground">Project:</span> <span className="font-medium">{sel.name}</span></span>
+                <span><span className="text-muted-foreground">Group:</span> <span className="font-medium">{sel.project_group || "—"}</span></span>
+              </div>
+            );
+          })()}
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
