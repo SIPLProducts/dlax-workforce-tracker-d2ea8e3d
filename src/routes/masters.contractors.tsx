@@ -196,10 +196,15 @@ function ContractorsPage() {
         return obj;
       }).filter((r) => r.company_name);
       if (records.length === 0) { toast.error("No valid rows (company_name required)"); return; }
-      const { error } = await supabase.from("contractors").insert(records);
+      // Skip duplicates already in DB (by company_name, case-insensitive)
+      const existingNames = new Set(items.map((c) => (c.company_name || "").trim().toLowerCase()));
+      const fresh = records.filter((r) => !existingNames.has((r.company_name || "").trim().toLowerCase()));
+      const skipped = records.length - fresh.length;
+      if (fresh.length === 0) { toast.info(`All ${records.length} rows already exist — nothing imported`); return; }
+      const { error } = await supabase.from("contractors").insert(fresh);
       if (error) throw error;
-      toast.success(`Imported ${records.length} contractors`);
-      load();
+      toast.success(`Imported ${fresh.length} contractors${skipped ? ` (skipped ${skipped} duplicates)` : ""}`);
+      await load();
     } catch (err: any) {
       toast.error(err.message || "Import failed");
     } finally {
