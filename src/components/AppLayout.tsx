@@ -12,7 +12,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <SidebarTrigger />
             <span className="font-bold text-foreground">DLAX</span>
           </div>
-          <div className="p-4 md:p-6 lg:p-8">
+          <div className="p-3 sm:p-4 md:p-6 lg:p-8">
             {children}
           </div>
         </main>
