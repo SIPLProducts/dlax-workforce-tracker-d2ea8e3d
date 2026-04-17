@@ -100,11 +100,22 @@ function ContractorsPage() {
       .slice(0, 5);
   }, [rows, items]);
 
+  const contractorsByNature = useMemo(() => {
+    const map = new Map<string, number>();
+    items.forEach((c) => {
+      const key = (c.nature_of_work || "").trim() || "Unspecified";
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [items]);
+
   const cards = [
-    { title: "Total Workers", value: stats.totalWorkers, icon: Users, color: "text-primary" },
-    { title: "Avg Workers/Day", value: stats.avgPerDay, icon: Users, color: "text-accent" },
-    { title: "Active Contractors", value: stats.activeContractors, icon: HardHat, color: "text-chart-3" },
-    { title: "Total Entries", value: stats.totalEntries, icon: ClipboardList, color: "text-chart-4" },
+    { title: "Total Contractors", value: items.length, icon: HardHat, color: "text-primary" },
+    { title: "Nature of Work Types", value: contractorsByNature.length, icon: ClipboardList, color: "text-accent" },
+    { title: "Total Workers (period)", value: stats.totalWorkers, icon: Users, color: "text-chart-3" },
+    { title: "Avg Workers/Day", value: stats.avgPerDay, icon: Users, color: "text-chart-4" },
   ];
 
   const resetFilters = () => {
@@ -307,6 +318,51 @@ function ContractorsPage() {
         ))}
       </div>
 
+      {/* Contractors by Nature of Work */}
+      <Card>
+        <CardHeader><CardTitle className="text-lg">Contractors by Nature of Work</CardTitle></CardHeader>
+        <CardContent>
+          {contractorsByNature.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">No contractors yet</p>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={contractorsByNature} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" allowDecimals={false} className="text-xs" />
+                    <YAxis type="category" dataKey="name" width={160} className="text-xs" />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="oklch(0.55 0.2 280)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="overflow-auto max-h-[300px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nature of Work</TableHead>
+                      <TableHead className="text-right">Contractors</TableHead>
+                      <TableHead className="text-right">Share</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {contractorsByNature.map((n) => (
+                      <TableRow key={n.name}>
+                        <TableCell className="font-medium">{n.name}</TableCell>
+                        <TableCell className="text-right">{n.count}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {items.length ? Math.round((n.count / items.length) * 100) : 0}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
