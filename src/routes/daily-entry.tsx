@@ -9,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Copy, Trash2, Save } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { CalendarIcon, Plus, Copy, Trash2, Save, FileDown, Upload } from "lucide-react";
+import { format, subDays, parse as parseDate } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import * as XLSX from "xlsx";
+import { useRef } from "react";
 
 export const Route = createFileRoute("/daily-entry")({
   component: () => <AuthGuard><DailyEntryPage /></AuthGuard>,
