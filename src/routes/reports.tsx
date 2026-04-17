@@ -78,7 +78,7 @@ function BreakdownCard({ title, icon: Icon, rows, total, accent }: { title: stri
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
   
-  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 6));
+  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 29));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [projectId, setProjectId] = useState("all");
   const [contractorId, setContractorId] = useState("all");
