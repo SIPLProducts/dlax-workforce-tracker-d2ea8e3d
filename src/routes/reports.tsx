@@ -30,11 +30,11 @@ export const Route = createFileRoute("/reports")({
 
 function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 min-w-0">
       <Label>{label}</Label>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" className={cn("w-[170px] justify-start text-left font-normal")}>
+          <Button variant="outline" className={cn("w-full sm:w-[170px] justify-start text-left font-normal")}>
             <CalendarIcon className="mr-2 h-4 w-4" />
             {format(value, "dd MMM yyyy")}
           </Button>
@@ -251,22 +251,22 @@ function ReportsPage() {
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 md:space-y-8">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Reports</h1>
-          <p className="text-sm text-muted-foreground">View and export workforce reports</p>
+          <h1 className="text-xl md:text-2xl font-bold">Reports</h1>
+          <p className="text-xs md:text-sm text-muted-foreground">View and export workforce reports</p>
         </div>
-        <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0}>
+        <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
           <Download className="mr-2 h-4 w-4" />Export CSV
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="daily">Daily Summary</TabsTrigger>
-          <TabsTrigger value="project">Project-wise</TabsTrigger>
-          <TabsTrigger value="contractor">Contractor-wise</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
+        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
+          <TabsTrigger value="daily">Daily</TabsTrigger>
+          <TabsTrigger value="project">Project</TabsTrigger>
+          <TabsTrigger value="contractor">Contractor</TabsTrigger>
         </TabsList>
 
         {/* Filters */}
@@ -281,64 +281,64 @@ function ReportsPage() {
               <Button size="sm" variant="outline" onClick={() => applyPreset("30d")}>Last 30 days</Button>
               <Button size="sm" variant="outline" onClick={() => applyPreset("mtd")}>Month to date</Button>
             </div>
-            <div className="flex flex-wrap gap-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 items-end">
               <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
               <DatePicker value={dateTo} onChange={setDateTo} label="To" />
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <Label>Project Group</Label>
                 <Select value={projectGroup} onValueChange={(v) => { setProjectGroup(v); setProjectId("all"); }}>
-                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Groups</SelectItem>
                     {projectGroups.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <Label>Project</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
                     {visibleProjects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <Label>Contractor</Label>
                 <Select value={contractorId} onValueChange={setContractorId}>
-                  <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Contractors</SelectItem>
                     {contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <Label>Department</Label>
                 <Select value={departmentId} onValueChange={setDepartmentId}>
-                  <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[170px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Departments</SelectItem>
                     {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <Label>Category</Label>
                 <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[170px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
                     {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <Label>Search</Label>
-                <Input placeholder="Search remarks/names..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-[200px]" />
+                <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:w-[200px]" />
               </div>
-              <Button variant="outline" onClick={resetFilters}>Reset</Button>
+              <Button variant="outline" onClick={resetFilters} className="w-full sm:w-auto">Reset</Button>
             </div>
           </CardContent>
         </Card>
