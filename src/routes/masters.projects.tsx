@@ -10,12 +10,35 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Download, Upload, FileDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, Upload, FileDown, Briefcase, CheckCircle2, PauseCircle, Layers, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/projects")({
   component: () => <AuthGuard><ProjectsPage /></AuthGuard>,
 });
+
+const TONE: Record<string, string> = {
+  primary: "bg-primary/10 text-primary",
+  accent: "bg-accent/20 text-accent",
+  muted: "bg-muted text-muted-foreground",
+  chart3: "bg-chart-3/20 text-chart-3",
+};
+
+function StatBox({ icon: Icon, label, value, tone }: { icon: any; label: string; value: number; tone: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${TONE[tone]}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-xl font-bold">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const TEMPLATE_HEADERS = ["name", "code", "project_group", "division", "location", "start_date", "status"];
 
@@ -25,6 +48,10 @@ function ProjectsPage() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" });
   const [search, setSearch] = useState("");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [divisionFilter, setDivisionFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { load(); }, []);
@@ -142,7 +169,36 @@ function ProjectsPage() {
     }
   };
 
-  const filtered = projects.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+  const uniq = (key: string) => Array.from(new Set(projects.map((p) => p[key]).filter(Boolean))).sort();
+  const groups = uniq("project_group");
+  const divisions = uniq("division");
+  const locations = uniq("location");
+
+  const filtered = projects.filter((p) => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.code || "").toLowerCase().includes(q) ||
+      (p.project_group || "").toLowerCase().includes(q) ||
+      (p.division || "").toLowerCase().includes(q) ||
+      (p.location || "").toLowerCase().includes(q);
+    const matchesGroup = groupFilter === "all" || p.project_group === groupFilter;
+    const matchesDivision = divisionFilter === "all" || p.division === divisionFilter;
+    const matchesLocation = locationFilter === "all" || p.location === locationFilter;
+    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+    return matchesSearch && matchesGroup && matchesDivision && matchesLocation && matchesStatus;
+  });
+
+  const stats = {
+    total: filtered.length,
+    active: filtered.filter((p) => p.status === "Active").length,
+    completed: filtered.filter((p) => p.status === "Completed").length,
+    onHold: filtered.filter((p) => p.status === "On Hold").length,
+    groups: new Set(filtered.map((p) => p.project_group).filter(Boolean)).size,
+  };
+
+  const hasActiveFilters = groupFilter !== "all" || divisionFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || search;
+  const clearFilters = () => { setSearch(""); setGroupFilter("all"); setDivisionFilter("all"); setLocationFilter("all"); setStatusFilter("all"); };
 
   return (
     <div className="space-y-6">
@@ -184,7 +240,55 @@ function ProjectsPage() {
           </Dialog>
         </div>
       </div>
-      <Input placeholder="Search projects..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatBox icon={Briefcase} label="Total" value={stats.total} tone="primary" />
+        <StatBox icon={CheckCircle2} label="Active" value={stats.active} tone="accent" />
+        <StatBox icon={CheckCircle2} label="Completed" value={stats.completed} tone="muted" />
+        <StatBox icon={PauseCircle} label="On Hold" value={stats.onHold} tone="chart3" />
+        <StatBox icon={Layers} label="Groups" value={stats.groups} tone="primary" />
+      </div>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <Input placeholder="Search code, name, group..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Select value={groupFilter} onValueChange={setGroupFilter}>
+              <SelectTrigger><SelectValue placeholder="All Groups" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Groups</SelectItem>
+                {groups.map((g) => <SelectItem key={g as string} value={g as string}>{g as string}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={divisionFilter} onValueChange={setDivisionFilter}>
+              <SelectTrigger><SelectValue placeholder="All Divisions" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Divisions</SelectItem>
+                {divisions.map((d) => <SelectItem key={d as string} value={d as string}>{d as string}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger><SelectValue placeholder="All Locations" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((l) => <SelectItem key={l as string} value={l as string}>{l as string}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="On Hold">On Hold</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}><X className="mr-1 h-3 w-3" />Clear filters</Button>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-0">
           <Table>
