@@ -153,9 +153,10 @@ function ReportsPage() {
   };
 
   const exportCsv = () => {
-    const headers = ["Date", "Project", "Contractor", "Department", "Category", "Headcount", "Remarks"];
+    const headers = ["Date", "Project Code", "Project", "Project Group", "Contractor", "Department", "Category", "Headcount", "Remarks"];
     const rows = filtered.map((r) => [
-      r.entry_date, getName(r.projects), getName(r.contractors), getName(r.departments), getName(r.worker_categories),
+      r.entry_date, r.projects?.code || "", getName(r.projects), r.projects?.project_group || "",
+      getName(r.contractors), getName(r.departments), getName(r.worker_categories),
       r.headcount, r.remarks || ""
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.map((c: any) => `"${c}"`).join(","))].join("\n");
