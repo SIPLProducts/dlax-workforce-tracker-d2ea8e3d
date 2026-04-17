@@ -20,7 +20,7 @@ function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", code: "", division: "", location: "", start_date: "", status: "Active" });
+  const [form, setForm] = useState({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" });
   const [search, setSearch] = useState("");
 
   useEffect(() => { load(); }, []);
