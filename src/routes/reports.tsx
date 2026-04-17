@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CalendarIcon, Download, Users, CalendarDays, HardHat, TrendingUp } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend } from "recharts";
 import { format, subDays, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -474,27 +474,64 @@ function ReportsPage() {
               drill.type === "project" ? r.project_id === drill.key : r.contractor_id === drill.key
             );
             const total = rows.reduce((s, r) => s + (r.headcount || 0), 0);
-            const trendMap = new Map<string, number>();
-            rows.forEach((r) => trendMap.set(r.entry_date, (trendMap.get(r.entry_date) || 0) + (r.headcount || 0)));
-            const trend = Array.from(trendMap.entries())
-              .sort((a, b) => a[0].localeCompare(b[0]))
-              .map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
-            const peak = trend.reduce((m, p) => Math.max(m, p.count), 0);
+            // Split-by axis: contractor when drilling into a project, project when drilling into a contractor
+            const splitKeyOf = (r: any) =>
+              drill.type === "project"
+                ? { id: r.contractor_id || "—", name: getName(r.contractors) }
+                : { id: r.project_id || "—", name: getName(r.projects) };
+            // Compute totals per split to pick top series + sort dates
+            const splitTotals = new Map<string, { name: string; total: number }>();
+            const dateSet = new Set<string>();
+            rows.forEach((r) => {
+              const s = splitKeyOf(r);
+              dateSet.add(r.entry_date);
+              const cur = splitTotals.get(s.id) || { name: s.name, total: 0 };
+              cur.total += r.headcount || 0;
+              splitTotals.set(s.id, cur);
+            });
+            const TOP_N = 6;
+            const sortedSplits = Array.from(splitTotals.entries()).sort((a, b) => b[1].total - a[1].total);
+            const topSplits = sortedSplits.slice(0, TOP_N);
+            const otherIds = new Set(sortedSplits.slice(TOP_N).map(([id]) => id));
+            const seriesKeys = topSplits.map(([id, v]) => ({ id, name: v.name }));
+            if (otherIds.size > 0) seriesKeys.push({ id: "__other__", name: "Other" });
+            // Build per-date stacked datapoints
+            const dates = Array.from(dateSet).sort();
+            const trend = dates.map((date) => {
+              const point: Record<string, any> = { date: format(new Date(date), "dd MMM"), _total: 0 };
+              seriesKeys.forEach((s) => (point[s.id] = 0));
+              return { date, point };
+            });
+            const trendIdx = new Map(trend.map((t, i) => [t.date, i]));
+            rows.forEach((r) => {
+              const idx = trendIdx.get(r.entry_date);
+              if (idx === undefined) return;
+              const s = splitKeyOf(r);
+              const key = otherIds.has(s.id) ? "__other__" : s.id;
+              trend[idx].point[key] = (trend[idx].point[key] || 0) + (r.headcount || 0);
+              trend[idx].point._total += r.headcount || 0;
+            });
+            const chartData = trend.map((t) => t.point);
+            const peak = chartData.reduce((m, p) => Math.max(m, p._total || 0), 0);
+            // Palette using design tokens
+            const palette = [
+              "hsl(var(--primary))",
+              "hsl(var(--accent))",
+              "hsl(var(--chart-3))",
+              "hsl(var(--chart-4))",
+              "hsl(var(--chart-5))",
+              "hsl(var(--chart-2))",
+              "hsl(var(--muted-foreground))",
+            ];
             return (
               <div className="space-y-3">
                 <div className="text-sm text-muted-foreground">
-                  {rows.length} entries · <strong className="text-foreground">{total}</strong> total workers · Peak day: <strong className="text-foreground">{peak}</strong>
+                  {rows.length} entries · <strong className="text-foreground">{total}</strong> total workers · Peak day: <strong className="text-foreground">{peak}</strong> · Split by {drill.type === "project" ? "contractor" : "project"}
                 </div>
-                {trend.length > 0 && (
-                  <div className="h-48 w-full rounded-md border bg-muted/20 p-2">
+                {chartData.length > 0 && (
+                  <div className="h-64 w-full rounded-md border bg-muted/20 p-2">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={trend} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
+                      <AreaChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                         <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={32} />
@@ -502,7 +539,20 @@ function ReportsPage() {
                           contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 12 }}
                           labelStyle={{ color: "hsl(var(--foreground))" }}
                         />
-                        <Area type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#trendFill)" />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        {seriesKeys.map((s, i) => (
+                          <Area
+                            key={s.id}
+                            type="monotone"
+                            dataKey={s.id}
+                            name={s.name}
+                            stackId="1"
+                            stroke={palette[i % palette.length]}
+                            fill={palette[i % palette.length]}
+                            fillOpacity={0.55}
+                            strokeWidth={1.5}
+                          />
+                        ))}
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
