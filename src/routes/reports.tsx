@@ -140,6 +140,19 @@ function ReportsPage() {
     return { total, days, conts, avg };
   }, [filtered]);
 
+  const groupBy = (keyFn: (r: any) => string) => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => {
+      const k = keyFn(r) || "—";
+      map.set(k, (map.get(k) || 0) + (r.headcount || 0));
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  };
+
+  const byDepartment = useMemo(() => groupBy((r) => getName(r.departments)), [filtered]);
+  const byProject = useMemo(() => groupBy((r) => r.projects?.code ? `[${r.projects.code}] ${getName(r.projects)}` : getName(r.projects)), [filtered]);
+  const byCategory = useMemo(() => groupBy((r) => getName(r.worker_categories)), [filtered]);
+
   const applyPreset = (preset: string) => {
     const today = new Date();
     if (preset === "today") { setDateFrom(today); setDateTo(today); }
