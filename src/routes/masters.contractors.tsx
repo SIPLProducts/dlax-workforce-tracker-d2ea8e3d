@@ -136,7 +136,7 @@ function ContractorsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold">Contractors</h1><p className="text-sm text-muted-foreground">Manage contractors and view workforce overview</p></div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "" }); } }}>
+        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
@@ -146,6 +146,7 @@ function ContractorsPage() {
               <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div><Label>Contact Number</Label><Input value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value })} placeholder="Mobile number" /></div>
               <div><Label>Work Place / Location</Label><Input value={form.work_place} onChange={(e) => setForm({ ...form, work_place: e.target.value })} placeholder="e.g. Block E1, F1" /></div>
+              <div><Label>Nature of Work</Label><Input value={form.nature_of_work} onChange={(e) => setForm({ ...form, nature_of_work: e.target.value })} placeholder="e.g. Civil, Electrical, Plumbing" /></div>
               <div><Label>License Number</Label><Input value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} /></div>
               <Button className="w-full" onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
             </div>
