@@ -132,6 +132,81 @@ function ContractorsPage() {
   const handleDelete = async (id: string) => { if (!confirm("Delete?")) return; await supabase.from("contractors").delete().eq("id", id); toast.success("Deleted"); load(); };
   const filtered = items.filter((c) => c.company_name.toLowerCase().includes(search.toLowerCase()));
 
+  const CSV_COLUMNS = ["company_name", "contact_person", "phone", "contact_number", "work_place", "nature_of_work", "license_number"];
+
+  const csvEscape = (v: any) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const downloadCsv = (filename: string, rows: string[][]) => {
+    const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = () => {
+    downloadCsv("contractors_template.csv", [CSV_COLUMNS, ["ABC Builders", "John Doe", "022-1234567", "9876543210", "Block E1", "Civil", "LIC-001"]]);
+  };
+
+  const handleDownloadData = () => {
+    const rows = [CSV_COLUMNS, ...items.map((c) => CSV_COLUMNS.map((k) => c[k] ?? ""))];
+    downloadCsv(`contractors_${format(new Date(), "yyyyMMdd")}.csv`, rows);
+    toast.success(`Exported ${items.length} contractors`);
+  };
+
+  const parseCsv = (text: string): string[][] => {
+    const rows: string[][] = [];
+    let cur: string[] = [], val = "", inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQ) {
+        if (ch === '"' && text[i + 1] === '"') { val += '"'; i++; }
+        else if (ch === '"') inQ = false;
+        else val += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === ",") { cur.push(val); val = ""; }
+        else if (ch === "\n") { cur.push(val); rows.push(cur); cur = []; val = ""; }
+        else if (ch === "\r") { /* skip */ }
+        else val += ch;
+      }
+    }
+    if (val.length || cur.length) { cur.push(val); rows.push(cur); }
+    return rows.filter((r) => r.some((c) => c.trim() !== ""));
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length < 2) { toast.error("CSV is empty"); return; }
+      const header = rows[0].map((h) => h.trim().toLowerCase());
+      const records = rows.slice(1).map((r) => {
+        const obj: any = {};
+        CSV_COLUMNS.forEach((col) => {
+          const idx = header.indexOf(col);
+          if (idx >= 0) obj[col] = r[idx]?.trim() || null;
+        });
+        return obj;
+      }).filter((r) => r.company_name);
+      if (records.length === 0) { toast.error("No valid rows (company_name required)"); return; }
+      const { error } = await supabase.from("contractors").insert(records);
+      if (error) throw error;
+      toast.success(`Imported ${records.length} contractors`);
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Import failed");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
