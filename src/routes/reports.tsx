@@ -112,10 +112,10 @@ function ReportsPage() {
   const totalSecurity = data.reduce((s, r) => s + (r.security_count || 0), 0);
 
   const exportCsv = () => {
-    const headers = ["Date", "Project", "Contractor", "Department", "Category", "Headcount", "Hours", "OT Hours", "NMR Mason", "NMR Male", "NMR Female", "Security", "Remarks"];
+    const headers = ["Date", "Project", "Contractor", "Department", "Category", "Headcount", "Remarks"];
     const rows = data.map((r) => [
       r.entry_date, getName(r.projects), getName(r.contractors), getName(r.departments), getName(r.worker_categories),
-      r.headcount, r.hours_worked, r.overtime_hours, r.nmr_mason, r.nmr_male_helpers, r.nmr_female_helpers, r.security_count, r.remarks || ""
+      r.headcount, r.remarks || ""
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.map((c: any) => `"${c}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -185,9 +185,6 @@ function ReportsPage() {
               <CardTitle className="text-lg">Results ({data.length} entries)</CardTitle>
               <div className="flex gap-4 text-sm flex-wrap">
                 <span>Workers: <strong>{totalHeadcount}</strong></span>
-                <span>Hours: <strong>{totalHours.toFixed(1)}</strong></span>
-                <span>NMR: <strong>{totalNmrMason + totalNmrMale + totalNmrFemale}</strong></span>
-                <span>Security: <strong>{totalSecurity}</strong></span>
               </div>
             </div>
           </CardHeader>
@@ -202,18 +199,12 @@ function ReportsPage() {
                     <TableHead>Department</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Count</TableHead>
-                    <TableHead className="text-right">Hours</TableHead>
-                    <TableHead className="text-right">OT</TableHead>
-                    <TableHead className="text-right">NMR M</TableHead>
-                    <TableHead className="text-right">NMR MH</TableHead>
-                    <TableHead className="text-right">NMR FH</TableHead>
-                    <TableHead className="text-right">Sec</TableHead>
                     <TableHead>Remarks</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading && (
-                    <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
                   )}
                   {!loading && data.map((r) => (
                     <TableRow key={r.id}>
@@ -223,17 +214,11 @@ function ReportsPage() {
                       <TableCell>{getName(r.departments)}</TableCell>
                       <TableCell>{getName(r.worker_categories)}</TableCell>
                       <TableCell className="text-right font-medium">{r.headcount}</TableCell>
-                      <TableCell className="text-right">{r.hours_worked}</TableCell>
-                      <TableCell className="text-right">{r.overtime_hours}</TableCell>
-                      <TableCell className="text-right">{r.nmr_mason}</TableCell>
-                      <TableCell className="text-right">{r.nmr_male_helpers}</TableCell>
-                      <TableCell className="text-right">{r.nmr_female_helpers}</TableCell>
-                      <TableCell className="text-right">{r.security_count}</TableCell>
                       <TableCell className="text-muted-foreground">{r.remarks || "—"}</TableCell>
                     </TableRow>
                   ))}
                   {!loading && data.length === 0 && (
-                    <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

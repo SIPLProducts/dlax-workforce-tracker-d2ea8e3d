@@ -239,12 +239,6 @@ function DailyEntryPage() {
                     <TableHead>Department</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="w-20">Count</TableHead>
-                    <TableHead className="w-20">Hours</TableHead>
-                    <TableHead className="w-20">OT Hrs</TableHead>
-                    <TableHead className="w-16">NMR Mason</TableHead>
-                    <TableHead className="w-16">NMR M</TableHead>
-                    <TableHead className="w-16">NMR F</TableHead>
-                    <TableHead className="w-16">Security</TableHead>
                     <TableHead>Remarks</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
@@ -279,12 +273,6 @@ function DailyEntryPage() {
                         })()}
                       </TableCell>
                       <TableCell><Input type="number" min={0} value={row.headcount} onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)} className="w-20" /></TableCell>
-                      <TableCell><Input type="number" min={0} step={0.5} value={row.hours_worked} onChange={(e) => updateRow(idx, "hours_worked", parseFloat(e.target.value) || 0)} className="w-20" /></TableCell>
-                      <TableCell><Input type="number" min={0} step={0.5} value={row.overtime_hours} onChange={(e) => updateRow(idx, "overtime_hours", parseFloat(e.target.value) || 0)} className="w-20" /></TableCell>
-                      <TableCell><Input type="number" min={0} value={row.nmr_mason} onChange={(e) => updateRow(idx, "nmr_mason", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
-                      <TableCell><Input type="number" min={0} value={row.nmr_male_helpers} onChange={(e) => updateRow(idx, "nmr_male_helpers", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
-                      <TableCell><Input type="number" min={0} value={row.nmr_female_helpers} onChange={(e) => updateRow(idx, "nmr_female_helpers", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
-                      <TableCell><Input type="number" min={0} value={row.security_count} onChange={(e) => updateRow(idx, "security_count", parseInt(e.target.value) || 0)} className="w-16" /></TableCell>
                       <TableCell><Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)} placeholder="Notes..." className="w-[150px]" /></TableCell>
                       <TableCell><Button variant="ghost" size="icon" onClick={() => removeRow(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
