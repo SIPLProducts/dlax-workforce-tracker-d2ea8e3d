@@ -54,6 +54,7 @@ function ReportsPage() {
   const [contractorId, setContractorId] = useState("all");
   const [departmentId, setDepartmentId] = useState("all");
   const [categoryId, setCategoryId] = useState("all");
+  const [projectGroup, setProjectGroup] = useState("all");
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
