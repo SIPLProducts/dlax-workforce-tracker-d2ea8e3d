@@ -291,28 +291,30 @@ function DailyEntryPage() {
     }
   };
 
+  const selProj = projects.find((p) => p.id === projectId);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="space-y-4 md:space-y-6 pb-24 md:pb-6">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Daily Manpower Entry</h1>
-          <p className="text-sm text-muted-foreground">Record daily workforce data</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Daily Manpower Entry</h1>
+          <p className="text-xs md:text-sm text-muted-foreground">Record daily workforce data</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkUpload} className="hidden" />
-          <Button variant="outline" onClick={downloadTemplate}><FileDown className="mr-2 h-4 w-4" />Template</Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
-            <Upload className="mr-2 h-4 w-4" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
+          <Button variant="outline" size="sm" onClick={downloadTemplate}><FileDown className="mr-1.5 h-4 w-4" />Template</Button>
+          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
+            <Upload className="mr-1.5 h-4 w-4" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 items-end">
         <div className="space-y-1">
           <label className="text-sm font-medium">Date</label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-[200px] justify-start text-left", !date && "text-muted-foreground")}>
+              <Button variant="outline" className={cn("w-full sm:w-[200px] justify-start text-left", !date && "text-muted-foreground")}>
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {date ? format(date, "dd MMM yyyy") : "Pick date"}
               </Button>
@@ -325,35 +327,32 @@ function DailyEntryPage() {
         <div className="space-y-1">
           <label className="text-sm font-medium">Project</label>
           <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger className="w-[250px]"><SelectValue placeholder="Select project" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[260px]"><SelectValue placeholder="Select project" /></SelectTrigger>
             <SelectContent>
               {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         {projectId && (
-          <>
-            <Button variant="outline" onClick={copyPreviousDay}><Copy className="mr-2 h-4 w-4" />Copy Previous Day</Button>
-            <Button onClick={addRow}><Plus className="mr-2 h-4 w-4" />Add Row</Button>
-          </>
+          <div className="flex gap-2 col-span-1 sm:col-span-2 lg:col-span-1">
+            <Button variant="outline" onClick={copyPreviousDay} className="flex-1 sm:flex-none"><Copy className="mr-2 h-4 w-4" />Copy Previous Day</Button>
+            <Button onClick={addRow} className="flex-1 sm:flex-none"><Plus className="mr-2 h-4 w-4" />Add Row</Button>
+          </div>
         )}
       </div>
 
       {projectId && rows.length > 0 && (
         <Card>
-          {(() => {
-            const sel = projects.find((p) => p.id === projectId);
-            if (!sel) return null;
-            return (
-              <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 py-3 border-b text-sm">
-                <span><span className="text-muted-foreground">Code:</span> <span className="font-mono font-medium">{sel.code || "—"}</span></span>
-                <span><span className="text-muted-foreground">Project:</span> <span className="font-medium">{sel.name}</span></span>
-                <span><span className="text-muted-foreground">Group:</span> <span className="font-medium">{sel.project_group || "—"}</span></span>
-              </div>
-            );
-          })()}
+          {selProj && (
+            <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 py-3 border-b text-xs sm:text-sm">
+              <span><span className="text-muted-foreground">Code:</span> <span className="font-mono font-medium">{selProj.code || "—"}</span></span>
+              <span><span className="text-muted-foreground">Project:</span> <span className="font-medium">{selProj.name}</span></span>
+              <span><span className="text-muted-foreground">Group:</span> <span className="font-medium">{selProj.project_group || "—"}</span></span>
+            </div>
+          )}
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            {/* Desktop / tablet table */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -366,52 +365,114 @@ function DailyEntryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>
-                        <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
-                          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
-                          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const linked = deptCategoryMap[row.department_id];
-                          const filteredCats = linked && linked.length > 0
-                            ? categories.filter((c) => linked.includes(c.id))
-                            : categories;
-                          return (
-                            <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Select" /></SelectTrigger>
-                              <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                            </Select>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell><Input type="number" min={0} value={row.headcount} onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)} className="w-20" /></TableCell>
-                      <TableCell><Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)} placeholder="Notes..." className="w-[150px]" /></TableCell>
-                      <TableCell><Button variant="ghost" size="icon" onClick={() => removeRow(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                    </TableRow>
-                  ))}
+                  {rows.map((row, idx) => {
+                    const linked = deptCategoryMap[row.department_id];
+                    const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
+                            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
+                            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
+                            <SelectTrigger className="w-[130px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell><Input type="number" inputMode="numeric" min={0} value={row.headcount} onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)} className="w-20" /></TableCell>
+                        <TableCell><Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)} placeholder="Notes..." className="w-[150px]" /></TableCell>
+                        <TableCell><Button variant="ghost" size="icon" onClick={() => removeRow(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y">
+              {rows.map((row, idx) => {
+                const linked = deptCategoryMap[row.department_id];
+                const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
+                return (
+                  <div key={idx} className="p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground">Row {idx + 1}</span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeRow(idx)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Contractor</label>
+                      <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
+                        <SelectTrigger className="w-full h-11"><SelectValue placeholder="Select contractor" /></SelectTrigger>
+                        <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Department</label>
+                        <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
+                          <SelectTrigger className="w-full h-11"><SelectValue placeholder="Dept" /></SelectTrigger>
+                          <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Category</label>
+                        <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
+                          <SelectTrigger className="w-full h-11"><SelectValue placeholder="Category" /></SelectTrigger>
+                          <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Count</label>
+                        <Input type="number" inputMode="numeric" min={0} value={row.headcount}
+                          onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)}
+                          className="h-11 text-base font-semibold tabular-nums" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-muted-foreground">Remarks</label>
+                        <Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)}
+                          placeholder="Notes..." className="h-11" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
 
       {projectId && rows.length > 0 && (
-        <div className="flex justify-end">
-          <Button onClick={save} disabled={saving} size="lg">
-            <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
-          </Button>
-        </div>
+        <>
+          <div className="hidden md:flex justify-end">
+            <Button onClick={save} disabled={saving} size="lg">
+              <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
+            </Button>
+          </div>
+          <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground tabular-nums">{rows.reduce((s, r) => s + (r.headcount || 0), 0)}</span> total · {rows.length} row{rows.length === 1 ? "" : "s"}
+              </div>
+              <Button onClick={save} disabled={saving} size="lg" className="flex-shrink-0">
+                <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </>
       )}
 
       {projectId && rows.length === 0 && (
