@@ -424,14 +424,6 @@ function DashboardContent() {
         </CardContent>
       </Card>
 
-      {/* Leaderboards */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total}
-          onSelect={(r) => setDrill({ type: "contractor", id: r.id, label: r.name })} />
-        <Leaderboard title="Top Projects" icon={Briefcase} rows={topProjects} total={stats.total}
-          onSelect={(r) => setDrill({ type: "project", id: r.id, label: r.name })} />
-      </div>
-
       <DrillDialog
         drill={drill}
         onClose={() => setDrill(null)}
@@ -444,7 +436,7 @@ function DashboardContent() {
         categoryMap={categoryMap}
       />
 
-      {/* Breakdowns */}
+      {/* Detailed Breakdowns */}
       <Tabs defaultValue="department">
         <TabsList>
           <TabsTrigger value="department"><Layers className="h-4 w-4 mr-1.5" />Department</TabsTrigger>
@@ -458,6 +450,44 @@ function DashboardContent() {
         <TabsContent value="division"><BreakdownCard data={divisionRollup} title="Workforce by Division" /></TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function TopList({ title, icon: Icon, data, total }: { title: string; icon: any; data: { name: string; value: number }[]; total: number }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center gap-2 pb-3">
+        <Trophy className="h-4 w-4 text-amber-500" />
+        <CardTitle className="text-base flex items-center gap-2"><Icon className="h-4 w-4" />{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No data in selected period.</p>
+        ) : (
+          <div className="space-y-3">
+            {data.map((r, i) => {
+              const pct = total ? (r.value / total) * 100 : 0;
+              return (
+                <div key={r.name + i} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 truncate">
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-semibold">{i + 1}</span>
+                      <span className="truncate font-medium">{r.name}</span>
+                    </span>
+                    <span className="font-mono text-xs tabular-nums whitespace-nowrap">
+                      {r.value.toLocaleString()} <span className="text-muted-foreground">({pct.toFixed(1)}%)</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
