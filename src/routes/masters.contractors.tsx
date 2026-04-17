@@ -196,10 +196,15 @@ function ContractorsPage() {
         return obj;
       }).filter((r) => r.company_name);
       if (records.length === 0) { toast.error("No valid rows (company_name required)"); return; }
-      const { error } = await supabase.from("contractors").insert(records);
+      // Skip duplicates already in DB (by company_name, case-insensitive)
+      const existingNames = new Set(items.map((c) => (c.company_name || "").trim().toLowerCase()));
+      const fresh = records.filter((r) => !existingNames.has((r.company_name || "").trim().toLowerCase()));
+      const skipped = records.length - fresh.length;
+      if (fresh.length === 0) { toast.info(`All ${records.length} rows already exist — nothing imported`); return; }
+      const { error } = await supabase.from("contractors").insert(fresh);
       if (error) throw error;
-      toast.success(`Imported ${records.length} contractors`);
-      load();
+      toast.success(`Imported ${fresh.length} contractors${skipped ? ` (skipped ${skipped} duplicates)` : ""}`);
+      await load();
     } catch (err: any) {
       toast.error(err.message || "Import failed");
     } finally {
@@ -238,6 +243,33 @@ function ContractorsPage() {
         </Dialog>
         </div>
       </div>
+
+      {/* Contractors List — shown first so imports are immediately visible */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">Contractors List ({items.length})</CardTitle>
+          <Input placeholder="Search contractors..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+        </CardHeader>
+        <CardContent className="p-0">
+        <Table>
+          <TableHeader><TableRow><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
+          <TableBody>
+            {filtered.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="font-medium">{c.company_name}</TableCell>
+                <TableCell>{c.contact_person || "—"}</TableCell>
+                <TableCell>{c.phone || "—"}</TableCell>
+                <TableCell>{c.contact_number || "—"}</TableCell>
+                <TableCell>{c.work_place || "—"}</TableCell>
+                <TableCell>{c.nature_of_work || "—"}</TableCell>
+                <TableCell>{c.license_number || "—"}</TableCell>
+                <TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => handleEdit(c)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
+              </TableRow>
+            ))}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </CardContent></Card>
 
       {/* Dashboard Filters */}
       <Card>
@@ -310,29 +342,6 @@ function ContractorsPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Contractors List */}
-      <Input placeholder="Search contractors..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-      <Card><CardContent className="p-0">
-        <Table>
-          <TableHeader><TableRow><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {filtered.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.company_name}</TableCell>
-                <TableCell>{c.contact_person || "—"}</TableCell>
-                <TableCell>{c.phone || "—"}</TableCell>
-                <TableCell>{c.contact_number || "—"}</TableCell>
-                <TableCell>{c.work_place || "—"}</TableCell>
-                <TableCell>{c.nature_of_work || "—"}</TableCell>
-                <TableCell>{c.license_number || "—"}</TableCell>
-                <TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => handleEdit(c)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
-          </TableBody>
-        </Table>
-      </CardContent></Card>
     </div>
   );
 }

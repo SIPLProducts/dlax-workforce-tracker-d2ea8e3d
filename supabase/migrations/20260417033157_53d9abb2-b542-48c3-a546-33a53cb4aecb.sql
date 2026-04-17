@@ -1,0 +1,1 @@
+DELETE FROM public.contractors a USING public.contractors b WHERE a.ctid < b.ctid AND lower(trim(a.company_name)) = lower(trim(b.company_name));
