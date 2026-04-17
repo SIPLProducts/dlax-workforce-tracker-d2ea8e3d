@@ -106,6 +106,7 @@ function ProjectsPage() {
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Group</TableHead>
                 <TableHead>Division</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Start Date</TableHead>
