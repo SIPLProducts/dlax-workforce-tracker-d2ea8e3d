@@ -136,7 +136,7 @@ function ReportsPage() {
   };
 
   const resetFilters = () => {
-    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setSearch("");
+    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setProjectGroup("all"); setSearch("");
   };
 
   const exportCsv = () => {
