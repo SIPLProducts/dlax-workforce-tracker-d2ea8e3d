@@ -41,6 +41,8 @@ function DailyEntryPage() {
   const [deptCategoryMap, setDeptCategoryMap] = useState<Record<string, string[]>>({});
   const [rows, setRows] = useState<ManpowerRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadMasters();
