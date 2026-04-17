@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { HardHat, Eye, EyeOff, Users, Building2, ShieldCheck, BarChart3, Loader2 } from "lucide-react";
+import { HardHat, Eye, EyeOff, Users, Building2, ShieldCheck, BarChart3, Loader2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react";
+
+const INSTALL_URL = "https://dlax.siplproducts.com";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -72,11 +75,11 @@ function LoginPage() {
           </p>
         </div>
 
-        <div className="relative z-10 space-y-4">
-          {features.map((f) => (
-            <div key={f.label} className="flex items-start gap-4 rounded-lg bg-white/5 border border-white/10 p-4 backdrop-blur-sm">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
-                <f.icon className="h-5 w-5 text-amber-400" />
+        <div className="relative z-10 space-y-3">
+          {features.slice(0, 3).map((f) => (
+            <div key={f.label} className="flex items-start gap-3 rounded-lg bg-white/5 border border-white/10 p-3 backdrop-blur-sm">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
+                <f.icon className="h-4 w-4 text-amber-400" />
               </div>
               <div>
                 <p className="font-semibold text-sm text-white">{f.label}</p>
@@ -84,6 +87,22 @@ function LoginPage() {
               </div>
             </div>
           ))}
+
+          {/* QR Install block */}
+          <div className="flex items-center gap-4 rounded-lg bg-white/5 border border-white/10 p-3 backdrop-blur-sm">
+            <div className="rounded-md bg-white p-2 shrink-0">
+              <QRCodeSVG value={INSTALL_URL} size={84} level="M" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Smartphone className="h-3.5 w-3.5 text-amber-400" />
+                <p className="font-semibold text-sm text-white">Install on Mobile</p>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 leading-snug">
+                Scan with your phone camera, then tap "Add to Home Screen" to install the DLAX app.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="relative z-10">
@@ -189,8 +208,24 @@ function LoginPage() {
           </CardContent>
         </Card>
 
+        {/* Mobile install QR (visible on tablets/desktop without left panel) */}
+        <div className="mt-6 flex items-center gap-3 rounded-lg border bg-card p-3 lg:hidden max-w-[420px] w-full">
+          <div className="rounded-md bg-white p-1.5 border shrink-0">
+            <QRCodeSVG value={INSTALL_URL} size={64} level="M" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Smartphone className="h-3.5 w-3.5 text-primary" />
+              <p className="text-sm font-semibold">Install on Mobile</p>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+              Scan and tap "Add to Home Screen".
+            </p>
+          </div>
+        </div>
+
         <p className="mt-6 text-xs text-muted-foreground lg:hidden">
-© 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
+          © 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
         </p>
       </div>
     </div>
