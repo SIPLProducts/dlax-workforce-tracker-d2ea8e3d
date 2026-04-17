@@ -51,7 +51,7 @@ function ProjectsPage() {
 
   const handleEdit = (p: any) => {
     setEditing(p);
-    setForm({ name: p.name, code: p.code || "", division: p.division || "", location: p.location || "", start_date: p.start_date || "", status: p.status });
+    setForm({ name: p.name, code: p.code || "", division: p.division || "", project_group: p.project_group || "", location: p.location || "", start_date: p.start_date || "", status: p.status });
     setOpen(true);
   };
 
