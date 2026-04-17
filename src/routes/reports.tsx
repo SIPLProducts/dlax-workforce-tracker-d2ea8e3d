@@ -93,6 +93,7 @@ function ReportsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [drill, setDrill] = useState<{ type: "project" | "contractor"; key: string; label: string } | null>(null);
 
   useEffect(() => { loadMasters(); }, []);
   useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup]);
