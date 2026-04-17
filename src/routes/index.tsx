@@ -360,6 +360,18 @@ function DashboardContent() {
         />
       </div>
 
+      {/* Top summaries — directly after KPI boxes */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total}
+          onSelect={(r) => setDrill({ type: "contractor", id: r.id, label: r.name })} />
+        <TopList title="Top Departments" icon={Layers} data={deptBreakdown.slice(0, 5)} total={stats.total} />
+        <TopList title="Top Categories" icon={ClipboardList} data={categoryBreakdown.slice(0, 5)} total={stats.total} />
+        <TopList title="Top Project Groups" icon={Building2} data={groupRollup.slice(0, 5)} total={stats.total} />
+        <TopList title="Top Divisions" icon={Building2} data={divisionRollup.slice(0, 5)} total={stats.total} />
+        <Leaderboard title="Top Projects" icon={Briefcase} rows={topProjects} total={stats.total}
+          onSelect={(r) => setDrill({ type: "project", id: r.id, label: r.name })} />
+      </div>
+
       {/* Alerts */}
       {projectsWithoutToday.length > 0 && (
         <Card className="border-l-4 border-l-amber-500">
