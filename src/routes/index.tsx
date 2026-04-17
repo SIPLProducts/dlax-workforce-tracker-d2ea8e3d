@@ -455,9 +455,9 @@ function DashboardContent() {
   );
 }
 
-function TopList({ title, icon: Icon, data, total }: { title: string; icon: any; data: { name: string; value: number }[]; total: number }) {
+function TopList({ title, icon: Icon, data, total, tint }: { title: string; icon: any; data: { name: string; value: number }[]; total: number; tint?: string }) {
   return (
-    <Card>
+    <Card className={tint}>
       <CardHeader className="flex-row items-center gap-2 pb-3">
         <Trophy className="h-4 w-4 text-amber-500" />
         <CardTitle className="text-base flex items-center gap-2"><Icon className="h-4 w-4" />{title}</CardTitle>
