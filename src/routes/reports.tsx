@@ -366,7 +366,11 @@ function ReportsPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Results ({filtered.length} entries)</CardTitle>
+              <CardTitle className="text-lg">
+                {tab === "daily" && `Daily Entries (${filtered.length})`}
+                {tab === "project" && `Project-wise Summary (${projectAgg.length})`}
+                {tab === "contractor" && `Contractor-wise Summary (${contractorAgg.length})`}
+              </CardTitle>
               <div className="flex gap-4 text-sm flex-wrap">
                 <span>Workers: <strong>{stats.total}</strong></span>
               </div>
@@ -374,42 +378,78 @@ function ReportsPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Group</TableHead>
-                    <TableHead>Contractor</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Count</TableHead>
-                    <TableHead>Remarks</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading && (
-                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>
-                  )}
-                  {!loading && filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell>{r.entry_date}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.projects?.code || "—"}</TableCell>
-                      <TableCell>{getName(r.projects)}</TableCell>
-                      <TableCell>{r.projects?.project_group || "—"}</TableCell>
-                      <TableCell>{getName(r.contractors)}</TableCell>
-                      <TableCell>{getName(r.departments)}</TableCell>
-                      <TableCell>{getName(r.worker_categories)}</TableCell>
-                      <TableCell className="text-right font-medium">{r.headcount}</TableCell>
-                      <TableCell className="text-muted-foreground">{r.remarks || "—"}</TableCell>
+              {tab === "daily" && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Group</TableHead>
+                      <TableHead>Contractor</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Count</TableHead>
+                      <TableHead>Remarks</TableHead>
                     </TableRow>
-                  ))}
-                  {!loading && filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {loading && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>}
+                    {!loading && filtered.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{r.entry_date}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.projects?.code || "—"}</TableCell>
+                        <TableCell>{getName(r.projects)}</TableCell>
+                        <TableCell>{r.projects?.project_group || "—"}</TableCell>
+                        <TableCell>{getName(r.contractors)}</TableCell>
+                        <TableCell>{getName(r.departments)}</TableCell>
+                        <TableCell>{getName(r.worker_categories)}</TableCell>
+                        <TableCell className="text-right font-medium">{r.headcount}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.remarks || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              )}
+
+              {(tab === "project" || tab === "contractor") && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{tab === "project" ? "Project" : "Contractor"}</TableHead>
+                      <TableHead>{tab === "project" ? "Code / Group" : "Nature of Work"}</TableHead>
+                      <TableHead className="text-right">Total Workers</TableHead>
+                      <TableHead className="text-right">Active Days</TableHead>
+                      <TableHead className="text-right">Avg / Day</TableHead>
+                      <TableHead className="text-right">Entries</TableHead>
+                      <TableHead className="text-right">% of Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>}
+                    {!loading && (tab === "project" ? projectAgg : contractorAgg).map((row) => {
+                      const days = row.days.size;
+                      const avg = days ? Math.round(row.headcount / days) : 0;
+                      const pct = stats.total ? Math.round((row.headcount / stats.total) * 100) : 0;
+                      return (
+                        <TableRow key={row.key}>
+                          <TableCell className="font-medium">{row.label}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{row.sub || "—"}</TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums">{row.headcount}</TableCell>
+                          <TableCell className="text-right tabular-nums">{days}</TableCell>
+                          <TableCell className="text-right tabular-nums">{avg}</TableCell>
+                          <TableCell className="text-right tabular-nums">{row.entries}</TableCell>
+                          <TableCell className="text-right tabular-nums">{pct}%</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {!loading && (tab === "project" ? projectAgg : contractorAgg).length === 0 && (
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </div>
           </CardContent>
         </Card>
