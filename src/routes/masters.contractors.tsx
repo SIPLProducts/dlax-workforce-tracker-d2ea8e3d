@@ -211,7 +211,16 @@ function ContractorsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold">Contractors</h1><p className="text-sm text-muted-foreground">Manage contractors and view workforce overview</p></div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleDownloadTemplate}><FileDown className="mr-2 h-4 w-4" />Template</Button>
+          <Button variant="outline" asChild>
+            <label className="cursor-pointer">
+              <Upload className="mr-2 h-4 w-4" />Upload
+              <input type="file" accept=".csv" className="hidden" onChange={handleUpload} />
+            </label>
+          </Button>
+          <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
