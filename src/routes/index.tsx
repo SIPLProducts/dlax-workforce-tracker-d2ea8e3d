@@ -12,13 +12,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Users, ClipboardList, HardHat, CalendarIcon, TrendingUp, TrendingDown,
   AlertTriangle, Building2, Layers, Trophy, Activity, Briefcase,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
-  Legend, PieChart, Pie, Cell, BarChart, Bar,
+  Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
 } from "recharts";
 import {
   format, subDays, eachDayOfInterval, differenceInCalendarDays,
