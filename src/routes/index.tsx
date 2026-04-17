@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Users, Building2, ClipboardList, HardHat, CalendarIcon } from "lucide-react";
+import { Users, ClipboardList, HardHat, CalendarIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { format, subDays, eachDayOfInterval } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,7 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
 }
 
 function DashboardContent() {
-  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 6));
+  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 29));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [projectId, setProjectId] = useState("all");
   const [contractorId, setContractorId] = useState("all");
@@ -92,13 +92,16 @@ function DashboardContent() {
     const totalWorkers = rows.reduce((s, r) => s + (r.headcount || 0), 0);
     const uniqueProjects = new Set(rows.map((r) => r.project_id)).size;
     const uniqueContractors = new Set(rows.map((r) => r.contractor_id)).size;
+    const uniqueDays = new Set(rows.map((r) => r.entry_date)).size;
+    const avgPerDay = uniqueDays ? Math.round(totalWorkers / uniqueDays) : 0;
     return {
       totalWorkers,
-      activeProjects: projectId === "all" ? uniqueProjects : 1,
-      activeContractors: contractorId === "all" ? uniqueContractors : 1,
+      activeProjects: uniqueProjects,
+      activeContractors: uniqueContractors,
+      avgPerDay,
       totalEntries: rows.length,
     };
-  }, [rows, projectId, contractorId]);
+  }, [rows]);
 
   const chartData = useMemo(() => {
     const days = eachDayOfInterval({ start: dateFrom, end: dateTo });
@@ -113,13 +116,13 @@ function DashboardContent() {
 
   const cards = [
     { title: "Total Workers", value: stats.totalWorkers, icon: Users, color: "text-primary" },
-    { title: "Active Projects", value: stats.activeProjects, icon: Building2, color: "text-accent" },
+    { title: "Avg Workers/Day", value: stats.avgPerDay, icon: Users, color: "text-accent" },
     { title: "Active Contractors", value: stats.activeContractors, icon: HardHat, color: "text-chart-3" },
     { title: "Total Entries", value: stats.totalEntries, icon: ClipboardList, color: "text-chart-4" },
   ];
 
   const resetFilters = () => {
-    setDateFrom(subDays(new Date(), 6));
+    setDateFrom(subDays(new Date(), 29));
     setDateTo(new Date());
     setProjectId("all");
     setContractorId("all");
