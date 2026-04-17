@@ -230,7 +230,7 @@ function ContractorsPage() {
       <Input placeholder="Search contractors..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
           <TableBody>
             {filtered.map((c) => (
               <TableRow key={c.id}>
@@ -239,11 +239,12 @@ function ContractorsPage() {
                 <TableCell>{c.phone || "—"}</TableCell>
                 <TableCell>{c.contact_number || "—"}</TableCell>
                 <TableCell>{c.work_place || "—"}</TableCell>
+                <TableCell>{c.nature_of_work || "—"}</TableCell>
                 <TableCell>{c.license_number || "—"}</TableCell>
                 <TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => handleEdit(c)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
               </TableRow>
             ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
           </TableBody>
         </Table>
       </CardContent></Card>
