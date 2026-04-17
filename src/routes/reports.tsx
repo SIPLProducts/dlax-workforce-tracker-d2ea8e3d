@@ -47,7 +47,7 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
 
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
-  const [date, setDate] = useState<Date>(new Date());
+  
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 6));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [projectId, setProjectId] = useState("all");
@@ -63,7 +63,7 @@ function ReportsPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadReport(); }, [tab, date, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId]);
+  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId]);
 
   const loadMasters = async () => {
     const [p, c, d, cat] = await Promise.all([
@@ -83,11 +83,9 @@ function ReportsPage() {
     try {
       let query = supabase.from("daily_manpower").select("*, projects(name), contractors(company_name), departments(name), worker_categories(name)");
 
-      if (tab === "daily") {
-        query = query.eq("entry_date", format(date, "yyyy-MM-dd"));
-      } else {
-        query = query.gte("entry_date", format(dateFrom, "yyyy-MM-dd")).lte("entry_date", format(dateTo, "yyyy-MM-dd"));
-      }
+      query = query
+        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
 
       if (projectId !== "all") query = query.eq("project_id", projectId);
       if (contractorId !== "all") query = query.eq("contractor_id", contractorId);
@@ -188,23 +186,15 @@ function ReportsPage() {
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {tab !== "daily" && (
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => applyPreset("today")}>Today</Button>
-                <Button size="sm" variant="outline" onClick={() => applyPreset("7d")}>Last 7 days</Button>
-                <Button size="sm" variant="outline" onClick={() => applyPreset("30d")}>Last 30 days</Button>
-                <Button size="sm" variant="outline" onClick={() => applyPreset("mtd")}>Month to date</Button>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => applyPreset("today")}>Today</Button>
+              <Button size="sm" variant="outline" onClick={() => applyPreset("7d")}>Last 7 days</Button>
+              <Button size="sm" variant="outline" onClick={() => applyPreset("30d")}>Last 30 days</Button>
+              <Button size="sm" variant="outline" onClick={() => applyPreset("mtd")}>Month to date</Button>
+            </div>
             <div className="flex flex-wrap gap-3 items-end">
-              {tab === "daily" ? (
-                <DatePicker value={date} onChange={setDate} label="Date" />
-              ) : (
-                <>
-                  <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
-                  <DatePicker value={dateTo} onChange={setDateTo} label="To" />
-                </>
-              )}
+              <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
+              <DatePicker value={dateTo} onChange={setDateTo} label="To" />
               <div className="space-y-1">
                 <Label>Project</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
