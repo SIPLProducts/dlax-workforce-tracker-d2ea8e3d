@@ -210,12 +210,22 @@ function ReportsPage() {
               <DatePicker value={dateFrom} onChange={setDateFrom} label="From" />
               <DatePicker value={dateTo} onChange={setDateTo} label="To" />
               <div className="space-y-1">
+                <Label>Project Group</Label>
+                <Select value={projectGroup} onValueChange={(v) => { setProjectGroup(v); setProjectId("all"); }}>
+                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Groups</SelectItem>
+                    {projectGroups.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
                 <Label>Project</Label>
                 <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    {visibleProjects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
