@@ -44,7 +44,7 @@ function ContractorsPage() {
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" });
+  const [form, setForm] = useState({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" });
   const [search, setSearch] = useState("");
 
   // Dashboard state
@@ -135,15 +135,15 @@ function ContractorsPage() {
         if (error) throw error;
       }
       toast.success(editing ? "Updated" : "Created");
-      setOpen(false); setEditing(null); setForm({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); load();
+      setOpen(false); setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); load();
     } catch (err: any) { toast.error(err.message); }
   };
 
-  const handleEdit = (c: any) => { setEditing(c); setForm({ company_name: c.company_name, contact_person: c.contact_person || "", phone: c.phone || "", license_number: c.license_number || "", contact_number: c.contact_number || "", work_place: c.work_place || "", nature_of_work: c.nature_of_work || "" }); setOpen(true); };
+  const handleEdit = (c: any) => { setEditing(c); setForm({ contractor_code: c.contractor_code || "", company_name: c.company_name, contact_person: c.contact_person || "", phone: c.phone || "", license_number: c.license_number || "", contact_number: c.contact_number || "", work_place: c.work_place || "", nature_of_work: c.nature_of_work || "" }); setOpen(true); };
   const handleDelete = async (id: string) => { if (!confirm("Delete?")) return; await supabase.from("contractors").delete().eq("id", id); toast.success("Deleted"); load(); };
   const filtered = items.filter((c) => c.company_name.toLowerCase().includes(search.toLowerCase()));
 
-  const CSV_COLUMNS = ["company_name", "contact_person", "phone", "contact_number", "work_place", "nature_of_work", "license_number"];
+  const CSV_COLUMNS = ["contractor_code", "company_name", "contact_person", "phone", "contact_number", "work_place", "nature_of_work", "license_number"];
 
   const csvEscape = (v: any) => {
     const s = v == null ? "" : String(v);
@@ -160,7 +160,7 @@ function ContractorsPage() {
   };
 
   const handleDownloadTemplate = () => {
-    downloadCsv("contractors_template.csv", [CSV_COLUMNS, ["ABC Builders", "John Doe", "022-1234567", "9876543210", "Block E1", "Civil", "LIC-001"]]);
+    downloadCsv("contractors_template.csv", [CSV_COLUMNS, ["C-001", "ABC Builders", "John Doe", "022-1234567", "9876543210", "Block E1", "Civil", "LIC-001"]]);
   };
 
   const handleDownloadData = () => {
@@ -236,11 +236,12 @@ function ContractorsPage() {
             </label>
           </Button>
           <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
             <div className="space-y-4">
+              <div><Label>Contractor Code</Label><Input value={form.contractor_code} onChange={(e) => setForm({ ...form, contractor_code: e.target.value })} placeholder="e.g. C-001" /></div>
               <div><Label>Company Name *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
               <div><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
               <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
@@ -380,10 +381,11 @@ function ContractorsPage() {
         </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader><TableRow><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {filtered.map((c) => (
                 <TableRow key={c.id}>
+                  <TableCell className="font-mono text-xs">{c.contractor_code || "—"}</TableCell>
                   <TableCell className="font-medium">{c.company_name}</TableCell>
                   <TableCell>{c.contact_person || "—"}</TableCell>
                   <TableCell>{c.phone || "—"}</TableCell>
@@ -394,7 +396,7 @@ function ContractorsPage() {
                   <TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => handleEdit(c)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>

@@ -19,6 +19,7 @@ export type Database = {
           company_name: string
           contact_number: string | null
           contact_person: string | null
+          contractor_code: string | null
           created_at: string
           id: string
           license_number: string | null
@@ -31,6 +32,7 @@ export type Database = {
           company_name: string
           contact_number?: string | null
           contact_person?: string | null
+          contractor_code?: string | null
           created_at?: string
           id?: string
           license_number?: string | null
@@ -43,6 +45,7 @@ export type Database = {
           company_name?: string
           contact_number?: string | null
           contact_person?: string | null
+          contractor_code?: string | null
           created_at?: string
           id?: string
           license_number?: string | null
