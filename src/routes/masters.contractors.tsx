@@ -236,11 +236,15 @@ function ContractorsPage() {
         <div><h1 className="text-2xl font-bold">Contractors</h1><p className="text-sm text-muted-foreground">Manage contractors and view workforce overview</p></div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleDownloadTemplate}><FileDown className="mr-2 h-4 w-4" />Template</Button>
-          <Button variant="outline" asChild>
-            <label className="cursor-pointer">
-              <Upload className="mr-2 h-4 w-4" />Upload
-              <input type="file" accept=".csv" className="hidden" onChange={handleUpload} />
-            </label>
+          <input
+            id="contractors-csv-upload"
+            type="file"
+            accept=".csv,text/csv,application/vnd.ms-excel"
+            className="hidden"
+            onChange={handleUpload}
+          />
+          <Button variant="outline" onClick={() => document.getElementById("contractors-csv-upload")?.click()}>
+            <Upload className="mr-2 h-4 w-4" />Upload
           </Button>
           <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
