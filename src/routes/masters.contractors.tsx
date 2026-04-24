@@ -207,9 +207,16 @@ function ContractorsPage() {
         return obj;
       }).filter((r) => r.company_name);
       if (records.length === 0) { toast.error("No valid rows (company_name required)"); return; }
-      // Skip duplicates already in DB (by company_name, case-insensitive)
-      const existingNames = new Set(items.map((c) => (c.company_name || "").trim().toLowerCase()));
-      const fresh = records.filter((r) => !existingNames.has((r.company_name || "").trim().toLowerCase()));
+      // Skip duplicates already in DB (by company_name OR contractor_code, case-insensitive)
+      const existingNames = new Set(items.map((c) => (c.company_name || "").trim().toLowerCase()).filter(Boolean));
+      const existingCodes = new Set(items.map((c) => (c.contractor_code || "").trim().toLowerCase()).filter(Boolean));
+      const fresh = records.filter((r) => {
+        const name = (r.company_name || "").trim().toLowerCase();
+        const code = (r.contractor_code || "").trim().toLowerCase();
+        if (name && existingNames.has(name)) return false;
+        if (code && existingCodes.has(code)) return false;
+        return true;
+      });
       const skipped = records.length - fresh.length;
       if (fresh.length === 0) { toast.info(`All ${records.length} rows already exist — nothing imported`); return; }
       const { error } = await supabase.from("contractors").insert(fresh);
