@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { HardHat, Eye, EyeOff, Users, Building2, ShieldCheck, BarChart3, Loader2, Smartphone } from "lucide-react";
+import { HardHat, Eye, EyeOff, Users, Building2, ShieldCheck, BarChart3, Loader2, Smartphone, User } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 
