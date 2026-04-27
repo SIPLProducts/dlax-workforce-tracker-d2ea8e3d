@@ -28,6 +28,7 @@ export const Route = createFileRoute("/users")({
 type UserWithRoles = {
   user_id: string;
   email: string | null;
+  login_id: string | null;
   display_name: string | null;
   roles: string[];
   custom_role_ids: string[];
@@ -54,7 +55,7 @@ function UsersPage() {
   const [roleOpen, setRoleOpen] = useState(false);
   const [customAssignOpen, setCustomAssignOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
-  const [newEmail, setNewEmail] = useState("");
+  const [newLoginId, setNewLoginId] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -81,9 +82,10 @@ function UsersPage() {
       if (rolesRes.error) throw rolesRes.error;
       if (customRolesRes.error) throw customRolesRes.error;
 
-      const userList: UserWithRoles[] = (profilesRes.data || []).map((p) => ({
+      const userList: UserWithRoles[] = (profilesRes.data || []).map((p: any) => ({
         user_id: p.user_id,
         email: p.email,
+        login_id: p.login_id ?? null,
         display_name: p.display_name,
         roles: (rolesRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role),
         custom_role_ids: (userCustomRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role_id),
@@ -106,16 +108,22 @@ function UsersPage() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedId = newLoginId.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{2,40}$/.test(trimmedId)) {
+      toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
+      return;
+    }
     setCreating(true);
     try {
+      const syntheticEmail = `${trimmedId}@dlax.local`;
       const { error } = await supabase.auth.signUp({
-        email: newEmail,
+        email: syntheticEmail,
         password: newPassword,
-        options: { data: { display_name: newDisplayName } },
+        options: { data: { display_name: newDisplayName, login_id: trimmedId } },
       });
       if (error) throw error;
-      toast.success("User invited! They'll receive a verification email.");
-      setNewEmail(""); setNewPassword(""); setNewDisplayName("");
+      toast.success(`User "${trimmedId}" created`);
+      setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
       setCreateOpen(false);
       setTimeout(() => fetchAll(), 1500);
     } catch (err: any) {
@@ -203,8 +211,20 @@ function UsersPage() {
           <DialogContent>
             <DialogHeader><DialogTitle>Create New User</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label>User ID</Label>
+                <Input
+                  required
+                  value={newLoginId}
+                  onChange={(e) => setNewLoginId(e.target.value)}
+                  placeholder="e.g. kpc001 or john.doe"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+                <p className="text-xs text-muted-foreground">2-40 chars. Letters, numbers, dot, underscore, dash.</p>
+              </div>
               <div className="space-y-2"><Label>Display Name</Label><Input value={newDisplayName} onChange={(e) => setNewDisplayName(e.target.value)} placeholder="John Doe" /></div>
-              <div className="space-y-2"><Label>Email</Label><Input type="email" required value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@example.com" /></div>
               <div className="space-y-2"><Label>Password</Label><Input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" minLength={6} /></div>
               <Button type="submit" className="w-full" disabled={creating}>
                 {creating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Create User"}
@@ -231,7 +251,7 @@ function UsersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Email</TableHead>
+                      <TableHead>User ID</TableHead>
                       <TableHead>Display Name</TableHead>
                       <TableHead>System Roles</TableHead>
                       <TableHead>Custom Roles</TableHead>
@@ -241,7 +261,7 @@ function UsersPage() {
                   <TableBody>
                     {users.map((u) => (
                       <TableRow key={u.user_id}>
-                        <TableCell className="font-medium">{u.email || "—"}</TableCell>
+                        <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
@@ -299,7 +319,7 @@ function UsersPage() {
                 <TableBody>
                   {users.map((u) => (
                     <TableRow key={u.user_id}>
-                      <TableCell className="font-medium">{u.email || "—"}</TableCell>
+                      <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {u.roles.length === 0 && <span className="text-muted-foreground text-sm">No role</span>}
@@ -386,7 +406,7 @@ function UsersPage() {
       {/* Add system role dialog */}
       <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add System Role to {selectedUser?.email}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add System Role to {selectedUser?.login_id || selectedUser?.email}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Select value={selectedRole} onValueChange={setSelectedRole}>
               <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
@@ -406,7 +426,7 @@ function UsersPage() {
       {/* Assign custom role dialog */}
       <Dialog open={customAssignOpen} onOpenChange={setCustomAssignOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Assign Custom Role to {selectedUser?.email}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Assign Custom Role to {selectedUser?.login_id || selectedUser?.email}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Select value={selectedCustomRole} onValueChange={setSelectedCustomRole}>
               <SelectTrigger><SelectValue placeholder="Select a custom role" /></SelectTrigger>

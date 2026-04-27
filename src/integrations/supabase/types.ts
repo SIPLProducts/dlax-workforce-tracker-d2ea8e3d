@@ -214,6 +214,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          login_id: string
           updated_at: string
           user_id: string
         }
@@ -222,6 +223,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          login_id: string
           updated_at?: string
           user_id: string
         }
@@ -230,6 +232,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          login_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -459,6 +462,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_email_for_login_id: { Args: { _login_id: string }; Returns: string }
       get_screen_permission: {
         Args: { _screen_key: string; _user_id: string }
         Returns: Database["public"]["Enums"]["permission_level"]

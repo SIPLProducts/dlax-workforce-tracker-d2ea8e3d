@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   hasRole: (role: AppRole) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithUserId: (loginId: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -77,6 +78,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const signInWithUserId = async (loginId: string, password: string) => {
+    const trimmed = loginId.trim().toLowerCase();
+    if (!trimmed) return { error: new Error("Please enter your User ID") };
+    const { data, error: lookupError } = await supabase.rpc("get_email_for_login_id", { _login_id: trimmed });
+    if (lookupError) return { error: lookupError as unknown as Error };
+    if (!data) return { error: new Error("Invalid User ID or password") };
+    const { error } = await supabase.auth.signInWithPassword({ email: data, password });
+    if (error) return { error: new Error("Invalid User ID or password") };
+    return { error: null };
+  };
+
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password });
     return { error: error as Error | null };
@@ -88,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, loading, hasRole, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, roles, loading, hasRole, signIn, signInWithUserId, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
