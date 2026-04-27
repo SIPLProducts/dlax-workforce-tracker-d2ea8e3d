@@ -1,32 +1,51 @@
-## Problem
+## Diagnosis
 
-When you click a screen in the sidebar, the menu items briefly disappear and then come back. This isn't a navigation bug — it's a permission-loading flicker.
+When `bhelstpp` (supervisor) opens **Daily Entry**, the project dropdown is empty and no entry sheet appears. Investigation in the database shows:
 
-## Root cause
+- `bhelstpp` has the `supervisor` role ✅
+- `user_projects` table contains **0 rows** for this user (and 0 rows in total across the whole DB) ❌
 
-The `usePermissions` hook (`src/hooks/use-permissions.tsx`) re-fetches permissions whenever its `roles` dependency changes. Two things make this happen on navigation:
+So no project assignment was actually saved, even though you opened the assignment dialog. Because non-admins only see projects through the `has_project_access(user, project)` RLS check, an empty `user_projects` table means the projects list is empty → the dropdown is empty → the entry sheet never shows.
 
-1. In `use-auth.tsx`, the Supabase auth listener (`onAuthStateChange`) fires on token refresh / tab focus / route changes and calls `setRoles(...)` with a brand-new array reference — even when the role values are identical. React sees a new reference and re-runs the permissions effect.
-2. While re-fetching, the hook does not preserve the previous `perms`. The sidebar's `canSee()` returns `false` for everything during that window, so all items vanish. Once the fetch resolves, items render again — producing the hide/show flicker.
+The save code in `users.tsx` (`handleSaveProjectsAssign`) looks correct — it does diff `toAdd`/`toRemove` and inserts into `user_projects`. The most likely causes are:
 
-## Fix
+1. The dialog was opened, projects ticked, but **"Save" was never clicked** (closed via X / outside-click, which discards changes).
+2. Save was clicked but the toast / error was missed.
+3. Assignment was attempted from a non-admin session (RLS would block silently in some flows).
 
-Make permissions stable so they don't blink during re-fetches.
+## Fix plan
 
-1. **Stabilize `roles` in `use-auth.tsx`**: when `fetchRoles` returns the same set of roles as before, keep the existing array reference instead of replacing it. This prevents downstream effects from re-running on every auth event.
+Two parts: (a) make this impossible to miss in the future, (b) give the user a clear path to recover right now.
 
-2. **Don't clear permissions while refetching in `use-permissions.tsx`**:
-   - Remove the `setLoading(true)` that visually resets state at the start of each fetch.
-   - Keep showing the previously computed `perms` until the new fetch resolves; only then swap them in.
-   - Optionally, treat the initial load as the only "loading" state; subsequent refreshes are background updates.
+### 1. Daily Entry: explicit "no projects assigned" state
 
-3. **Avoid unnecessary refetches**: gate the effect on a stable, sorted `roles` key (e.g. `roles.slice().sort().join(",")`) plus `user.id`, so identical role sets don't trigger work.
+In `src/routes/daily-entry.tsx`, when `projects.length === 0` after loading, show a clear empty-state card instead of an empty dropdown:
+
+> "No projects assigned to your account. Ask an admin to assign projects in **User Management → Projects**."
+
+This makes the root cause obvious to any supervisor/manager who lands on the page.
+
+### 2. User Management: confirm project assignment saves
+
+In `src/routes/users.tsx` `handleSaveProjectsAssign`:
+
+- Add a guard: if neither `toAdd` nor `toRemove` has anything, show an info toast ("No changes") instead of silently closing — so you know the click registered.
+- Surface RLS errors clearly (already throws, but add a console.error for diagnosis).
+- After save, re-read `user_projects` for that user and verify the row count matches the selection. If mismatch, show an error toast instead of "updated".
+
+### 3. One-time recovery for `bhelstpp`
+
+You can either:
+- Re-open **User Management → Projects** for `bhelstpp`, tick the projects, and click **Save**, OR
+- I can run a quick admin migration that inserts the project assignment(s) directly. Tell me which project(s) `bhelstpp` should have access to.
 
 ## Files to change
 
-- `src/hooks/use-auth.tsx` — keep `roles` reference stable when content is unchanged.
-- `src/hooks/use-permissions.tsx` — preserve previous perms during refetch; depend on a stable roles key.
+- `src/routes/daily-entry.tsx` — add empty-state when no projects are visible.
+- `src/routes/users.tsx` — harden `handleSaveProjectsAssign` with verification + clearer feedback.
 
 ## Out of scope
 
-No changes to the sidebar UI, routing, RLS, or permission logic itself. Behavior stays identical — only the flicker goes away.
+- No RLS changes. Existing `has_project_access` policy is correct.
+- No schema changes.
+- Permissions hook / sidebar flicker fixes from the previous turn stay as-is.

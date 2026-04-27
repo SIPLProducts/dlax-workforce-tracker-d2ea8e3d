@@ -243,19 +243,52 @@ function UsersPage() {
       const toAdd = [...next].filter((id) => !current.has(id));
       const toRemove = [...current].filter((id) => !next.has(id));
 
+      if (toAdd.length === 0 && toRemove.length === 0) {
+        toast.info("No changes to save");
+        return;
+      }
+
       if (toRemove.length > 0) {
         const { error } = await (supabase.from as any)("user_projects")
           .delete()
           .eq("user_id", selectedUser.user_id)
           .in("project_id", toRemove);
-        if (error) throw error;
+        if (error) {
+          console.error("user_projects delete failed:", error);
+          throw error;
+        }
       }
       if (toAdd.length > 0) {
         const rows = toAdd.map((pid) => ({ user_id: selectedUser.user_id, project_id: pid }));
         const { error } = await (supabase.from as any)("user_projects").insert(rows);
-        if (error) throw error;
+        if (error) {
+          console.error("user_projects insert failed:", error);
+          throw error;
+        }
       }
-      toast.success("Project access updated");
+
+      // Verify what actually persisted
+      const { data: verifyRows, error: verifyErr } = await (supabase.from as any)("user_projects")
+        .select("project_id")
+        .eq("user_id", selectedUser.user_id);
+      if (verifyErr) {
+        console.error("Verification read failed:", verifyErr);
+        throw verifyErr;
+      }
+      const persisted = new Set((verifyRows || []).map((r: any) => r.project_id));
+      const expected = next;
+      const mismatch =
+        persisted.size !== expected.size ||
+        [...expected].some((id) => !persisted.has(id));
+
+      if (mismatch) {
+        toast.error(
+          `Save did not persist (expected ${expected.size}, got ${persisted.size}). Check that you are signed in as an admin.`
+        );
+        return;
+      }
+
+      toast.success(`Project access updated (${persisted.size} project${persisted.size === 1 ? "" : "s"})`);
       setProjectsAssignOpen(false);
       fetchAll();
     } catch (err: any) {
