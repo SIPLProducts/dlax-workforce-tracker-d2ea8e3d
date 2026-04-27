@@ -204,6 +204,53 @@ function UsersPage() {
     } catch (err: any) { toast.error(err.message || "Failed"); }
   };
 
+  const openProjectsAssign = (u: UserWithRoles) => {
+    setSelectedUser(u);
+    setProjectsAssignSelection(new Set(u.project_ids));
+    setProjectsFilter("");
+    setProjectsAssignOpen(true);
+  };
+
+  const toggleProjectInSelection = (projectId: string) => {
+    setProjectsAssignSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const handleSaveProjectsAssign = async () => {
+    if (!selectedUser) return;
+    setSavingProjects(true);
+    try {
+      const current = new Set(selectedUser.project_ids);
+      const next = projectsAssignSelection;
+      const toAdd = [...next].filter((id) => !current.has(id));
+      const toRemove = [...current].filter((id) => !next.has(id));
+
+      if (toRemove.length > 0) {
+        const { error } = await (supabase.from as any)("user_projects")
+          .delete()
+          .eq("user_id", selectedUser.user_id)
+          .in("project_id", toRemove);
+        if (error) throw error;
+      }
+      if (toAdd.length > 0) {
+        const rows = toAdd.map((pid) => ({ user_id: selectedUser.user_id, project_id: pid }));
+        const { error } = await (supabase.from as any)("user_projects").insert(rows);
+        if (error) throw error;
+      }
+      toast.success("Project access updated");
+      setProjectsAssignOpen(false);
+      fetchAll();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save project access");
+    } finally {
+      setSavingProjects(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
