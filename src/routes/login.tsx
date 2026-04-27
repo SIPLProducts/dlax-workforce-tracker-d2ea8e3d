@@ -27,7 +27,9 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await signInWithUserId(userId, password);
+      // Auto-strip @domain in case user typed their full email
+      const cleanedId = userId.includes("@") ? userId.split("@")[0] : userId;
+      const { error } = await signInWithUserId(cleanedId, password);
       if (error) throw error;
       toast.success("Logged in successfully");
       navigate({ to: "/" });
@@ -139,10 +141,13 @@ function LoginPage() {
                     spellCheck={false}
                     value={userId}
                     onChange={(e) => setUserId(e.target.value)}
-                    placeholder="e.g. kpc001"
+                    placeholder="e.g. bala (not your email)"
                     className="h-11 pl-9"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter your User ID only — do not type your full email address.
+                </p>
               </div>
 
               <div className="space-y-2">
