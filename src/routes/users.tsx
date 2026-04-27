@@ -426,7 +426,7 @@ function UsersPage() {
       {/* Assign custom role dialog */}
       <Dialog open={customAssignOpen} onOpenChange={setCustomAssignOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Assign Custom Role to {selectedUser?.email}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Assign Custom Role to {selectedUser?.login_id || selectedUser?.email}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Select value={selectedCustomRole} onValueChange={setSelectedCustomRole}>
               <SelectTrigger><SelectValue placeholder="Select a custom role" /></SelectTrigger>
