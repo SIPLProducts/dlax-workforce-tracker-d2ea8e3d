@@ -42,6 +42,7 @@ function DailyEntryPage() {
   const [rows, setRows] = useState<ManpowerRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [mastersLoaded, setMastersLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -75,6 +76,7 @@ function DailyEntryPage() {
       map[link.department_id].push(link.category_id);
     });
     setDeptCategoryMap(map);
+    setMastersLoaded(true);
   };
 
   const loadEntries = async () => {
@@ -313,6 +315,17 @@ function DailyEntryPage() {
           </Button>
         </div>
       </div>
+
+      {mastersLoaded && projects.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center space-y-2">
+            <p className="text-base font-medium text-foreground">No projects assigned to your account</p>
+            <p className="text-sm text-muted-foreground">
+              Ask an administrator to assign projects to you under <span className="font-medium">User Management → Projects</span>.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 items-end">
         <div className="space-y-1">
