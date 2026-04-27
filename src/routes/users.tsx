@@ -211,8 +211,20 @@ function UsersPage() {
           <DialogContent>
             <DialogHeader><DialogTitle>Create New User</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label>User ID</Label>
+                <Input
+                  required
+                  value={newLoginId}
+                  onChange={(e) => setNewLoginId(e.target.value)}
+                  placeholder="e.g. kpc001 or john.doe"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+                <p className="text-xs text-muted-foreground">2-40 chars. Letters, numbers, dot, underscore, dash.</p>
+              </div>
               <div className="space-y-2"><Label>Display Name</Label><Input value={newDisplayName} onChange={(e) => setNewDisplayName(e.target.value)} placeholder="John Doe" /></div>
-              <div className="space-y-2"><Label>Email</Label><Input type="email" required value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@example.com" /></div>
               <div className="space-y-2"><Label>Password</Label><Input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" minLength={6} /></div>
               <Button type="submit" className="w-full" disabled={creating}>
                 {creating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Create User"}
