@@ -16,11 +16,10 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { signIn, signUp } = useAuth();
+  const { signInWithUserId } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -28,16 +27,10 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (isSignUp) {
-        const { error } = await signUp(email, password);
-        if (error) throw error;
-        toast.success("Account created! Check email for verification.");
-      } else {
-        const { error } = await signIn(email, password);
-        if (error) throw error;
-        toast.success("Logged in successfully");
-        navigate({ to: "/" });
-      }
+      const { error } = await signInWithUserId(userId, password);
+      if (error) throw error;
+      toast.success("Logged in successfully");
+      navigate({ to: "/" });
     } catch (err: any) {
       toast.error(err.message || "Authentication failed");
     } finally {
