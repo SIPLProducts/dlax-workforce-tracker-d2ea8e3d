@@ -27,7 +27,9 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await signInWithUserId(userId, password);
+      // Auto-strip @domain in case user typed their full email
+      const cleanedId = userId.includes("@") ? userId.split("@")[0] : userId;
+      const { error } = await signInWithUserId(cleanedId, password);
       if (error) throw error;
       toast.success("Logged in successfully");
       navigate({ to: "/" });
