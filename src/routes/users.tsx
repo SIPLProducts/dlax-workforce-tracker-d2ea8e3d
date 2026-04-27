@@ -17,6 +17,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
 import { APP_SCREENS } from "@/lib/screens";
+import { useServerFn } from "@tanstack/react-start";
+import { adminCreateUser } from "@/utils/admin-users.functions";
 
 export const Route = createFileRoute("/users")({
   component: () => (
@@ -122,6 +124,8 @@ function UsersPage() {
     if (isAdmin) fetchAll();
   }, [isAdmin, fetchAll]);
 
+  const createUserFn = useServerFn(adminCreateUser);
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedId = newLoginId.trim().toLowerCase();
@@ -131,16 +135,16 @@ function UsersPage() {
     }
     setCreating(true);
     try {
-      const syntheticEmail = `${trimmedId}@dlax.local`;
-      const { error } = await supabase.auth.signUp({
-        email: syntheticEmail,
-        password: newPassword,
-        options: { data: { display_name: newDisplayName, login_id: trimmedId } },
+      await createUserFn({
+        data: {
+          loginId: trimmedId,
+          password: newPassword,
+          displayName: newDisplayName,
+        },
       });
-      if (error) throw error;
-      toast.success(`User "${trimmedId}" created`);
+      toast.success(`User "${trimmedId}" created — they can log in immediately`);
       setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
-      setTimeout(() => fetchAll(), 1500);
+      setTimeout(() => fetchAll(), 800);
     } catch (err: any) {
       toast.error(err.message || "Failed to create user");
     } finally {

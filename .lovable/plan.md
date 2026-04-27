@@ -1,51 +1,44 @@
-## Project-wise access for users
+# Fix: New users can't log in ("Invalid User ID or password")
 
-Today every signed-in user can see and work with **all projects**. You want to scope each user to one or more **assigned projects** so:
-- A user assigned to "BHELSTPP" only sees BHELSTPP in dropdowns and reports.
-- A user can be assigned to **multiple** projects (e.g. BHELSTPP + ED-KSK).
-- Admins still see and manage everything.
+## Root cause
 
-### How it will work
+When an admin creates a new user from **User Management**, the app calls the standard signup flow. Lovable Cloud then marks that account as **"email not confirmed"** and refuses every login attempt — even though the password is correct.
 
-**1. New table: `user_projects`** (many-to-many link)
-- Columns: `user_id`, `project_id`, `created_at`.
-- Unique on (user_id, project_id) so the same project can't be assigned twice.
-- RLS: Admins manage all; users can read only their own assignments.
+Because DLAX uses internal User IDs (not real email addresses), the confirmation email goes to a fake address like `bhelstpp@dlax.local` and is never received. Result: the account is created but permanently unable to sign in.
 
-**2. Helper function `has_project_access(user_id, project_id)`**
-- Returns true if the user is admin OR has the project in `user_projects`.
-- Used in RLS policies and in the UI to filter dropdowns.
+This is exactly what's happening with **BHELSTPP** — the auth logs show `error_code: email_not_confirmed` on every login attempt.
 
-**3. Tighten RLS on data tables**
-- `projects` SELECT: admin sees all, others see only assigned projects.
-- `daily_manpower` SELECT/INSERT/UPDATE: must be for a project the user has access to.
-- `worker_attendance` SELECT/INSERT/UPDATE: same rule.
-- Admins keep full access; supervisors get insert/update only on their assigned projects.
+## The fix
 
-**4. UI: Project assignment in User Management**
-- New **"Projects"** action button on each user row (next to System / Custom).
-- Opens a panel listing all projects with checkboxes — admin ticks the ones this user can access and clicks Save.
-- Shows current assignments as badges in a new **"Projects"** column on the user table.
+Move user creation to a **secure backend function** that creates the account already confirmed, so the new user can log in the moment the admin clicks "Create User".
 
-**5. UI: Auto-filtered project dropdowns**
-- **Daily Entry** screen: project dropdown only lists assigned projects. If the user has exactly 1 project, it's pre-selected.
-- **Reports** screen: project filter only lists assigned projects; "All projects" means "all my assigned projects".
-- **Masters → Projects** stays admin-only (no change).
+### What changes
 
-**6. Admins are unaffected**
-- An admin user implicitly has access to every project — no rows needed in `user_projects`. The `has_project_access` function returns true for any project when the caller is admin.
+**1. New backend function: `admin-create-user`**
+- Only callable by admins (verified server-side using the caller's session).
+- Accepts: `login_id`, `display_name`, `password`.
+- Creates the auth user with `email_confirm: true` (no confirmation needed).
+- Stores the User ID and display name on the profile.
+- Returns success/failure to the UI.
 
-### Migration safety
-- Existing data is untouched. Until you assign projects to a non-admin user, that user will simply see no projects (dropdowns empty). You'll want to assign projects to existing supervisors/managers right after the migration — I'll surface a banner in User Management for users who have zero project assignments.
+**2. User Management screen (`src/routes/users.tsx`)**
+- The inline "Create User" form now calls the new backend function instead of the public signup endpoint.
+- Same UX — admin types User ID, name, password, hits Create. New user can log in straight away.
+- Existing fields, layout, and "keep panel open for bulk entry" behaviour are unchanged.
 
-### Open questions
+**3. One-time fix for the BHELSTPP user already stuck**
+- The migration will mark any existing `*@dlax.local` users as confirmed, so **BHELSTPP** (and any other already-created users in this state) can log in with their existing passwords immediately — no need to recreate them.
 
-1. **Default behavior for managers (view-only role):** should they also be project-scoped? Default in this plan = **yes** (managers only see reports for their assigned projects). Say if you want managers to always see all projects.
-2. **What about Daily Entry already-saved data?** A supervisor whose project access is later revoked won't see/edit those days anymore. Admins always can. OK?
+### What stays the same
+- Login screen, User ID format, password rules, role assignment, project assignment — no changes.
+- Admin user, supervisors, and managers all keep their current access.
+- The public signup endpoint is no longer used for in-app user creation (admins are the only ones who create users anyway).
 
 ### Files touched
-- `supabase/migrations/<new>.sql` — `user_projects` table, `has_project_access` function, updated RLS policies
-- `src/routes/users.tsx` — Projects column + assignment panel
-- `src/routes/daily-entry.tsx` — filter project dropdown to assigned projects
-- `src/routes/reports.tsx` — filter project dropdown to assigned projects
-- `src/hooks/use-auth.tsx` *(optional)* — expose `accessibleProjectIds` for convenience
+- `supabase/functions/admin-create-user/index.ts` *(new — secure admin-only user creation)*
+- `supabase/migrations/<new>.sql` *(one-time: confirm existing `*@dlax.local` users)*
+- `src/routes/users.tsx` *(call the new function instead of `signUp`)*
+
+### After this is deployed
+- **BHELSTPP / BHELSTPP@123** will work immediately — no need to recreate the user.
+- Any new user you add from User Management will be able to log in right away.
