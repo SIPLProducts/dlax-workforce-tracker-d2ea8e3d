@@ -108,16 +108,22 @@ function UsersPage() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedId = newLoginId.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{2,40}$/.test(trimmedId)) {
+      toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
+      return;
+    }
     setCreating(true);
     try {
+      const syntheticEmail = `${trimmedId}@dlax.local`;
       const { error } = await supabase.auth.signUp({
-        email: newEmail,
+        email: syntheticEmail,
         password: newPassword,
-        options: { data: { display_name: newDisplayName } },
+        options: { data: { display_name: newDisplayName, login_id: trimmedId } },
       });
       if (error) throw error;
-      toast.success("User invited! They'll receive a verification email.");
-      setNewEmail(""); setNewPassword(""); setNewDisplayName("");
+      toast.success(`User "${trimmedId}" created`);
+      setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
       setCreateOpen(false);
       setTimeout(() => fetchAll(), 1500);
     } catch (err: any) {
