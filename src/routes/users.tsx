@@ -319,7 +319,7 @@ function UsersPage() {
                 <TableBody>
                   {users.map((u) => (
                     <TableRow key={u.user_id}>
-                      <TableCell className="font-medium">{u.email || "—"}</TableCell>
+                      <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {u.roles.length === 0 && <span className="text-muted-foreground text-sm">No role</span>}
