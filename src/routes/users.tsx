@@ -82,9 +82,10 @@ function UsersPage() {
       if (rolesRes.error) throw rolesRes.error;
       if (customRolesRes.error) throw customRolesRes.error;
 
-      const userList: UserWithRoles[] = (profilesRes.data || []).map((p) => ({
+      const userList: UserWithRoles[] = (profilesRes.data || []).map((p: any) => ({
         user_id: p.user_id,
         email: p.email,
+        login_id: p.login_id ?? null,
         display_name: p.display_name,
         roles: (rolesRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role),
         custom_role_ids: (userCustomRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role_id),
