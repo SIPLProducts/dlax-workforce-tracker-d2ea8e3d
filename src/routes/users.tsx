@@ -55,7 +55,7 @@ function UsersPage() {
   const [roleOpen, setRoleOpen] = useState(false);
   const [customAssignOpen, setCustomAssignOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
-  const [newEmail, setNewEmail] = useState("");
+  const [newLoginId, setNewLoginId] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
