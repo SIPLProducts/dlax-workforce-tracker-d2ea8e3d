@@ -32,7 +32,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("role")
         .eq("user_id", userId);
       if (data) {
-        setRoles(data.map((r) => r.role as AppRole));
+        const next = data.map((r) => r.role as AppRole);
+        setRoles((prev) => {
+          if (prev.length === next.length && prev.every((r, i) => r === next[i])) {
+            return prev;
+          }
+          return next;
+        });
       }
     } catch (e) {
       console.error("Failed to fetch roles:", e);

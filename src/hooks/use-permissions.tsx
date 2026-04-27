@@ -30,9 +30,12 @@ export function usePermissions() {
   const [perms, setPerms] = useState<Record<string, PermissionLevel>>({});
   const [loading, setLoading] = useState(true);
 
+  const userId = user?.id;
+  const rolesKey = roles.slice().sort().join(",");
+
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
+    if (!userId) {
       setPerms({});
       setLoading(false);
       return;
@@ -40,22 +43,19 @@ export function usePermissions() {
 
     let cancelled = false;
     (async () => {
-      setLoading(true);
       try {
-        // Start with system baseline
         const merged: Record<string, PermissionLevel> = {};
-        roles.forEach((r) => {
+        rolesKey.split(",").filter(Boolean).forEach((r) => {
           const baseline = SYSTEM_BASELINE[r] || {};
           Object.entries(baseline).forEach(([k, v]) => {
             merged[k] = merged[k] ? maxPerm(merged[k], v as PermissionLevel) : (v as PermissionLevel);
           });
         });
 
-        // Layer custom-role screen permissions
         const { data: ucr } = await supabase
           .from("user_custom_roles")
           .select("role_id")
-          .eq("user_id", user.id);
+          .eq("user_id", userId);
         const roleIds = (ucr || []).map((r: any) => r.role_id);
         if (roleIds.length > 0) {
           const { data: rsp } = await supabase
@@ -76,7 +76,7 @@ export function usePermissions() {
     })();
 
     return () => { cancelled = true; };
-  }, [user, roles, authLoading]);
+  }, [userId, rolesKey, authLoading]);
 
   const get = (key: ScreenKey | string): PermissionLevel => (perms[key] as PermissionLevel) || "none";
   const canView = (key: ScreenKey | string) => RANK[get(key)] >= RANK.view;
