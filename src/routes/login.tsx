@@ -119,36 +119,35 @@ function LoginPage() {
         <Card className="w-full max-w-[420px] border-0 shadow-xl shadow-black/5 bg-card">
           <CardContent className="p-8">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-foreground">
-                {isSignUp ? "Create your account" : "Welcome back"}
-              </h2>
+              <h2 className="text-xl font-bold text-foreground">Welcome back</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {isSignUp ? "Enter your details to get started" : "Sign in to your DLAX account"}
+                Sign in to your DLAX account
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@kpc-infra.com"
-                  className="h-11"
-                />
+                <Label htmlFor="userId" className="text-sm font-medium">User ID</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="userId"
+                    type="text"
+                    required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={userId}
+                    onChange={(e) => setUserId(e.target.value)}
+                    placeholder="e.g. kpc001"
+                    className="h-11 pl-9"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-                  {!isSignUp && (
-                    <button type="button" className="text-xs text-primary hover:underline font-medium">
-                      Forgot password?
-                    </button>
-                  )}
                 </div>
                 <div className="relative">
                   <Input
@@ -178,8 +177,6 @@ function LoginPage() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Please wait...
                   </>
-                ) : isSignUp ? (
-                  "Create Account"
                 ) : (
                   "Sign In"
                 )}
@@ -187,15 +184,8 @@ function LoginPage() {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-                <button
-                  type="button"
-                  className="text-primary font-semibold hover:underline"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                >
-                  {isSignUp ? "Sign In" : "Sign Up"}
-                </button>
+              <p className="text-xs text-muted-foreground">
+                Don't have an account? Please contact your administrator.
               </p>
             </div>
           </CardContent>
