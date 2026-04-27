@@ -251,7 +251,7 @@ function UsersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Email</TableHead>
+                      <TableHead>User ID</TableHead>
                       <TableHead>Display Name</TableHead>
                       <TableHead>System Roles</TableHead>
                       <TableHead>Custom Roles</TableHead>
@@ -261,7 +261,7 @@ function UsersPage() {
                   <TableBody>
                     {users.map((u) => (
                       <TableRow key={u.user_id}>
-                        <TableCell className="font-medium">{u.email || "—"}</TableCell>
+                        <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
