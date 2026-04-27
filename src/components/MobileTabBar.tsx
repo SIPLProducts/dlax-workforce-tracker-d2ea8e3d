@@ -1,21 +1,23 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { LayoutDashboard, ClipboardList, BarChart3 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: [] as string[] },
-  { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, exact: false, roles: ["admin", "supervisor"] },
-  { to: "/reports", label: "Reports", icon: BarChart3, exact: false, roles: [] as string[] },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, screen: "dashboard" },
+  { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, exact: false, screen: "daily_entry" },
+  { to: "/reports", label: "Reports", icon: BarChart3, exact: false, screen: "reports" },
 ];
 
 export function MobileTabBar() {
-  const { user, hasRole } = useAuth();
+  const { user } = useAuth();
+  const { canView } = usePermissions();
   const location = useLocation();
 
   if (!user) return null;
 
-  const visible = tabs.filter((t) => t.roles.length === 0 || t.roles.some((r) => hasRole(r as any)));
+  const visible = tabs.filter((t) => canView(t.screen));
 
   return (
     <nav
