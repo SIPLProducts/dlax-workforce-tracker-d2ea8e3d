@@ -406,7 +406,7 @@ function UsersPage() {
       {/* Add system role dialog */}
       <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add System Role to {selectedUser?.email}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add System Role to {selectedUser?.login_id || selectedUser?.email}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Select value={selectedRole} onValueChange={setSelectedRole}>
               <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
