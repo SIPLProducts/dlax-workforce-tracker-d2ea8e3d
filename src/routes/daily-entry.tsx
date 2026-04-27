@@ -60,7 +60,12 @@ function DailyEntryPage() {
       supabase.from("worker_categories").select("*").order("name"),
       supabase.from("department_categories").select("*"),
     ]);
-    setProjects(p.data || []);
+    const projectList = p.data || [];
+    setProjects(projectList);
+    // Auto-select if user has access to exactly 1 project
+    if (projectList.length === 1 && !projectId) {
+      setProjectId(projectList[0].id);
+    }
     setContractors(c.data || []);
     setDepartments(d.data || []);
     setCategories(cat.data || []);
