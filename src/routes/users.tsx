@@ -284,11 +284,15 @@ function UsersPage() {
                       <TableHead>Display Name</TableHead>
                       <TableHead>System Roles</TableHead>
                       <TableHead>Custom Roles</TableHead>
+                      <TableHead>Projects</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u) => (
+                    {users.map((u) => {
+                      const isUserAdmin = u.roles.includes("admin");
+                      const noProjects = !isUserAdmin && u.project_ids.length === 0;
+                      return (
                       <TableRow key={u.user_id}>
                         <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
@@ -314,6 +318,23 @@ function UsersPage() {
                             })}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap max-w-[280px]">
+                            {isUserAdmin ? (
+                              <Badge variant="default" className="text-xs">All projects (admin)</Badge>
+                            ) : noProjects ? (
+                              <span className="text-amber-600 text-xs font-medium">⚠ No projects assigned</span>
+                            ) : u.project_ids.length <= 3 ? (
+                              u.project_ids.map((pid) => {
+                                const p = projects.find((x) => x.id === pid);
+                                if (!p) return null;
+                                return <Badge key={pid} variant="secondary" className="text-xs">{p.code || p.name}</Badge>;
+                              })
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">{u.project_ids.length} projects</Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right space-x-2 whitespace-nowrap">
                           <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setRoleOpen(true); }}>
                             <Shield className="h-3 w-3 mr-1" />System
@@ -321,11 +342,14 @@ function UsersPage() {
                           <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setCustomAssignOpen(true); }}>
                             <Key className="h-3 w-3 mr-1" />Custom
                           </Button>
+                          <Button variant="outline" size="sm" onClick={() => openProjectsAssign(u)}>
+                            <FolderKanban className="h-3 w-3 mr-1" />Projects
+                          </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    );})}
                     {users.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
