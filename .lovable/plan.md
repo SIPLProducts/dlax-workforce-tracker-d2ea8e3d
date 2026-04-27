@@ -1,44 +1,63 @@
-# Fix: New users can't log in ("Invalid User ID or password")
+# Fix: Custom roles don't unlock screens in the sidebar
+
+## What's happening
+
+You created a custom role **"Data Entry"** and assigned **Dashboard, Daily Entry, Reports** to it, then assigned that role to **BHELSTPP**. The data in the database is exactly right:
+
+| Screen | Permission |
+|---|---|
+| Dashboard | edit |
+| Daily Entry | edit |
+| Reports | edit |
+| (everything else) | none |
+
+But when BHELSTPP logs in, **Daily Entry doesn't appear in the sidebar** and the screens don't behave as expected.
 
 ## Root cause
 
-When an admin creates a new user from **User Management**, the app calls the standard signup flow. Lovable Cloud then marks that account as **"email not confirmed"** and refuses every login attempt — even though the password is correct.
+The sidebar menu only looks at **system roles** (admin / supervisor / manager). It has no idea custom roles or screen permissions exist. Since BHELSTPP has no system role, the sidebar hides "Daily Entry" (which it thinks requires admin or supervisor) and the user sees a stripped-down app.
 
-Because DLAX uses internal User IDs (not real email addresses), the confirmation email goes to a fake address like `bhelstpp@dlax.local` and is never received. Result: the account is created but permanently unable to sign in.
+The same issue applies to write actions inside Daily Entry — the form's "Save" buttons only show for users with the `supervisor` or `admin` system role.
 
-This is exactly what's happening with **BHELSTPP** — the auth logs show `error_code: email_not_confirmed` on every login attempt.
+## Fix
 
-## The fix
+Make the app honor custom-role screen permissions everywhere it currently honors system roles.
 
-Move user creation to a **secure backend function** that creates the account already confirmed, so the new user can log in the moment the admin clicks "Create User".
+### 1. Central permission hook
+A new `usePermissions()` hook loads each user's effective permission per screen, by combining:
+- System role (admin = edit on everything; supervisor = edit on dashboard/daily entry/reports; manager = view on dashboard/reports).
+- All custom roles assigned to the user (highest permission wins).
 
-### What changes
+Returns helpers like `canView("daily_entry")` and `canEdit("daily_entry")`.
 
-**1. New backend function: `admin-create-user`**
-- Only callable by admins (verified server-side using the caller's session).
-- Accepts: `login_id`, `display_name`, `password`.
-- Creates the auth user with `email_confirm: true` (no confirmation needed).
-- Stores the User ID and display name on the profile.
-- Returns success/failure to the UI.
+### 2. Sidebar shows screens by permission, not by system role
+**Daily Entry, Reports, Dashboard, Master Data, User Management** all become visible based on `canView(screen)` instead of a hardcoded role list. So BHELSTPP — with the "Data Entry" custom role — will immediately see the three screens you granted.
 
-**2. User Management screen (`src/routes/users.tsx`)**
-- The inline "Create User" form now calls the new backend function instead of the public signup endpoint.
-- Same UX — admin types User ID, name, password, hits Create. New user can log in straight away.
-- Existing fields, layout, and "keep panel open for bulk entry" behaviour are unchanged.
+### 3. Daily Entry "Save" works for users with edit permission
+Today the save buttons require the `supervisor` system role. They will instead require `canEdit("daily_entry")`, so the Data Entry custom role can save headcounts and worker attendance. RLS already permits this because we'll also grant `supervisor` to such users behind the scenes — actually, simpler approach:
 
-**3. One-time fix for the BHELSTPP user already stuck**
-- The migration will mark any existing `*@dlax.local` users as confirmed, so **BHELSTPP** (and any other already-created users in this state) can log in with their existing passwords immediately — no need to recreate them.
+→ **Use the existing `supervisor` system role as the "can write" flag.** When an admin assigns a custom role that grants `edit` on `daily_entry`, the app additionally adds the `supervisor` system role to that user automatically. This keeps the existing RLS policies working without changes. (You won't see this in the UI; it just happens behind the scenes when you tick "Daily Entry: edit" on a custom role assignment.)
 
-### What stays the same
-- Login screen, User ID format, password rules, role assignment, project assignment — no changes.
-- Admin user, supervisors, and managers all keep their current access.
-- The public signup endpoint is no longer used for in-app user creation (admins are the only ones who create users anyway).
+Result: BHELSTPP can save daily entry & worker attendance for their assigned projects.
 
-### Files touched
-- `supabase/functions/admin-create-user/index.ts` *(new — secure admin-only user creation)*
-- `supabase/migrations/<new>.sql` *(one-time: confirm existing `*@dlax.local` users)*
-- `src/routes/users.tsx` *(call the new function instead of `signUp`)*
+### 4. Route guards
+`AuthGuard` stays as-is (auth only). Screen-level access continues to be enforced by:
+- The sidebar (visibility)
+- RLS on the database (writes)
+- A small in-page check that shows "You don't have permission" if a non-permitted user types the URL directly.
 
-### After this is deployed
-- **BHELSTPP / BHELSTPP@123** will work immediately — no need to recreate the user.
-- Any new user you add from User Management will be able to log in right away.
+### 5. Reminder banner
+After this change, BHELSTPP also needs **at least one project assigned** under User Management → Projects, otherwise the project dropdowns on Daily Entry and Reports will still be empty (this is by design — non-admins are scoped to assigned projects only).
+
+## Files touched
+- `src/hooks/use-permissions.tsx` *(new — central permission resolver)*
+- `src/components/AppSidebar.tsx` *(visibility based on canView)*
+- `src/components/MobileTabBar.tsx` *(same)*
+- `src/routes/daily-entry.tsx` *(replace `hasRole("supervisor")` checks with `canEdit("daily_entry")`)*
+- `src/routes/reports.tsx` *(same pattern, view permission)*
+- `src/routes/users.tsx` *(when assigning a custom role that includes daily-entry edit, also grant supervisor system role)*
+
+## After this is done
+- Log out and back in as **BHELSTPP** → Dashboard, Daily Entry, Reports appear in the sidebar.
+- Make sure BHELSTPP also has at least one project assigned (User Management → Projects).
+- They'll be able to enter daily attendance for that project.
