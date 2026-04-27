@@ -24,7 +24,7 @@ export function MobileTabBar() {
       className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_rgba(0,0,0,0.04)]"
       aria-label="Primary mobile navigation"
     >
-      <ul className="grid grid-cols-3">
+      <ul className="grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, visible.length)}, minmax(0, 1fr))` }}>
         {visible.map((tab) => {
           const isActive = tab.exact ? location.pathname === tab.to : location.pathname.startsWith(tab.to);
           const Icon = tab.icon;
