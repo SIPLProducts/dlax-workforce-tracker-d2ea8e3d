@@ -28,6 +28,7 @@ export const Route = createFileRoute("/users")({
 type UserWithRoles = {
   user_id: string;
   email: string | null;
+  login_id: string | null;
   display_name: string | null;
   roles: string[];
   custom_role_ids: string[];
