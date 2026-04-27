@@ -341,6 +341,35 @@ export type Database = {
           },
         ]
       }
+      user_projects: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -466,6 +495,10 @@ export type Database = {
       get_screen_permission: {
         Args: { _screen_key: string; _user_id: string }
         Returns: Database["public"]["Enums"]["permission_level"]
+      }
+      has_project_access: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {

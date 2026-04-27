@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, Shield, Trash2, Loader2, Plus, Pencil, Key, X } from "lucide-react";
+import { UserPlus, Shield, Trash2, Loader2, Plus, Pencil, Key, X, FolderKanban, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
 import { APP_SCREENS } from "@/lib/screens";
@@ -32,8 +33,11 @@ type UserWithRoles = {
   display_name: string | null;
   roles: string[];
   custom_role_ids: string[];
+  project_ids: string[];
   created_at: string;
 };
+
+type ProjectLite = { id: string; name: string; code: string | null };
 
 type CustomRole = {
   id: string;
@@ -50,10 +54,15 @@ function UsersPage() {
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [rolePerms, setRolePerms] = useState<RolePerm[]>([]);
+  const [projects, setProjects] = useState<ProjectLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
   const [customAssignOpen, setCustomAssignOpen] = useState(false);
+  const [projectsAssignOpen, setProjectsAssignOpen] = useState(false);
+  const [projectsAssignSelection, setProjectsAssignSelection] = useState<Set<string>>(new Set());
+  const [savingProjects, setSavingProjects] = useState(false);
+  const [projectsFilter, setProjectsFilter] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [newLoginId, setNewLoginId] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -71,16 +80,21 @@ function UsersPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, customRolesRes, userCustomRes, permsRes] = await Promise.all([
+      const [profilesRes, rolesRes, customRolesRes, userCustomRes, permsRes, projectsRes, userProjectsRes] = await Promise.all([
         supabase.from("profiles").select("*"),
         supabase.from("user_roles").select("*"),
         supabase.from("custom_roles").select("*").order("name"),
         supabase.from("user_custom_roles").select("*"),
         supabase.from("role_screen_permissions").select("*"),
+        supabase.from("projects").select("id, name, code").order("name"),
+        (supabase.from as any)("user_projects").select("user_id, project_id"),
       ]);
       if (profilesRes.error) throw profilesRes.error;
       if (rolesRes.error) throw rolesRes.error;
       if (customRolesRes.error) throw customRolesRes.error;
+      if (projectsRes.error) throw projectsRes.error;
+
+      const userProjectsData: { user_id: string; project_id: string }[] = userProjectsRes?.data || [];
 
       const userList: UserWithRoles[] = (profilesRes.data || []).map((p: any) => ({
         user_id: p.user_id,
@@ -89,12 +103,14 @@ function UsersPage() {
         display_name: p.display_name,
         roles: (rolesRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role),
         custom_role_ids: (userCustomRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role_id),
+        project_ids: userProjectsData.filter((up) => up.user_id === p.user_id).map((up) => up.project_id),
         created_at: p.created_at,
       }));
 
       setUsers(userList);
       setCustomRoles(customRolesRes.data || []);
       setRolePerms((permsRes.data || []) as RolePerm[]);
+      setProjects((projectsRes.data || []) as ProjectLite[]);
     } catch (err: any) {
       toast.error("Failed to load: " + err.message);
     } finally {
@@ -188,6 +204,53 @@ function UsersPage() {
     } catch (err: any) { toast.error(err.message || "Failed"); }
   };
 
+  const openProjectsAssign = (u: UserWithRoles) => {
+    setSelectedUser(u);
+    setProjectsAssignSelection(new Set(u.project_ids));
+    setProjectsFilter("");
+    setProjectsAssignOpen(true);
+  };
+
+  const toggleProjectInSelection = (projectId: string) => {
+    setProjectsAssignSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const handleSaveProjectsAssign = async () => {
+    if (!selectedUser) return;
+    setSavingProjects(true);
+    try {
+      const current = new Set(selectedUser.project_ids);
+      const next = projectsAssignSelection;
+      const toAdd = [...next].filter((id) => !current.has(id));
+      const toRemove = [...current].filter((id) => !next.has(id));
+
+      if (toRemove.length > 0) {
+        const { error } = await (supabase.from as any)("user_projects")
+          .delete()
+          .eq("user_id", selectedUser.user_id)
+          .in("project_id", toRemove);
+        if (error) throw error;
+      }
+      if (toAdd.length > 0) {
+        const rows = toAdd.map((pid) => ({ user_id: selectedUser.user_id, project_id: pid }));
+        const { error } = await (supabase.from as any)("user_projects").insert(rows);
+        if (error) throw error;
+      }
+      toast.success("Project access updated");
+      setProjectsAssignOpen(false);
+      fetchAll();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save project access");
+    } finally {
+      setSavingProjects(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -268,11 +331,15 @@ function UsersPage() {
                       <TableHead>Display Name</TableHead>
                       <TableHead>System Roles</TableHead>
                       <TableHead>Custom Roles</TableHead>
+                      <TableHead>Projects</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u) => (
+                    {users.map((u) => {
+                      const isUserAdmin = u.roles.includes("admin");
+                      const noProjects = !isUserAdmin && u.project_ids.length === 0;
+                      return (
                       <TableRow key={u.user_id}>
                         <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
@@ -298,6 +365,23 @@ function UsersPage() {
                             })}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap max-w-[280px]">
+                            {isUserAdmin ? (
+                              <Badge variant="default" className="text-xs">All projects (admin)</Badge>
+                            ) : noProjects ? (
+                              <span className="text-amber-600 text-xs font-medium">⚠ No projects assigned</span>
+                            ) : u.project_ids.length <= 3 ? (
+                              u.project_ids.map((pid) => {
+                                const p = projects.find((x) => x.id === pid);
+                                if (!p) return null;
+                                return <Badge key={pid} variant="secondary" className="text-xs">{p.code || p.name}</Badge>;
+                              })
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">{u.project_ids.length} projects</Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right space-x-2 whitespace-nowrap">
                           <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setRoleOpen(true); }}>
                             <Shield className="h-3 w-3 mr-1" />System
@@ -305,11 +389,14 @@ function UsersPage() {
                           <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setCustomAssignOpen(true); }}>
                             <Key className="h-3 w-3 mr-1" />Custom
                           </Button>
+                          <Button variant="outline" size="sm" onClick={() => openProjectsAssign(u)}>
+                            <FolderKanban className="h-3 w-3 mr-1" />Projects
+                          </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    );})}
                     {users.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -453,6 +540,63 @@ function UsersPage() {
             <Button onClick={handleAssignCustomRole} className="w-full" disabled={!selectedCustomRole || savingRole}>
               {savingRole ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Assign Role"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Projects assignment dialog */}
+      <Dialog open={projectsAssignOpen} onOpenChange={setProjectsAssignOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Projects to {selectedUser?.login_id || selectedUser?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {selectedUser?.roles.includes("admin") && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                This user is an admin and already has access to all projects regardless of assignments below.
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Search projects by name or code..."
+                value={projectsFilter}
+                onChange={(e) => setProjectsFilter(e.target.value)}
+                className="h-9"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={() => setProjectsAssignSelection(new Set(projects.map((p) => p.id)))}>Select all</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setProjectsAssignSelection(new Set())}>Clear</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{projectsAssignSelection.size} of {projects.length} selected</p>
+            <div className="max-h-[400px] overflow-y-auto border rounded-md divide-y">
+              {projects
+                .filter((p) => {
+                  if (!projectsFilter.trim()) return true;
+                  const q = projectsFilter.trim().toLowerCase();
+                  return (p.name || "").toLowerCase().includes(q) || (p.code || "").toLowerCase().includes(q);
+                })
+                .map((p) => {
+                  const checked = projectsAssignSelection.has(p.id);
+                  return (
+                    <label key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer">
+                      <Checkbox checked={checked} onCheckedChange={() => toggleProjectInSelection(p.id)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{p.name}</div>
+                        {p.code && <div className="text-xs text-muted-foreground font-mono">{p.code}</div>}
+                      </div>
+                      {checked && <Check className="h-4 w-4 text-primary" />}
+                    </label>
+                  );
+                })}
+              {projects.length === 0 && (
+                <div className="p-4 text-center text-sm text-muted-foreground">No projects found</div>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setProjectsAssignOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveProjectsAssign} disabled={savingProjects}>
+                {savingProjects ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Save"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
