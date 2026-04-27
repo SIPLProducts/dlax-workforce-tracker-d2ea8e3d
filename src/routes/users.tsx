@@ -544,6 +544,63 @@ function UsersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Projects assignment dialog */}
+      <Dialog open={projectsAssignOpen} onOpenChange={setProjectsAssignOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Projects to {selectedUser?.login_id || selectedUser?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {selectedUser?.roles.includes("admin") && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                This user is an admin and already has access to all projects regardless of assignments below.
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Search projects by name or code..."
+                value={projectsFilter}
+                onChange={(e) => setProjectsFilter(e.target.value)}
+                className="h-9"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={() => setProjectsAssignSelection(new Set(projects.map((p) => p.id)))}>Select all</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setProjectsAssignSelection(new Set())}>Clear</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{projectsAssignSelection.size} of {projects.length} selected</p>
+            <div className="max-h-[400px] overflow-y-auto border rounded-md divide-y">
+              {projects
+                .filter((p) => {
+                  if (!projectsFilter.trim()) return true;
+                  const q = projectsFilter.trim().toLowerCase();
+                  return (p.name || "").toLowerCase().includes(q) || (p.code || "").toLowerCase().includes(q);
+                })
+                .map((p) => {
+                  const checked = projectsAssignSelection.has(p.id);
+                  return (
+                    <label key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer">
+                      <Checkbox checked={checked} onCheckedChange={() => toggleProjectInSelection(p.id)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{p.name}</div>
+                        {p.code && <div className="text-xs text-muted-foreground font-mono">{p.code}</div>}
+                      </div>
+                      {checked && <Check className="h-4 w-4 text-primary" />}
+                    </label>
+                  );
+                })}
+              {projects.length === 0 && (
+                <div className="p-4 text-center text-sm text-muted-foreground">No projects found</div>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setProjectsAssignOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveProjectsAssign} disabled={savingProjects}>
+                {savingProjects ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <RolePermissionsDialog
         open={roleDialogOpen}
         onOpenChange={setRoleDialogOpen}
