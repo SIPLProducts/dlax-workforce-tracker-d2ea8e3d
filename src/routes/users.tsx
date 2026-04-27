@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, Shield, Trash2, Loader2, Plus, Pencil, Key } from "lucide-react";
+import { UserPlus, Shield, Trash2, Loader2, Plus, Pencil, Key, X } from "lucide-react";
 import { toast } from "sonner";
 import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
 import { APP_SCREENS } from "@/lib/screens";
@@ -124,7 +124,6 @@ function UsersPage() {
       if (error) throw error;
       toast.success(`User "${trimmedId}" created`);
       setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
-      setCreateOpen(false);
       setTimeout(() => fetchAll(), 1500);
     } catch (err: any) {
       toast.error(err.message || "Failed to create user");
@@ -204,35 +203,49 @@ function UsersPage() {
           <h1 className="text-2xl font-bold text-foreground">User Management</h1>
           <p className="text-sm text-muted-foreground">Manage users, roles and screen permissions</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button><UserPlus className="h-4 w-4 mr-2" />Add User</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Create New User</DialogTitle></DialogHeader>
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div className="space-y-2">
-                <Label>User ID</Label>
-                <Input
-                  required
-                  value={newLoginId}
-                  onChange={(e) => setNewLoginId(e.target.value)}
-                  placeholder="e.g. kpc001 or john.doe"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-                <p className="text-xs text-muted-foreground">2-40 chars. Letters, numbers, dot, underscore, dash.</p>
-              </div>
-              <div className="space-y-2"><Label>Display Name</Label><Input value={newDisplayName} onChange={(e) => setNewDisplayName(e.target.value)} placeholder="John Doe" /></div>
-              <div className="space-y-2"><Label>Password</Label><Input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" minLength={6} /></div>
-              <Button type="submit" className="w-full" disabled={creating}>
-                {creating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Create User"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setCreateOpen(!createOpen)}>
+          {createOpen ? <><X className="h-4 w-4 mr-2" />Close</> : <><UserPlus className="h-4 w-4 mr-2" />Add User</>}
+        </Button>
       </div>
+
+      {createOpen && (
+        <Card>
+          <CardHeader><CardTitle>Create New User</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>User ID</Label>
+                  <Input
+                    required
+                    value={newLoginId}
+                    onChange={(e) => setNewLoginId(e.target.value)}
+                    placeholder="e.g. kpc001 or john.doe"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <p className="text-xs text-muted-foreground">2-40 chars. Letters, numbers, . _ -</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Display Name</Label>
+                  <Input value={newDisplayName} onChange={(e) => setNewDisplayName(e.target.value)} placeholder="John Doe" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" minLength={6} />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={creating}>
+                  {creating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Create User"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="users">
         <TabsList>
