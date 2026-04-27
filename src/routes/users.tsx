@@ -54,10 +54,15 @@ function UsersPage() {
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [rolePerms, setRolePerms] = useState<RolePerm[]>([]);
+  const [projects, setProjects] = useState<ProjectLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
   const [customAssignOpen, setCustomAssignOpen] = useState(false);
+  const [projectsAssignOpen, setProjectsAssignOpen] = useState(false);
+  const [projectsAssignSelection, setProjectsAssignSelection] = useState<Set<string>>(new Set());
+  const [savingProjects, setSavingProjects] = useState(false);
+  const [projectsFilter, setProjectsFilter] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [newLoginId, setNewLoginId] = useState("");
   const [newPassword, setNewPassword] = useState("");
