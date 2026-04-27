@@ -181,6 +181,16 @@ function UsersPage() {
     try {
       const { error } = await supabase.from("user_custom_roles").insert({ user_id: selectedUser.user_id, role_id: selectedCustomRole });
       if (error) throw error;
+
+      // Auto-grant supervisor system role if this custom role includes daily_entry edit
+      // (RLS uses system roles for write permission on daily_manpower & worker_attendance)
+      const grantsDailyEdit = rolePerms.some(
+        (rp) => rp.role_id === selectedCustomRole && rp.screen_key === "daily_entry" && rp.permission === "edit"
+      );
+      if (grantsDailyEdit && !selectedUser.roles.includes("supervisor") && !selectedUser.roles.includes("admin")) {
+        await supabase.from("user_roles").insert({ user_id: selectedUser.user_id, role: "supervisor" as any });
+      }
+
       toast.success("Custom role assigned");
       setCustomAssignOpen(false); setSelectedCustomRole("");
       fetchAll();
