@@ -70,7 +70,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Main</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.filter((i) => canSee(i.roles)).map((item) => (
+              {navItems.filter((i) => canSee(i.screen)).map((item) => (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                     <Link to={item.to as any}>
@@ -84,12 +84,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {masterItems.some((i) => canSee(i.roles)) && (
+        {masterItems.some((i) => canSee(i.screen)) && (
           <SidebarGroup>
             <SidebarGroupLabel>Master Data</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {masterItems.filter((i) => canSee(i.roles)).map((item) => (
+                {masterItems.filter((i) => canSee(i.screen)).map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                       <Link to={item.to as any}>
@@ -108,7 +108,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Analytics</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {reportItems.filter((i) => canSee(i.roles)).map((item) => (
+              {reportItems.filter((i) => canSee(i.screen)).map((item) => (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                     <Link to={item.to as any}>
@@ -122,12 +122,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {adminItems.some((i) => canSee(i.roles)) && (
+        {adminItems.some((i) => canSee(i.screen)) && (
           <SidebarGroup>
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminItems.filter((i) => canSee(i.roles)).map((item) => (
+                {adminItems.filter((i) => canSee(i.screen)).map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                       <Link to={item.to as any}>
