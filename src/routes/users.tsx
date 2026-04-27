@@ -80,16 +80,21 @@ function UsersPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, customRolesRes, userCustomRes, permsRes] = await Promise.all([
+      const [profilesRes, rolesRes, customRolesRes, userCustomRes, permsRes, projectsRes, userProjectsRes] = await Promise.all([
         supabase.from("profiles").select("*"),
         supabase.from("user_roles").select("*"),
         supabase.from("custom_roles").select("*").order("name"),
         supabase.from("user_custom_roles").select("*"),
         supabase.from("role_screen_permissions").select("*"),
+        supabase.from("projects").select("id, name, code").order("name"),
+        (supabase.from as any)("user_projects").select("user_id, project_id"),
       ]);
       if (profilesRes.error) throw profilesRes.error;
       if (rolesRes.error) throw rolesRes.error;
       if (customRolesRes.error) throw customRolesRes.error;
+      if (projectsRes.error) throw projectsRes.error;
+
+      const userProjectsData: { user_id: string; project_id: string }[] = userProjectsRes?.data || [];
 
       const userList: UserWithRoles[] = (profilesRes.data || []).map((p: any) => ({
         user_id: p.user_id,
@@ -98,12 +103,14 @@ function UsersPage() {
         display_name: p.display_name,
         roles: (rolesRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role),
         custom_role_ids: (userCustomRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role_id),
+        project_ids: userProjectsData.filter((up) => up.user_id === p.user_id).map((up) => up.project_id),
         created_at: p.created_at,
       }));
 
       setUsers(userList);
       setCustomRoles(customRolesRes.data || []);
       setRolePerms((permsRes.data || []) as RolePerm[]);
+      setProjects((projectsRes.data || []) as ProjectLite[]);
     } catch (err: any) {
       toast.error("Failed to load: " + err.message);
     } finally {
