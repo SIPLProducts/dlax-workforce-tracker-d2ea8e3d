@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -27,33 +28,31 @@ import {
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: [] },
-  { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, roles: ["admin", "supervisor"] },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, screen: "dashboard" },
+  { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, screen: "daily_entry" },
 ];
 
 const masterItems = [
-  { to: "/masters/projects", label: "Projects", icon: Building2, roles: ["admin"] },
-  { to: "/masters/contractors", label: "Contractors", icon: Users, roles: ["admin"] },
-  { to: "/masters/departments", label: "Departments", icon: Layers, roles: ["admin"] },
-  { to: "/masters/categories", label: "Categories", icon: Tag, roles: ["admin"] },
+  { to: "/masters/projects", label: "Projects", icon: Building2, screen: "masters_projects" },
+  { to: "/masters/contractors", label: "Contractors", icon: Users, screen: "masters_contractors" },
+  { to: "/masters/departments", label: "Departments", icon: Layers, screen: "masters_departments" },
+  { to: "/masters/categories", label: "Categories", icon: Tag, screen: "masters_categories" },
 ];
 
 const reportItems = [
-  { to: "/reports", label: "Reports", icon: BarChart3, roles: [] },
+  { to: "/reports", label: "Reports", icon: BarChart3, screen: "reports" },
 ];
 
 const adminItems = [
-  { to: "/users", label: "User Management", icon: UserCog, roles: ["admin"] },
+  { to: "/users", label: "User Management", icon: UserCog, screen: "user_management" },
 ];
 
 export function AppSidebar() {
-  const { user, roles, signOut, hasRole } = useAuth();
+  const { user, roles, signOut } = useAuth();
+  const { canView } = usePermissions();
   const location = useLocation();
 
-  const canSee = (itemRoles: string[]) => {
-    if (itemRoles.length === 0) return true;
-    return itemRoles.some((r) => hasRole(r as any));
-  };
+  const canSee = (screen: string) => canView(screen);
 
   return (
     <Sidebar>
@@ -71,7 +70,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Main</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.filter((i) => canSee(i.roles)).map((item) => (
+              {navItems.filter((i) => canSee(i.screen)).map((item) => (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                     <Link to={item.to as any}>
@@ -85,12 +84,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {masterItems.some((i) => canSee(i.roles)) && (
+        {masterItems.some((i) => canSee(i.screen)) && (
           <SidebarGroup>
             <SidebarGroupLabel>Master Data</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {masterItems.filter((i) => canSee(i.roles)).map((item) => (
+                {masterItems.filter((i) => canSee(i.screen)).map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                       <Link to={item.to as any}>
@@ -109,7 +108,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Analytics</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {reportItems.filter((i) => canSee(i.roles)).map((item) => (
+              {reportItems.filter((i) => canSee(i.screen)).map((item) => (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                     <Link to={item.to as any}>
@@ -123,12 +122,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {adminItems.some((i) => canSee(i.roles)) && (
+        {adminItems.some((i) => canSee(i.screen)) && (
           <SidebarGroup>
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminItems.filter((i) => canSee(i.roles)).map((item) => (
+                {adminItems.filter((i) => canSee(i.screen)).map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild isActive={location.pathname === item.to}>
                       <Link to={item.to as any}>

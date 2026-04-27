@@ -1,28 +1,30 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { LayoutDashboard, ClipboardList, BarChart3 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: [] as string[] },
-  { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, exact: false, roles: ["admin", "supervisor"] },
-  { to: "/reports", label: "Reports", icon: BarChart3, exact: false, roles: [] as string[] },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true, screen: "dashboard" },
+  { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, exact: false, screen: "daily_entry" },
+  { to: "/reports", label: "Reports", icon: BarChart3, exact: false, screen: "reports" },
 ];
 
 export function MobileTabBar() {
-  const { user, hasRole } = useAuth();
+  const { user } = useAuth();
+  const { canView } = usePermissions();
   const location = useLocation();
 
   if (!user) return null;
 
-  const visible = tabs.filter((t) => t.roles.length === 0 || t.roles.some((r) => hasRole(r as any)));
+  const visible = tabs.filter((t) => canView(t.screen));
 
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_rgba(0,0,0,0.04)]"
       aria-label="Primary mobile navigation"
     >
-      <ul className="grid grid-cols-3">
+      <ul className="grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, visible.length)}, minmax(0, 1fr))` }}>
         {visible.map((tab) => {
           const isActive = tab.exact ? location.pathname === tab.to : location.pathname.startsWith(tab.to);
           const Icon = tab.icon;
