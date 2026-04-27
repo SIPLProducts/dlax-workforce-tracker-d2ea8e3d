@@ -124,7 +124,6 @@ function UsersPage() {
       if (error) throw error;
       toast.success(`User "${trimmedId}" created`);
       setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
-      setCreateOpen(false);
       setTimeout(() => fetchAll(), 1500);
     } catch (err: any) {
       toast.error(err.message || "Failed to create user");
