@@ -141,10 +141,13 @@ function LoginPage() {
                     spellCheck={false}
                     value={userId}
                     onChange={(e) => setUserId(e.target.value)}
-                    placeholder="e.g. kpc001"
+                    placeholder="e.g. bala (not your email)"
                     className="h-11 pl-9"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter your User ID only — do not type your full email address.
+                </p>
               </div>
 
               <div className="space-y-2">
