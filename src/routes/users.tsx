@@ -33,8 +33,11 @@ type UserWithRoles = {
   display_name: string | null;
   roles: string[];
   custom_role_ids: string[];
+  project_ids: string[];
   created_at: string;
 };
+
+type ProjectLite = { id: string; name: string; code: string | null };
 
 type CustomRole = {
   id: string;
