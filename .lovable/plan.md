@@ -1,51 +1,42 @@
-## Diagnosis
+## What I found
 
-When `bhelstpp` (supervisor) opens **Daily Entry**, the project dropdown is empty and no entry sheet appears. Investigation in the database shows:
+Looking at the database right now:
 
-- `bhelstpp` has the `supervisor` role ✅
-- `user_projects` table contains **0 rows** for this user (and 0 rows in total across the whole DB) ❌
+**Users (profiles table) — 5 total, all visible:**
+- admin
+- bala (you, admin)
+- prasad.kvvk (admin)
+- mounikamnk07
+- bhelstpp (supervisor)
 
-So no project assignment was actually saved, even though you opened the assignment dialog. Because non-admins only see projects through the `has_project_access(user, project)` RLS check, an empty `user_projects` table means the projects list is empty → the dropdown is empty → the entry sheet never shows.
+**There is no user named `IIPEVSKP`.** `IIPEVSKP` exists only as a **project code** (in fact, two projects share that code: one named "IIPEVSKP" and one named "MD(KAK)").
 
-The save code in `users.tsx` (`handleSaveProjectsAssign`) looks correct — it does diff `toAdd`/`toRemove` and inserts into `user_projects`. The most likely causes are:
+So I need to confirm what you mean before making changes. Two likely scenarios:
 
-1. The dialog was opened, projects ticked, but **"Save" was never clicked** (closed via X / outside-click, which discards changes).
-2. Save was clicked but the toast / error was missed.
-3. Assignment was attempted from a non-admin session (RLS would block silently in some flows).
+### Scenario A — You tried to create a user `IIPEVSKP` but they don't appear in the list
+The most common cause is that the create call failed silently or the toast was missed (e.g. password too short, duplicate ID, network error). The list **does** include `bhelstpp`, so the table itself is working correctly for admins.
 
-## Fix plan
+**Fix:** Add a small "diagnostics" path to the Create User flow:
+- Log the server-side error to the browser console with full detail.
+- After a successful create, force-refresh the list immediately (today there is an 800ms delay) and verify the new `login_id` is present; if not, show a clear error with the reason.
+- Show a banner on the Users tab if the count differs from `auth.users` (admin-only).
 
-Two parts: (a) make this impossible to miss in the future, (b) give the user a clear path to recover right now.
+### Scenario B — When logged in as the new user (e.g. IIPEVSKP/bhelstpp), they don't see other users on the User Management page
+This is **expected and correct**:
+- The User Management screen is admin-only — non-admins see "You don't have permission to access this page."
+- RLS on `profiles` only lets non-admins see their own row.
 
-### 1. Daily Entry: explicit "no projects assigned" state
+If this is what you mean, the fix isn't a code change — it's a permission decision: do you want non-admins to view (but not edit) other users? If yes, I can add a read-only users list for users with the `user_management: view` custom permission.
 
-In `src/routes/daily-entry.tsx`, when `projects.length === 0` after loading, show a clear empty-state card instead of an empty dropdown:
+### Scenario C — Project `IIPEVSKP` is duplicated and you want to clean it up
+There are two projects with code `IIPEVSKP`. If that's what's confusing assignments, I can deduplicate.
 
-> "No projects assigned to your account. Ask an admin to assign projects in **User Management → Projects**."
+## What I need from you
 
-This makes the root cause obvious to any supervisor/manager who lands on the page.
+Please tell me which scenario matches:
+1. **A** — "I created IIPEVSKP user and they're missing from the list" → I'll harden the create flow + add diagnostics.
+2. **B** — "User IIPEVSKP should be able to see other users" → I'll add a read-only Users view gated by a permission.
+3. **C** — "There are duplicate IIPEVSKP projects" → I'll merge/clean them up.
+4. Something else — please describe.
 
-### 2. User Management: confirm project assignment saves
-
-In `src/routes/users.tsx` `handleSaveProjectsAssign`:
-
-- Add a guard: if neither `toAdd` nor `toRemove` has anything, show an info toast ("No changes") instead of silently closing — so you know the click registered.
-- Surface RLS errors clearly (already throws, but add a console.error for diagnosis).
-- After save, re-read `user_projects` for that user and verify the row count matches the selection. If mismatch, show an error toast instead of "updated".
-
-### 3. One-time recovery for `bhelstpp`
-
-You can either:
-- Re-open **User Management → Projects** for `bhelstpp`, tick the projects, and click **Save**, OR
-- I can run a quick admin migration that inserts the project assignment(s) directly. Tell me which project(s) `bhelstpp` should have access to.
-
-## Files to change
-
-- `src/routes/daily-entry.tsx` — add empty-state when no projects are visible.
-- `src/routes/users.tsx` — harden `handleSaveProjectsAssign` with verification + clearer feedback.
-
-## Out of scope
-
-- No RLS changes. Existing `has_project_access` policy is correct.
-- No schema changes.
-- Permissions hook / sidebar flicker fixes from the previous turn stay as-is.
+No files will be changed until you confirm which path to take.
