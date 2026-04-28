@@ -42,6 +42,16 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // Pre-check: login_id must be unique
+    const { data: existing } = await admin
+      .from("profiles")
+      .select("user_id")
+      .ilike("login_id", data.loginId)
+      .maybeSingle();
+    if (existing) {
+      throw new Error(`User ID "${data.loginId}" already exists`);
+    }
+
     const email = `${data.loginId}@dlax.local`;
     const { data: created, error } = await admin.auth.admin.createUser({
       email,
@@ -53,14 +63,41 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       },
     });
 
-    if (error) {
-      // Surface friendly message for duplicates
-      const msg = error.message || "Failed to create user";
-      if (/already|exists|registered/i.test(msg)) {
+    if (error || !created?.user) {
+      const msg = error?.message || "Failed to create user";
+      if (/already|exists|registered|duplicate/i.test(msg)) {
         throw new Error(`User ID "${data.loginId}" already exists`);
       }
       throw new Error(msg);
     }
 
-    return { userId: created.user?.id, loginId: data.loginId };
+    const newUserId = created.user.id;
+
+    // Ensure profile exists (the auth trigger should create it, but we make
+    // it deterministic here so the UI can refresh immediately).
+    const { error: upsertErr } = await admin
+      .from("profiles")
+      .upsert(
+        {
+          user_id: newUserId,
+          email,
+          login_id: data.loginId,
+          display_name: data.displayName || null,
+        },
+        { onConflict: "user_id" },
+      );
+
+    if (upsertErr) {
+      console.error("[adminCreateUser] profile upsert failed:", upsertErr);
+      throw new Error(
+        `Account created but profile save failed: ${upsertErr.message}`,
+      );
+    }
+
+    return {
+      userId: newUserId,
+      loginId: data.loginId,
+      email,
+      displayName: data.displayName || null,
+    };
   });

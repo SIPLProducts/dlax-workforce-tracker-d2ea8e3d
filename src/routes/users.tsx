@@ -146,28 +146,8 @@ function UsersPage() {
 
       toast.success(`User "${trimmedId}" created — they can log in immediately`);
       setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
-
-      // Immediate refresh + verification (profile is created via DB trigger
-      // on auth.users insert; allow up to ~3s for it to appear).
-      let appeared = false;
-      for (let i = 0; i < 6; i++) {
-        await new Promise((r) => setTimeout(r, 500));
-        const { data: check, error: checkErr } = await supabase
-          .from("profiles")
-          .select("user_id, login_id")
-          .eq("login_id", trimmedId)
-          .maybeSingle();
-        if (checkErr) {
-          console.error("[create user] profile check failed:", checkErr);
-        }
-        if (check) { appeared = true; break; }
-      }
+      setCreateOpen(false);
       await fetchAll();
-      if (!appeared) {
-        toast.error(
-          `User "${trimmedId}" was created but did not appear in the list. Try refreshing the page.`
-        );
-      }
     } catch (err: any) {
       console.error("[create user] failed:", err);
       toast.error(err.message || "Failed to create user");
