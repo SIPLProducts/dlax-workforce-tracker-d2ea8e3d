@@ -88,7 +88,7 @@ function UsersPage() {
         supabase.from("custom_roles").select("*").order("name"),
         supabase.from("user_custom_roles").select("*"),
         supabase.from("role_screen_permissions").select("*"),
-        supabase.from("projects").select("id, name, code").order("name"),
+        (supabase as any).rpc("list_assignable_projects"),
         (supabase.from as any)("user_projects").select("user_id, project_id"),
       ]);
       if (profilesRes.error) throw profilesRes.error;
