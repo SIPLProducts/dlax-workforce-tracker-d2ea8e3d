@@ -135,7 +135,7 @@ function UsersPage() {
     }
     setCreating(true);
     try {
-      const result = await createUserFn({
+      const result: any = await createUserFn({
         data: {
           loginId: trimmedId,
           password: newPassword,
@@ -144,13 +144,26 @@ function UsersPage() {
       });
       console.log("[create user] server response:", result);
 
+      if (!result || !result.userId) {
+        throw new Error(
+          result?.message || "Server did not confirm the new user. Please sign out and sign back in, then try again."
+        );
+      }
+
       toast.success(`User "${trimmedId}" created — they can log in immediately`);
       setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
       setCreateOpen(false);
       await fetchAll();
     } catch (err: any) {
       console.error("[create user] failed:", err);
-      toast.error(err.message || "Failed to create user");
+      const msg = err?.message || String(err) || "Failed to create user";
+      if (/401|unauthor/i.test(msg)) {
+        toast.error("Session expired. Please sign out and sign in again.");
+      } else if (/403|forbidden|admin only/i.test(msg)) {
+        toast.error("Only admins can create users.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setCreating(false);
     }
