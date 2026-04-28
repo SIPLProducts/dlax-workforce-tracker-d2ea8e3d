@@ -1,65 +1,33 @@
-## Plan: Fix admin project visibility for `prasad`
+## Plan
 
-### Current reason
-`prasad` has role **admin**, and the current backend access rule says:
+Fix the Daily Entry project dropdown so `prasad.kvvk` only sees the 4 assigned projects, even though the user has the admin role.
 
+## What I found
+
+- `prasad.kvvk` is an admin and has exactly 4 assigned projects: `BHELSTPP`, `IIPEVSKP`, `NLCHITES`, `UNITVSKP`.
+- The backend access function already supports restricted admins.
+- The likely issue is the `projects` table still has an admin management policy that allows admins to select all project rows, so the Daily Entry query `projects.select(*)` receives all active projects.
+
+## Changes to make
+
+1. Update the `projects` table SELECT access rule so project lists are filtered through `has_project_access(auth.uid(), id)` for all users, including admins with project assignments.
+2. Keep admin create/update/delete access for projects intact.
+3. Verify that `prasad.kvvk` resolves to exactly 4 projects through the same access logic used by Daily Entry.
+4. No UI change is needed unless the dropdown still uses a bypass query after the policy fix.
+
+## Technical details
+
+Current conflict:
 ```text
-admin = can access every project
+projects SELECT policy = has_project_access(...)
+projects ALL policy for admins = has_role(admin)
 ```
 
-So even if only 4 projects are assigned in User Management, the system still returns all projects because admin access is overriding the assignment list.
+Because `ALL` includes SELECT, admin users can still read every project. I will replace the admin `ALL` policy with write-specific admin policies, so SELECT remains scoped by project access.
 
-### Desired behavior
-Keep `prasad` as **admin**, but if an admin has project assignments, restrict that admin to only those assigned projects.
-
-New rule:
-
+Target behavior:
 ```text
-Admin with no assigned projects  -> all projects
-Admin with assigned projects     -> only assigned projects
-Supervisor/Manager               -> only assigned projects
+Admin with no project assignments -> all projects
+Admin with project assignments -> assigned projects only
+Supervisor/Manager -> assigned projects only
 ```
-
-### Implementation steps
-
-1. **Update backend project access rule**
-   - Change the `has_project_access(user_id, project_id)` database function.
-   - It will first check whether the user has explicit project assignments.
-   - If assignments exist, only those projects are accessible.
-   - If the user is admin and has no assignments, they keep full access.
-
-2. **Keep role unchanged**
-   - `prasad` remains **admin**.
-   - No need to select “all projects”.
-   - Only the 4 selected projects will be visible once assigned.
-
-3. **Update User Management display**
-   - In the users table, show clearer project scope text:
-     - `All projects (admin)` for admins with no assigned projects.
-     - `Restricted to 4 projects` for admins like `prasad`.
-     - Normal assigned project count for non-admin users.
-
-4. **Verify behavior**
-   - Login as `prasad`.
-   - Confirm Projects dropdowns, Daily Entry, Reports, and project master list only show the 4 assigned projects.
-   - Confirm other admins with no assignments still see all projects.
-
-### Technical details
-
-Replace the current logic:
-
-```sql
-has_role(user, 'admin') OR explicit_project_assignment
-```
-
-with:
-
-```sql
-explicit_project_assignment
-OR (
-  has_role(user, 'admin')
-  AND user_has_no_project_assignments
-)
-```
-
-This keeps access control enforced in the backend, not only in the UI.
