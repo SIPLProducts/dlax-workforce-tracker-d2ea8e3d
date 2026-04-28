@@ -507,6 +507,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_assignable_projects: {
+        Args: never
+        Returns: {
+          code: string
+          id: string
+          name: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "supervisor" | "manager"
