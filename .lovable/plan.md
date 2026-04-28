@@ -1,53 +1,65 @@
-## Why "pc" doesn't appear after creation
+## Plan: Fix admin project visibility for `prasad`
 
-When you click **Create User**, the UI shows a green success toast, but the user is never actually created. Behind the scenes:
+### Current reason
+`prasad` has role **admin**, and the current backend access rule says:
 
-1. The browser sends the create-user request to the server.
-2. The server **rejects it with a 401 Unauthorized** because the request is missing the login token.
-3. The error response is being silently treated as `{}` by the client, so the UI shows "success" and then refreshes — but there's no new user, because nothing was created.
-
-You can confirm this in the network logs: `POST /_serverFn/... → 401`, and the profiles list returned by the server has no `pc` row.
-
-## Root cause
-
-The protected server function (`adminCreateUser`) requires the caller's Supabase session token in the `Authorization` header. The current client call from `src/routes/users.tsx` does not attach that token, so the auth middleware rejects every request with 401.
-
-The previous "user created successfully" message for some other accounts (`bhelstpp`) likely worked by another path; new attempts (`pc`, `IIPEVSKP`) consistently fail with 401.
-
-## Fix plan
-
-1. **Forward the session token to the server function**
-   - In `src/routes/users.tsx` (`handleCreateUser`), read the current Supabase session via `supabase.auth.getSession()` and pass `access_token` in the request `headers: { Authorization: "Bearer <token>" }` when invoking `adminCreateUser`.
-   - If no session is found, abort early with a clear error toast ("Please sign in again").
-
-2. **Stop showing fake success on failure**
-   - Treat any non-2xx / thrown response from the server function as an error and display the real message.
-   - Only show the success toast and call `fetchAll()` after the server confirms a `userId` was returned.
-
-3. **Surface 401 / permission errors clearly**
-   - If the server returns 401, show "Session expired — please sign in again".
-   - If it returns 403, show "Only admins can create users".
-
-4. **Verify**
-   - Re-create user `pc` and confirm:
-     - Network: `POST /_serverFn/...` returns `200`
-     - Console: `[create user] server response` includes `userId` and `loginId`
-     - The `pc` row appears immediately in **All Users**.
-
-## Technical details
-
-Implementation will set per-call headers using TanStack's server-function options:
-
-```ts
-const { data: { session } } = await supabase.auth.getSession();
-if (!session) { toast.error("Please sign in again"); return; }
-
-const result = await createUserFn({
-  data: { loginId, password, displayName },
-  headers: { Authorization: `Bearer ${session.access_token}` },
-});
+```text
+admin = can access every project
 ```
 
-This restores the Authorization header that `requireSupabaseAuth` middleware in `src/integrations/supabase/auth-middleware.ts` expects, eliminating the 401 and letting the existing profile-upsert logic in `src/utils/admin-users.functions.ts` actually run.
+So even if only 4 projects are assigned in User Management, the system still returns all projects because admin access is overriding the assignment list.
 
-No database/schema changes are required.
+### Desired behavior
+Keep `prasad` as **admin**, but if an admin has project assignments, restrict that admin to only those assigned projects.
+
+New rule:
+
+```text
+Admin with no assigned projects  -> all projects
+Admin with assigned projects     -> only assigned projects
+Supervisor/Manager               -> only assigned projects
+```
+
+### Implementation steps
+
+1. **Update backend project access rule**
+   - Change the `has_project_access(user_id, project_id)` database function.
+   - It will first check whether the user has explicit project assignments.
+   - If assignments exist, only those projects are accessible.
+   - If the user is admin and has no assignments, they keep full access.
+
+2. **Keep role unchanged**
+   - `prasad` remains **admin**.
+   - No need to select “all projects”.
+   - Only the 4 selected projects will be visible once assigned.
+
+3. **Update User Management display**
+   - In the users table, show clearer project scope text:
+     - `All projects (admin)` for admins with no assigned projects.
+     - `Restricted to 4 projects` for admins like `prasad`.
+     - Normal assigned project count for non-admin users.
+
+4. **Verify behavior**
+   - Login as `prasad`.
+   - Confirm Projects dropdowns, Daily Entry, Reports, and project master list only show the 4 assigned projects.
+   - Confirm other admins with no assignments still see all projects.
+
+### Technical details
+
+Replace the current logic:
+
+```sql
+has_role(user, 'admin') OR explicit_project_assignment
+```
+
+with:
+
+```sql
+explicit_project_assignment
+OR (
+  has_role(user, 'admin')
+  AND user_has_no_project_assignments
+)
+```
+
+This keeps access control enforced in the backend, not only in the UI.
