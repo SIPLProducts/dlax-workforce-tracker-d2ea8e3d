@@ -35,7 +35,7 @@ const navItems = [
 const masterItems = [
   { to: "/masters/projects", label: "Projects", icon: Building2, screen: "masters_projects" },
   { to: "/masters/contractors", label: "Contractors", icon: Users, screen: "masters_contractors" },
-  { to: "/masters/departments", label: "Category of Labour", icon: Layers, screen: "masters_departments" },
+  { to: "/masters/departments", label: "Departments", icon: Layers, screen: "masters_departments" },
   { to: "/masters/categories", label: "Categories", icon: Tag, screen: "masters_categories" },
 ];
 
