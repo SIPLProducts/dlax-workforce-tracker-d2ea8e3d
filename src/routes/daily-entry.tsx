@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -309,8 +309,9 @@ function DailyEntryPage() {
       </Card>
 
       <Card>
-        <CardContent className="p-0 overflow-auto">
-          <table className="border-collapse text-xs w-full min-w-[1600px]">
+        <CardContent className="p-0">
+          <TableWithTopScroll>
+            <table className="border-collapse text-xs w-full min-w-[1600px]">
             <thead>
               {/* Group super-header */}
               <tr>
@@ -390,8 +391,43 @@ function DailyEntryPage() {
               </tfoot>
             )}
           </table>
+          </TableWithTopScroll>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function TableWithTopScroll({ children }: { children: React.ReactNode }) {
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const inner = bottomRef.current?.firstElementChild as HTMLElement | null;
+    if (!inner) return;
+    const update = () => setWidth(inner.scrollWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [children]);
+
+  const syncFromTop = () => {
+    if (topRef.current && bottomRef.current) bottomRef.current.scrollLeft = topRef.current.scrollLeft;
+  };
+  const syncFromBottom = () => {
+    if (topRef.current && bottomRef.current) topRef.current.scrollLeft = bottomRef.current.scrollLeft;
+  };
+
+  return (
+    <>
+      <div ref={topRef} onScroll={syncFromTop} className="overflow-x-auto overflow-y-hidden border-b sticky top-0 z-30 bg-background">
+        <div style={{ width, height: 1 }} />
+      </div>
+      <div ref={bottomRef} onScroll={syncFromBottom} className="overflow-auto">
+        {children}
+      </div>
+    </>
   );
 }
