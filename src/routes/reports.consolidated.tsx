@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, FileDown } from "lucide-react";
+import { CalendarIcon, FileDown, FileSpreadsheet } from "lucide-react";
 import { format, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -17,29 +17,23 @@ export const Route = createFileRoute("/reports/consolidated")({
   component: () => <AuthGuard><ConsolidatedReportPage /></AuthGuard>,
 });
 
-// Mapping from daily_manpower remarks JSON keys → report buckets
 type ReportRow = {
   project_id: string;
   project_name: string;
-  // Civil
-  civil_masons: number;       // Tiles, Granite, Brickwork, Glazing
-  civil_carpenters: number;   // Shuttering, Scaffolding, Wood works
-  civil_steel: number;        // Fabricator works, Rod benders
+  civil_masons: number;
+  civil_carpenters: number;
+  civil_steel: number;
   civil_painters: number;
   civil_helpers: number;
-  // MEP
   mep_skilled: number;
   mep_helpers: number;
-  // NMR
   nmr_mason: number;
   nmr_helpers_m: number;
   nmr_helpers_f: number;
-  // Totals
   security: number;
-  nmr_planned: number; // user-supplied target (no DB column yet)
 };
 
-const COLS: { key: keyof ReportRow; label: string; group?: string }[] = [
+const COLS: { key: keyof ReportRow; label: string }[] = [
   { key: "civil_masons", label: "Masons" },
   { key: "civil_carpenters", label: "Carpenters" },
   { key: "civil_steel", label: "Steel Fixers" },
@@ -51,6 +45,53 @@ const COLS: { key: keyof ReportRow; label: string; group?: string }[] = [
   { key: "nmr_helpers_m", label: "Helpers (M)" },
   { key: "nmr_helpers_f", label: "Helpers (F)" },
 ];
+
+// Map worker_category NAME (lowercased) → bucket key on ReportRow.
+// Covers both legacy single-category rows AND new JSON-in-remarks model.
+const CATEGORY_TO_BUCKET: Record<string, keyof ReportRow> = {
+  // Civil
+  "mason": "civil_masons",
+  "masons": "civil_masons",
+  "carpenters": "civil_carpenters",
+  "carpenter": "civil_carpenters",
+  "shuttering": "civil_carpenters",
+  "scaffolders": "civil_carpenters",
+  "rod bending": "civil_steel",
+  "steel fixers": "civil_steel",
+  "painters": "civil_painters",
+  "helpers": "civil_helpers",
+  // MEP
+  "plumbers": "mep_skilled",
+  "fitters": "mep_skilled",
+  "welders": "mep_skilled",
+  "electricians": "mep_skilled",
+  "skilled": "mep_skilled",
+  "mep helpers": "mep_helpers",
+  // NMR
+  "nmr mason": "nmr_mason",
+  "m/c": "nmr_helpers_m",
+  "f /c": "nmr_helpers_f",
+  "f/c": "nmr_helpers_f",
+};
+
+// New JSON-in-remarks key → bucket
+const JSON_KEY_TO_BUCKET: Record<string, keyof ReportRow> = {
+  civil_mason: "civil_masons",
+  civil_shuttering: "civil_carpenters",
+  civil_scaffolders: "civil_carpenters",
+  civil_rod_bending: "civil_steel",
+  civil_painters: "civil_painters",
+  civil_helpers: "civil_helpers",
+  mep_plumbers: "mep_skilled",
+  mep_carpenters: "mep_skilled",
+  mep_fitters: "mep_skilled",
+  mep_welders: "mep_skilled",
+  mep_electricians: "mep_skilled",
+  mep_helpers: "mep_helpers",
+  nmr_mason: "nmr_mason",
+  nmr_mc: "nmr_helpers_m",
+  nmr_fc: "nmr_helpers_f",
+};
 
 function ConsolidatedReportPage() {
   const today = new Date();
@@ -73,49 +114,49 @@ function ConsolidatedReportPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data: projects } = await supabase
-        .from("projects")
-        .select("id,name")
-        .order("name");
-
-      const { data: mp } = await supabase
-        .from("daily_manpower")
-        .select("project_id,headcount,security_count,remarks")
-        .eq("entry_date", format(date, "yyyy-MM-dd"));
-
+      const [{ data: projects }, { data: cats }, { data: mp }] = await Promise.all([
+        supabase.from("projects").select("id,name").order("name"),
+        supabase.from("worker_categories").select("id,name"),
+        supabase
+          .from("daily_manpower")
+          .select("project_id,category_id,headcount,security_count,remarks")
+          .eq("entry_date", format(date, "yyyy-MM-dd")),
+      ]);
       if (cancelled) return;
 
+      const catMap: Record<string, string> = {};
+      (cats || []).forEach((c: any) => (catMap[c.id] = (c.name || "").toLowerCase().trim()));
+
       const byProject: Record<string, ReportRow> = {};
-      (projects || []).forEach((p) => {
+      (projects || []).forEach((p: any) => {
         byProject[p.id] = {
-          project_id: p.id,
-          project_name: p.name,
+          project_id: p.id, project_name: p.name,
           civil_masons: 0, civil_carpenters: 0, civil_steel: 0,
           civil_painters: 0, civil_helpers: 0,
           mep_skilled: 0, mep_helpers: 0,
           nmr_mason: 0, nmr_helpers_m: 0, nmr_helpers_f: 0,
-          security: 0, nmr_planned: 0,
+          security: 0,
         };
       });
 
       (mp || []).forEach((rec: any) => {
         const r = byProject[rec.project_id];
         if (!r) return;
+
+        // 1) Try parsing remarks as JSON (new format)
         let parsed: any = null;
-        try { parsed = rec.remarks ? JSON.parse(rec.remarks) : null; } catch { /* ignore */ }
-        const g = (k: string) => Number(parsed?.[k]) || 0;
+        try { parsed = rec.remarks ? JSON.parse(rec.remarks) : null; } catch { /* not JSON */ }
 
         if (parsed && typeof parsed === "object") {
-          r.civil_masons     += g("civil_mason");
-          r.civil_carpenters += g("civil_shuttering") + g("civil_scaffolders");
-          r.civil_steel      += g("civil_rod_bending");
-          r.civil_painters   += g("civil_painters");
-          r.civil_helpers    += g("civil_helpers");
-          r.mep_skilled      += g("mep_plumbers") + g("mep_carpenters") + g("mep_fitters") + g("mep_welders") + g("mep_electricians");
-          r.mep_helpers      += g("mep_helpers");
-          r.nmr_mason        += g("nmr_mason");
-          r.nmr_helpers_m    += g("nmr_mc");
-          r.nmr_helpers_f    += g("nmr_fc");
+          Object.entries(JSON_KEY_TO_BUCKET).forEach(([k, bucket]) => {
+            const v = Number(parsed[k]) || 0;
+            if (v) (r as any)[bucket] += v;
+          });
+        } else {
+          // 2) Legacy: one row per category, headcount has the count
+          const catName = catMap[rec.category_id];
+          const bucket = catName ? CATEGORY_TO_BUCKET[catName] : undefined;
+          if (bucket) (r as any)[bucket] += Number(rec.headcount) || 0;
         }
         r.security += Number(rec.security_count) || 0;
       });
@@ -174,14 +215,21 @@ function ConsolidatedReportPage() {
   };
 
   const cell = "border px-2 py-1 text-center text-xs";
-  const head = "border px-2 py-1 text-center text-xs font-semibold bg-slate-100";
+  const head = "border px-2 py-1 text-center text-xs font-semibold";
+
+  const hasAnyData = computed.some((r) => r.total > 0 || r.security > 0);
 
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold">Consolidated Report</h1>
-          <p className="text-sm text-muted-foreground">Project-wise daily manpower summary</p>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <FileSpreadsheet className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Consolidated Report</h1>
+            <p className="text-sm text-muted-foreground">Project × Trade cross-tab — Sub Contractors/Job Works vs NMR for the selected date</p>
+          </div>
         </div>
         <Button onClick={exportExcel}><FileDown className="w-4 h-4 mr-2" />Export Excel</Button>
       </div>
@@ -189,7 +237,7 @@ function ConsolidatedReportPage() {
       <Card>
         <CardContent className="p-4 flex items-end gap-3 flex-wrap">
           <div className="space-y-1">
-            <label className="text-xs font-medium">Date</label>
+            <label className="text-xs font-medium">Report Date</label>
             <div className="flex gap-1">
               <Input
                 value={dateText}
@@ -211,38 +259,41 @@ function ConsolidatedReportPage() {
               </Popover>
             </div>
           </div>
+          {!loading && !hasAnyData && (
+            <p className="text-xs text-muted-foreground ml-auto">No manpower entries for this date. Pick another date or add entries on Daily Entry.</p>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="p-0 overflow-auto">
-          <table className="border-collapse text-xs w-full min-w-[1800px]">
+          <table className="border-collapse text-xs w-full min-w-[1900px]">
             <thead>
               <tr>
-                <th rowSpan={3} className={cn(head, "min-w-[180px] text-left")}>Name of the Project</th>
-                <th colSpan={7} className={cn(head, "bg-blue-100")}>Sub Contractors/Job Works</th>
-                <th colSpan={3} className={cn(head, "bg-orange-100")}>NMR</th>
-                <th colSpan={2} className={cn(head, "bg-emerald-100")}>Total Labour</th>
-                <th rowSpan={3} className={cn(head, "bg-green-100 min-w-[60px]")}>Total</th>
-                <th rowSpan={3} className={cn(head, "min-w-[80px]")}>NMR % on Total</th>
-                <th rowSpan={3} className={cn(head, "min-w-[100px]")}>NMR (no.s) per day as per planned</th>
-                <th rowSpan={3} className={cn(head, "min-w-[80px]")}>NMR % on no.s planned</th>
-                <th rowSpan={3} className={cn(head, "min-w-[70px]")}>Security</th>
-                <th rowSpan={3} className={cn(head, "min-w-[160px]")}>Remarks</th>
+                <th rowSpan={3} className={cn(head, "bg-slate-100 min-w-[200px] text-left")}>Name of the Project</th>
+                <th colSpan={7} className={cn(head, "bg-blue-100 text-blue-900")}>Sub Contractors/Job Works</th>
+                <th colSpan={3} className={cn(head, "bg-orange-100 text-orange-900")}>NMR</th>
+                <th colSpan={2} className={cn(head, "bg-emerald-100 text-emerald-900")}>Total Labour</th>
+                <th rowSpan={3} className={cn(head, "bg-green-100 text-green-900 min-w-[60px]")}>Total</th>
+                <th rowSpan={3} className={cn(head, "bg-slate-100 min-w-[80px]")}>NMR % on Total</th>
+                <th rowSpan={3} className={cn(head, "bg-yellow-50 min-w-[100px]")}>NMR (no.s) per day as per planned</th>
+                <th rowSpan={3} className={cn(head, "bg-slate-100 min-w-[80px]")}>NMR % on no.s planned</th>
+                <th rowSpan={3} className={cn(head, "bg-slate-100 min-w-[70px]")}>Security</th>
+                <th rowSpan={3} className={cn(head, "bg-slate-100 min-w-[160px]")}>Remarks</th>
               </tr>
               <tr>
-                <th colSpan={5} className={cn(head, "bg-blue-100")}>Civil</th>
-                <th colSpan={2} className={cn(head, "bg-blue-100")}>MEP</th>
-                <th rowSpan={2} className={cn(head, "bg-orange-100 min-w-[60px]")}>Mason</th>
-                <th rowSpan={2} className={cn(head, "bg-orange-100 min-w-[70px]")}>Helpers (M)</th>
-                <th rowSpan={2} className={cn(head, "bg-orange-100 min-w-[70px]")}>Helpers (F)</th>
-                <th rowSpan={2} className={cn(head, "bg-emerald-100 min-w-[80px]")}>Sub Contractors/ Job Work</th>
-                <th rowSpan={2} className={cn(head, "bg-emerald-100 min-w-[60px]")}>NMR</th>
+                <th colSpan={5} className={cn(head, "bg-blue-50 text-blue-900")}>Civil</th>
+                <th colSpan={2} className={cn(head, "bg-blue-50 text-blue-900")}>MEP</th>
+                <th rowSpan={2} className={cn(head, "bg-orange-50 text-orange-900 min-w-[60px]")}>Mason</th>
+                <th rowSpan={2} className={cn(head, "bg-orange-50 text-orange-900 min-w-[70px]")}>Helpers (M)</th>
+                <th rowSpan={2} className={cn(head, "bg-orange-50 text-orange-900 min-w-[70px]")}>Helpers (F)</th>
+                <th rowSpan={2} className={cn(head, "bg-emerald-50 text-emerald-900 min-w-[90px]")}>Sub Contractors / Job Work</th>
+                <th rowSpan={2} className={cn(head, "bg-emerald-50 text-emerald-900 min-w-[60px]")}>NMR</th>
               </tr>
               <tr>
-                <th className={cn(head, "bg-blue-50 min-w-[110px]")}>Masons<br /><span className="font-normal text-[10px]">Tiles, Granite, Brickwork, Glazing</span></th>
-                <th className={cn(head, "bg-blue-50 min-w-[110px]")}>Carpenters<br /><span className="font-normal text-[10px]">Shuttering, Scaffolding, Wood works</span></th>
-                <th className={cn(head, "bg-blue-50 min-w-[110px]")}>Steel Fixers<br /><span className="font-normal text-[10px]">Fabricator works, Rod benders</span></th>
+                <th className={cn(head, "bg-blue-50 min-w-[110px]")}>Masons<br /><span className="font-normal text-[10px] text-muted-foreground">Tiles, Granite, Brickwork, Glazing</span></th>
+                <th className={cn(head, "bg-blue-50 min-w-[110px]")}>Carpenters<br /><span className="font-normal text-[10px] text-muted-foreground">Shuttering, Scaffolding, Wood works</span></th>
+                <th className={cn(head, "bg-blue-50 min-w-[110px]")}>Steel Fixers<br /><span className="font-normal text-[10px] text-muted-foreground">Fabricator works, Rod benders</span></th>
                 <th className={cn(head, "bg-blue-50 min-w-[70px]")}>Painters</th>
                 <th className={cn(head, "bg-blue-50 min-w-[70px]")}>Helpers</th>
                 <th className={cn(head, "bg-blue-50 min-w-[70px]")}>Skilled</th>
