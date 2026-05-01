@@ -508,15 +508,14 @@ function DailyEntryPage() {
       {/* Save bar — desktop sticky footer */}
       {projectId && rows.length > 0 && (
         <>
-          <div className="hidden md:flex fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] z-30 border-t bg-background/95 backdrop-blur px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+          <div className="hidden md:flex fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] z-30 border-t border-border bg-background/95 backdrop-blur-sm px-6 py-3">
             <div className="flex items-center justify-between gap-4 w-full max-w-screen-2xl mx-auto">
-              <div className="flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Total headcount:</span>
-                <span className="font-bold text-foreground tabular-nums text-base">{totalHeadcount}</span>
-                <span className="text-muted-foreground">· {rows.length} row{rows.length === 1 ? "" : "s"}</span>
+              <div className="text-sm text-muted-foreground">
+                Total: <span className="font-semibold text-foreground tabular-nums">{totalHeadcount}</span>
+                <span className="mx-1.5">·</span>
+                {rows.length} row{rows.length === 1 ? "" : "s"}
               </div>
-              <Button onClick={save} disabled={saving} size="lg">
+              <Button onClick={save} disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
               </Button>
             </div>
