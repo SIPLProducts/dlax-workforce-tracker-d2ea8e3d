@@ -1,50 +1,57 @@
-## Goal
+## Daily Entry — Professional UI Polish
 
-Redesign the Daily Manpower Entry page to look modern, organized, and easier to scan — without changing any business logic, data, or save behavior.
+Frontend-only refinements to `src/routes/daily-entry.tsx`. No business logic, state, or backend changes.
 
-## What changes (visual only)
+### 1. Page header (tighter, more executive)
+- Remove the icon tile next to the title; keep the icon only in the sidebar.
+- Title `text-[22px] font-semibold tracking-tight`, subtitle `text-[13px] text-muted-foreground`.
+- Move `Template` and `Bulk Upload` into a single right-aligned button group (`size="sm"`, `h-9`, neutral outline, monochrome icons at `h-3.5 w-3.5`).
+- Replace the full-width `border-b` under the header with a subtle `border-b border-border/60` that spans the content column only.
 
-1. **Page header**
-   - Hero strip with a small icon badge (ClipboardList) next to the title
-   - Title, subtitle, and action buttons (Template, Bulk Upload) grouped on the right with cleaner spacing
-   - Becomes sticky-friendly with subtle border-bottom separation
+### 2. Unified toolbar (replaces the big filter card + action row)
+Convert the oversized gradient filter card into a single slim toolbar bar:
 
-2. **Filters card (Date + Project + actions)**
-   - Move Date, Project, "Copy Previous Day", and "Add Row" into a single rounded card with light gradient background
-   - Better labels, full-width controls on mobile, inline on desktop
-   - Primary "Add Row" button uses primary color; "Copy Previous Day" stays outline
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│ [📅 01 May 2026]  [Project ▾ Select project        ]   [Copy prev] [+ Add row] │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
-3. **Selected project info bar**
-   - Replace the plain text strip with three colored info chips (Code / Project / Group) using the existing `stat-tint-*` utilities for visual hierarchy
-   - Add a small live counter chip: total headcount and row count
+- `bg-card border border-border rounded-lg px-3 py-2` — no gradient, no shadow.
+- Inline labels removed; use placeholder text + leading icon inside each control.
+- Date and Project triggers `h-9`, equal visual weight.
+- Action buttons right-aligned with `ml-auto`; only `+ Add row` is `variant="default"`, `Copy Previous Day` becomes `variant="ghost"` with icon.
+- Stack vertically below `sm` breakpoint.
 
-4. **Entries table (desktop)**
-   - Wrap in a clean card with subtle header background
-   - Zebra striping for rows, hover highlight, slightly larger row padding
-   - Right-align Count column with tabular-nums and a subtle badge style
-   - Trash icon turns red on hover only
+### 3. Project context strip (replaces 4 colored stat tiles)
+Replace `stat-tint-blue/purple/teal/green` chips with one neutral inline strip directly above the table:
 
-5. **Entries cards (mobile)**
-   - Each row becomes a rounded sub-card with a colored left border (alternating tints)
-   - Larger touch targets and clearer field grouping
+```text
+PROJECT  [CODE] Project Name · Group         •         TOTAL  128 across 12 rows
+```
 
-6. **Empty / no-project states**
-   - Replace plain text empty state with a friendly illustration block: muted icon, headline, helper text, and a primary "Add Row" CTA inside
+- Single row, `bg-muted/30 border border-border/60 rounded-md px-4 py-2.5 text-sm`.
+- Left side: monospace code in a small `bg-background border` pill, then name, then group as muted text.
+- Right side: total headcount as `text-foreground font-semibold tabular-nums` followed by row count in muted text.
+- Collapses to two lines on mobile; no colored backgrounds anywhere.
 
-7. **Save bar**
-   - Desktop: sticky footer save bar with total headcount summary on the left and Save button on the right (matching the mobile pattern for consistency)
-   - Mobile: keep existing fixed bottom bar, polish spacing and typography
+### 4. Empty / no-project state
+- Keep the existing empty card but remove the circular muted icon background; use a plain `ClipboardList` icon at `h-8 w-8 text-muted-foreground/60` centered above the message.
+- Reduce vertical padding from `py-14` → `py-12`; tighten copy spacing.
 
-## What stays the same
+### 5. Table card refinements
+- Drop `shadow-sm`; use `border border-border rounded-lg` only.
+- `TableHeader` row: `bg-muted/40`, `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground`, `h-10`.
+- Row hover: `hover:bg-muted/30`; remove any zebra striping.
+- Tighten cell padding to `py-2.5`; numeric inputs right-aligned with `tabular-nums`.
 
-- All data flow, Supabase calls, validation, bulk upload, template download, and save logic are untouched
-- Route, props, hooks, and state remain identical
-- No new dependencies; uses existing shadcn components, Tailwind tokens, and the `stat-tint-*` utilities already in `src/styles.css`
+### 6. Sticky save bar
+- Keep sticky behavior but simplify: `border-t bg-background/95 backdrop-blur-sm` (no heavy shadow, no gradient).
+- Left: muted summary `Total: 128 · 12 rows`. Right: `Save Entries` primary button only.
 
-## Files touched
+### Files touched
+- `src/routes/daily-entry.tsx` — JSX + classNames only. No handlers, queries, or types modified.
 
-- `src/routes/daily-entry.tsx` — JSX/markup and class names only
-
-## Out of scope
-
-- Sidebar, other pages, database, permissions, or backend logic
+### Out of scope
+- No changes to bulk upload, template generation, save logic, or data model.
+- No changes to the sidebar, theme tokens, or other routes.
