@@ -88,7 +88,7 @@ function DepartmentsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this department?")) return;
+    if (!confirm("Delete this category of labour?")) return;
     await supabase.from("departments").delete().eq("id", id);
     toast.success("Deleted");
     load();
