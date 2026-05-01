@@ -187,7 +187,7 @@ function DepartmentsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Name</TableHead>
+                <TableHead className="w-[200px]">Category of Labour</TableHead>
                 <TableHead>Categories</TableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
