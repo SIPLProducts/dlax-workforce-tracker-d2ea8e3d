@@ -1,33 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Copy, Trash2, Save, FileDown, Upload, ClipboardList, Users, Inbox } from "lucide-react";
+import { CalendarIcon, Copy, Save, FileDown, Upload, ClipboardList, Inbox } from "lucide-react";
 import { format, subDays, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import * as XLSX from "xlsx";
-import { useRef } from "react";
 
 export const Route = createFileRoute("/daily-entry")({
   component: () => <AuthGuard><DailyEntryPage /></AuthGuard>,
 });
 
-type ManpowerRow = {
-  id?: string;
-  contractor_id: string;
-  department_id: string;
-  category_id: string;
-  headcount: number;
-  remarks: string;
+type CellMap = Record<string, number>; // key: `${contractor_id}:${category_id}` -> headcount
+type ExtraMap = Record<string, { security: number; deficiency: number; remarks: string }>; // key: contractor_id
+
+const GROUP_ORDER = ["CIVIL", "MEP", "NMR"] as const;
+const GROUP_LABELS: Record<string, string> = {
+  CIVIL: "CIVIL — Item rate / Subcontract",
+  MEP: "MEP — Item rate / Subcontract",
+  NMR: "NMR Man powers",
+  OTHER: "Other",
 };
 
 function DailyEntryPage() {
@@ -46,7 +46,6 @@ function DailyEntryPage() {
   };
 
   const handleDateTextChange = (raw: string) => {
-    // Auto-insert slashes for digit-only input up to 8 digits
     const digits = raw.replace(/\D/g, "").slice(0, 8);
     let formatted = raw;
     if (raw === digits && digits.length > 0) {
@@ -56,10 +55,7 @@ function DailyEntryPage() {
     }
     setDateText(formatted);
     const parsed = tryParseDate(formatted);
-    if (parsed) {
-      setDate(parsed);
-      setDateError(false);
-    }
+    if (parsed) { setDate(parsed); setDateError(false); }
   };
 
   const handleDateBlur = () => {
@@ -78,46 +74,28 @@ function DailyEntryPage() {
   const [projectId, setProjectId] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [deptCategoryMap, setDeptCategoryMap] = useState<Record<string, string[]>>({});
-  const [rows, setRows] = useState<ManpowerRow[]>([]);
+  const [cells, setCells] = useState<CellMap>({});
+  const [extras, setExtras] = useState<ExtraMap>({});
   const [saving, setSaving] = useState(false);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [mastersLoaded, setMastersLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadMasters();
-  }, []);
-
-  useEffect(() => {
-    if (projectId && date) loadEntries();
-  }, [projectId, date]);
+  useEffect(() => { loadMasters(); }, []);
+  useEffect(() => { if (projectId && date) loadEntries(); }, [projectId, date]);
 
   const loadMasters = async () => {
-    const [p, c, d, cat, dcLinks] = await Promise.all([
+    const [p, c, cat] = await Promise.all([
       supabase.from("projects").select("*").eq("status", "Active").order("name"),
-      supabase.from("contractors").select("*").order("company_name"),
-      supabase.from("departments").select("*").order("name"),
-      supabase.from("worker_categories").select("*").order("name"),
-      supabase.from("department_categories").select("*"),
+      supabase.from("contractors").select("*").order("nature_of_work").order("company_name"),
+      supabase.from("worker_categories").select("*").order("display_order").order("name"),
     ]);
     const projectList = p.data || [];
     setProjects(projectList);
-    // Auto-select if user has access to exactly 1 project
-    if (projectList.length === 1 && !projectId) {
-      setProjectId(projectList[0].id);
-    }
+    if (projectList.length === 1 && !projectId) setProjectId(projectList[0].id);
     setContractors(c.data || []);
-    setDepartments(d.data || []);
     setCategories(cat.data || []);
-    const map: Record<string, string[]> = {};
-    (dcLinks.data || []).forEach((link: any) => {
-      if (!map[link.department_id]) map[link.department_id] = [];
-      map[link.department_id].push(link.category_id);
-    });
-    setDeptCategoryMap(map);
     setMastersLoaded(true);
   };
 
@@ -127,41 +105,76 @@ function DailyEntryPage() {
       .select("*")
       .eq("entry_date", format(date, "yyyy-MM-dd"))
       .eq("project_id", projectId);
-    if (data && data.length > 0) {
-      setRows(data.map((r) => ({
-        id: r.id,
-        contractor_id: r.contractor_id,
-        department_id: r.department_id,
-        category_id: r.category_id,
-        headcount: r.headcount,
-        remarks: r.remarks || "",
-      })));
-    } else {
-      setRows([]);
-    }
-  };
-
-  const addRow = () => {
-    setRows([...rows, { contractor_id: "", department_id: "", category_id: "", headcount: 0, remarks: "" }]);
-  };
-
-  const removeRow = (idx: number) => {
-    setRows(rows.filter((_, i) => i !== idx));
-  };
-
-  const updateRow = (idx: number, field: keyof ManpowerRow, value: any) => {
-    setRows(rows.map((r, i) => {
-      if (i !== idx) return r;
-      const updated = { ...r, [field]: value };
-      // Reset category when department changes
-      if (field === "department_id" && value !== r.department_id) {
-        updated.category_id = "";
+    const cellMap: CellMap = {};
+    const extraMap: ExtraMap = {};
+    (data || []).forEach((r: any) => {
+      cellMap[`${r.contractor_id}:${r.category_id}`] = r.headcount || 0;
+      // For each contractor, aggregate the security / deficiency / remarks (we store them on every row, so any row works)
+      if (!extraMap[r.contractor_id]) {
+        extraMap[r.contractor_id] = {
+          security: r.security_count || 0,
+          deficiency: r.deficiency_manpower || 0,
+          remarks: r.remarks || "",
+        };
       }
-      return updated;
+    });
+    setCells(cellMap);
+    setExtras(extraMap);
+  };
+
+  // Group categories by category_group, preserving display_order
+  const groupedCategories = useMemo(() => {
+    const groups: Record<string, any[]> = { CIVIL: [], MEP: [], NMR: [], OTHER: [] };
+    categories.forEach((c) => {
+      const g = (c.category_group || "OTHER").toUpperCase();
+      if (groups[g]) groups[g].push(c);
+      else groups.OTHER.push(c);
+    });
+    const ordered: { group: string; cats: any[] }[] = [];
+    GROUP_ORDER.forEach((g) => { if (groups[g].length) ordered.push({ group: g, cats: groups[g] }); });
+    if (groups.OTHER.length) ordered.push({ group: "OTHER", cats: groups.OTHER });
+    return ordered;
+  }, [categories]);
+
+  const flatCategories = useMemo(() => groupedCategories.flatMap((g) => g.cats), [groupedCategories]);
+
+  // Group contractors by nature_of_work
+  const groupedContractors = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    contractors.forEach((c) => {
+      const key = (c.nature_of_work || "").trim() || "Uncategorised";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(c);
+    });
+    return Array.from(groups.entries()).map(([name, list]) => ({ name, list }));
+  }, [contractors]);
+
+  const setCell = (contractorId: string, categoryId: string, value: number) => {
+    setCells((prev) => ({ ...prev, [`${contractorId}:${categoryId}`]: value }));
+  };
+  const setExtra = (contractorId: string, field: "security" | "deficiency" | "remarks", value: any) => {
+    setExtras((prev) => ({
+      ...prev,
+      [contractorId]: { security: 0, deficiency: 0, remarks: "", ...prev[contractorId], [field]: value },
     }));
   };
 
+  const rowTotal = (contractorId: string) =>
+    flatCategories.reduce((s, cat) => s + (cells[`${contractorId}:${cat.id}`] || 0), 0);
+
+  const colTotal = (categoryId: string) =>
+    contractors.reduce((s, c) => s + (cells[`${c.id}:${categoryId}`] || 0), 0);
+
+  const grandTotal = useMemo(() =>
+    Object.values(cells).reduce((s, v) => s + (v || 0), 0)
+  , [cells]);
+
+  const securityTotal = useMemo(() =>
+    Object.values(extras).reduce((s, e) => s + (e.security || 0), 0)
+  , [extras]);
+
   const copyPreviousDay = async () => {
+    if (!projectId) { toast.error("Select a project"); return; }
     const prevDate = format(subDays(date, 1), "yyyy-MM-dd");
     const { data } = await supabase
       .from("daily_manpower")
@@ -169,13 +182,20 @@ function DailyEntryPage() {
       .eq("entry_date", prevDate)
       .eq("project_id", projectId);
     if (data && data.length > 0) {
-      setRows(data.map((r) => ({
-        contractor_id: r.contractor_id,
-        department_id: r.department_id,
-        category_id: r.category_id,
-        headcount: r.headcount,
-        remarks: r.remarks || "",
-      })));
+      const cellMap: CellMap = {};
+      const extraMap: ExtraMap = {};
+      data.forEach((r: any) => {
+        cellMap[`${r.contractor_id}:${r.category_id}`] = r.headcount || 0;
+        if (!extraMap[r.contractor_id]) {
+          extraMap[r.contractor_id] = {
+            security: r.security_count || 0,
+            deficiency: r.deficiency_manpower || 0,
+            remarks: r.remarks || "",
+          };
+        }
+      });
+      setCells(cellMap);
+      setExtras(extraMap);
       toast.success("Copied from previous day");
     } else {
       toast.info("No entries found for previous day");
@@ -184,32 +204,54 @@ function DailyEntryPage() {
 
   const save = async () => {
     if (!projectId) { toast.error("Select a project"); return; }
-    if (rows.length === 0) { toast.error("Add at least one row"); return; }
-    for (const r of rows) {
-      if (!r.contractor_id || !r.department_id || !r.category_id) {
-        toast.error("Fill all required fields in each row");
-        return;
-      }
-    }
     setSaving(true);
     try {
       const dateStr = format(date, "yyyy-MM-dd");
-      // Delete existing entries for this date/project
+      // Delete all existing for this date+project
       await supabase.from("daily_manpower").delete().eq("entry_date", dateStr).eq("project_id", projectId);
-      // Insert new
-      const inserts = rows.map((r) => ({
-        entry_date: dateStr,
-        project_id: projectId,
-        contractor_id: r.contractor_id,
-        department_id: r.department_id,
-        category_id: r.category_id,
-        headcount: r.headcount,
-        remarks: r.remarks || null,
-        created_by: user?.id,
-      }));
+
+      const inserts: any[] = [];
+      contractors.forEach((c) => {
+        const ex = extras[c.id] || { security: 0, deficiency: 0, remarks: "" };
+        const contractorCells = flatCategories
+          .map((cat) => ({ cat, hc: cells[`${c.id}:${cat.id}`] || 0 }))
+          .filter((x) => x.hc > 0);
+
+        if (contractorCells.length === 0 && ex.security === 0 && ex.deficiency === 0 && !ex.remarks) {
+          return; // nothing to save for this contractor
+        }
+
+        // Need a category for any contractor with extras-only data; pick first available category
+        const rows = contractorCells.length > 0
+          ? contractorCells
+          : (flatCategories[0] ? [{ cat: flatCategories[0], hc: 0 }] : []);
+
+        rows.forEach((row) => {
+          inserts.push({
+            entry_date: dateStr,
+            project_id: projectId,
+            contractor_id: c.id,
+            // department_id is required NOT NULL — use the first department available
+            department_id: defaultDepartmentId,
+            category_id: row.cat.id,
+            headcount: row.hc,
+            security_count: ex.security || 0,
+            deficiency_manpower: ex.deficiency || 0,
+            remarks: ex.remarks || null,
+            created_by: user?.id,
+          });
+        });
+      });
+
+      if (inserts.length === 0) {
+        toast.info("Nothing to save");
+        setSaving(false);
+        return;
+      }
+
       const { error } = await supabase.from("daily_manpower").insert(inserts);
       if (error) throw error;
-      toast.success("Saved successfully");
+      toast.success(`Saved ${inserts.length} entries`);
       loadEntries();
     } catch (err: any) {
       toast.error(err.message || "Failed to save");
@@ -218,60 +260,44 @@ function DailyEntryPage() {
     }
   };
 
-  const downloadTemplate = () => {
-    const sampleDate = format(new Date(), "yyyy-MM-dd");
-    const sampleProject = projects[0]?.code || "PROJ-001";
-    const sampleContractor = contractors[0]?.company_name || "Contractor Name";
-    const sampleDept = departments[0]?.name || "Civil";
-    const sampleCat = categories[0]?.name || "Helper";
-    const data = [
-      {
-        entry_date: sampleDate,
-        project_code: sampleProject,
-        contractor: sampleContractor,
-        department: sampleDept,
-        category: sampleCat,
-        headcount: 10,
-        remarks: "Optional notes",
-      },
-    ];
-    const ws = XLSX.utils.json_to_sheet(data, {
-      header: ["entry_date", "project_code", "contractor", "department", "category", "headcount", "remarks"],
-    });
-    ws["!cols"] = [{ wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 30 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "DailyEntry");
-    // Reference sheet
-    const ref: any[] = [];
-    ref.push({ Type: "Project Codes", Values: projects.map((p) => p.code).filter(Boolean).join(", ") });
-    ref.push({ Type: "Contractors", Values: contractors.map((c) => c.company_name).join(", ") });
-    ref.push({ Type: "Departments", Values: departments.map((d) => d.name).join(", ") });
-    ref.push({ Type: "Categories", Values: categories.map((c) => c.name).join(", ") });
-    const refWs = XLSX.utils.json_to_sheet(ref);
-    refWs["!cols"] = [{ wch: 18 }, { wch: 100 }];
-    XLSX.utils.book_append_sheet(wb, refWs, "Reference");
-    XLSX.writeFile(wb, "daily_entry_template.xlsx");
-    toast.success("Template downloaded");
-  };
+  // department_id is still NOT NULL on daily_manpower; load a default department
+  const [defaultDepartmentId, setDefaultDepartmentId] = useState<string>("");
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("departments").select("id").order("name").limit(1).maybeSingle();
+      if (data?.id) setDefaultDepartmentId(data.id);
+    })();
+  }, []);
 
-  const parseExcelDate = (v: any): string | null => {
-    if (!v) return null;
-    if (typeof v === "number") {
-      const d = XLSX.SSF.parse_date_code(v);
-      if (!d) return null;
-      return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
-    }
-    const s = String(v).trim();
-    // Try common formats
-    for (const fmt of ["yyyy-MM-dd", "dd-MM-yyyy", "dd/MM/yyyy", "MM/dd/yyyy", "d-MMM-yyyy", "dd-MMM-yyyy"]) {
-      try {
-        const d = parseDate(s, fmt, new Date());
-        if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
-      } catch {}
-    }
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return format(d, "yyyy-MM-dd");
-    return null;
+  const downloadTemplate = () => {
+    const headerRow1: any[] = ["Sl.no", "Name of the Contractor", "Contact No", "Work Place"];
+    const headerRow2: any[] = ["", "", "", ""];
+    groupedCategories.forEach((g) => {
+      g.cats.forEach((c, idx) => {
+        headerRow1.push(idx === 0 ? GROUP_LABELS[g.group] : "");
+        headerRow2.push(c.name);
+      });
+    });
+    headerRow1.push("Total", "Security", "Deficiency Manpower", "Remarks");
+    headerRow2.push("", "", "", "");
+
+    const data: any[][] = [headerRow1, headerRow2];
+    let sl = 1;
+    groupedContractors.forEach((g) => {
+      data.push([g.name]);
+      g.list.forEach((c) => {
+        const row: any[] = [sl++, c.company_name, c.contact_number || "", c.work_place || ""];
+        flatCategories.forEach((cat) => row.push(cells[`${c.id}:${cat.id}`] || ""));
+        row.push(rowTotal(c.id) || "", extras[c.id]?.security || "", extras[c.id]?.deficiency || "", extras[c.id]?.remarks || "");
+        data.push(row);
+      });
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Manpower");
+    XLSX.writeFile(wb, `manpower_${format(date, "yyyy-MM-dd")}.xlsx`);
+    toast.success("Sheet downloaded");
   };
 
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,56 +308,37 @@ function DailyEntryPage() {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
-      if (json.length === 0) { toast.error("Sheet is empty"); return; }
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as any[][];
+      if (rows.length < 3) { toast.error("Sheet appears empty"); return; }
+      const subHeader = rows[1].map((v) => String(v).toLowerCase().trim());
+      const contractorMap = new Map(contractors.map((c) => [String(c.company_name).toLowerCase().trim(), c]));
+      const catMap = new Map(flatCategories.map((c) => [String(c.name).toLowerCase().trim(), c]));
 
-      // Build lookup maps (case-insensitive)
-      const projByCode = new Map(projects.filter((p) => p.code).map((p) => [String(p.code).toLowerCase().trim(), p]));
-      const projByName = new Map(projects.map((p) => [String(p.name).toLowerCase().trim(), p]));
-      const contMap = new Map(contractors.map((c) => [String(c.company_name).toLowerCase().trim(), c]));
-      const deptMap = new Map(departments.map((d) => [String(d.name).toLowerCase().trim(), d]));
-      const catMap = new Map(categories.map((c) => [String(c.name).toLowerCase().trim(), c]));
-
-      const inserts: any[] = [];
-      const errors: string[] = [];
-
-      json.forEach((row, idx) => {
-        const lineNo = idx + 2;
-        const dateStr = parseExcelDate(row.entry_date ?? row.date ?? row.Date);
-        if (!dateStr) { errors.push(`Row ${lineNo}: invalid date`); return; }
-        const projKey = String(row.project_code ?? row.project ?? "").toLowerCase().trim();
-        const proj = projByCode.get(projKey) || projByName.get(projKey);
-        if (!proj) { errors.push(`Row ${lineNo}: project not found "${row.project_code ?? row.project}"`); return; }
-        const cont = contMap.get(String(row.contractor ?? "").toLowerCase().trim());
-        if (!cont) { errors.push(`Row ${lineNo}: contractor not found "${row.contractor}"`); return; }
-        const dept = deptMap.get(String(row.department ?? "").toLowerCase().trim());
-        if (!dept) { errors.push(`Row ${lineNo}: department not found "${row.department}"`); return; }
-        const cat = catMap.get(String(row.category ?? "").toLowerCase().trim());
-        if (!cat) { errors.push(`Row ${lineNo}: category not found "${row.category}"`); return; }
-        const hc = parseInt(String(row.headcount ?? 0)) || 0;
-        inserts.push({
-          entry_date: dateStr,
-          project_id: proj.id,
-          contractor_id: cont.id,
-          department_id: dept.id,
-          category_id: cat.id,
-          headcount: hc,
-          remarks: row.remarks ? String(row.remarks) : null,
-          created_by: user?.id,
-        });
-      });
-
-      if (errors.length > 0 && inserts.length === 0) {
-        toast.error(`Upload failed. ${errors.length} error(s). First: ${errors[0]}`);
-        console.error("Bulk upload errors:", errors);
-        return;
+      const newCells: CellMap = { ...cells };
+      const newExtras: ExtraMap = { ...extras };
+      let updated = 0;
+      for (let i = 2; i < rows.length; i++) {
+        const r = rows[i];
+        const name = String(r[1] || "").toLowerCase().trim();
+        if (!name) continue;
+        const cont = contractorMap.get(name);
+        if (!cont) continue;
+        for (let col = 4; col < subHeader.length - 4; col++) {
+          const cat = catMap.get(subHeader[col]);
+          if (!cat) continue;
+          const val = parseInt(String(r[col] || 0)) || 0;
+          newCells[`${cont.id}:${cat.id}`] = val;
+        }
+        const lastIdx = subHeader.length;
+        const sec = parseInt(String(r[lastIdx - 3] || 0)) || 0;
+        const def = parseInt(String(r[lastIdx - 2] || 0)) || 0;
+        const rem = String(r[lastIdx - 1] || "");
+        newExtras[cont.id] = { security: sec, deficiency: def, remarks: rem };
+        updated++;
       }
-
-      const { error } = await supabase.from("daily_manpower").insert(inserts);
-      if (error) throw error;
-      toast.success(`Uploaded ${inserts.length} entries${errors.length ? ` (${errors.length} skipped)` : ""}`);
-      if (errors.length) console.warn("Skipped rows:", errors);
-      if (projectId && date) loadEntries();
+      setCells(newCells);
+      setExtras(newExtras);
+      toast.success(`Loaded ${updated} contractor rows. Click Save to persist.`);
     } catch (err: any) {
       toast.error(err.message || "Upload failed");
     } finally {
@@ -341,36 +348,26 @@ function DailyEntryPage() {
   };
 
   const selProj = projects.find((p) => p.id === projectId);
-  const totalHeadcount = rows.reduce((s, r) => s + (r.headcount || 0), 0);
 
   return (
-    <div className="space-y-5 md:space-y-6 pb-28 md:pb-24">
-      {/* Page header */}
-      <div className="space-y-4">
+    <div className="space-y-5 pb-28 md:pb-24">
+      {/* Header */}
+      <div className="space-y-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Daily Operations</p>
-            <h1 className="text-[24px] font-semibold text-foreground tracking-tight leading-tight mt-1">Daily Manpower Entry</h1>
-            <p className="text-[13px] text-muted-foreground mt-1">Record daily workforce data across projects, contractors and departments.</p>
+            <h1 className="text-[24px] font-semibold text-foreground tracking-tight leading-tight mt-1">
+              GENMNGR — Manpower Details {selProj && <span className="text-muted-foreground font-normal text-base">· {selProj.name}</span>}
+            </h1>
+            <p className="text-[13px] text-muted-foreground mt-1">As on {format(date, "dd.MM.yyyy")} · One row per contractor, headcounts grouped by trade.</p>
           </div>
           <div className="inline-flex items-center -space-x-px rounded-md shadow-sm">
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkUpload} className="hidden" />
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-r-none focus:z-10"
-              onClick={downloadTemplate}
-            >
-              <FileDown className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />Template
+            <Button variant="outline" size="sm" className="h-9 rounded-r-none focus:z-10" onClick={downloadTemplate}>
+              <FileDown className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />Export
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-l-none focus:z-10"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={bulkUploading}
-            >
-              <Upload className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
+            <Button variant="outline" size="sm" className="h-9 rounded-l-none focus:z-10" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
+              <Upload className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />{bulkUploading ? "Uploading..." : "Import"}
             </Button>
           </div>
         </div>
@@ -380,13 +377,9 @@ function DailyEntryPage() {
       {mastersLoaded && projects.length === 0 && (
         <Card className="border-dashed border-border/70 bg-muted/20 shadow-none">
           <CardContent className="py-14 text-center space-y-3">
-            <div className="mx-auto h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
-              <Inbox className="h-7 w-7 text-muted-foreground/60" />
-            </div>
+            <div className="mx-auto h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center"><Inbox className="h-7 w-7 text-muted-foreground/60" /></div>
             <p className="text-base font-medium text-foreground">No projects assigned to your account</p>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Ask an administrator to assign projects to you under <span className="font-medium text-foreground">User Management → Projects</span>.
-            </p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">Ask an administrator to assign projects to you under <span className="font-medium text-foreground">User Management → Projects</span>.</p>
           </CardContent>
         </Card>
       )}
@@ -408,31 +401,15 @@ function DailyEntryPage() {
           />
           <Popover>
             <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Open calendar"
-                className="h-full w-9 flex items-center justify-center border-l border-input bg-muted/30 hover:bg-muted/60 transition-colors"
-              >
+              <button type="button" aria-label="Open calendar" className="h-full w-9 flex items-center justify-center border-l border-input bg-muted/30 hover:bg-muted/60 transition-colors">
                 <CalendarIcon className="h-4 w-4 text-muted-foreground" />
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(d) => {
-                  if (d) {
-                    setDate(d);
-                    setDateText(format(d, "dd/MM/yyyy"));
-                    setDateError(false);
-                  }
-                }}
-                className="p-3 pointer-events-auto"
-              />
+              <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }} className="p-3 pointer-events-auto" />
             </PopoverContent>
           </Popover>
         </div>
-
 
         <div className="hidden sm:block h-6 w-px bg-border/70" />
 
@@ -446,228 +423,258 @@ function DailyEntryPage() {
         </Select>
 
         {projectId && (
-          <div className="flex items-center gap-1.5 sm:ml-auto">
-            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground" onClick={copyPreviousDay}>
-              <Copy className="mr-1.5 h-3.5 w-3.5" />Copy Previous Day
-            </Button>
-            <Button size="sm" className="h-9 shadow-sm hover:shadow transition-shadow" onClick={addRow}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />Add Row
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground sm:ml-auto" onClick={copyPreviousDay}>
+            <Copy className="mr-1.5 h-3.5 w-3.5" />Copy Previous Day
+          </Button>
         )}
       </div>
 
-      {/* Project context strip */}
-      {projectId && selProj && (
-        <div className="bg-gradient-to-r from-muted/50 via-muted/25 to-muted/10 border border-border/60 rounded-lg px-4 py-3 text-sm flex flex-col sm:flex-row sm:items-center gap-y-2 gap-x-4">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary/80 shrink-0" aria-hidden />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shrink-0">Project</span>
-            {selProj.code && (
-              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-background border border-border/60 text-foreground shrink-0">
-                {selProj.code}
-              </span>
-            )}
-            <span className="font-medium text-foreground truncate">{selProj.name}</span>
-            {selProj.project_group && (
-              <span className="text-muted-foreground truncate hidden sm:inline">· {selProj.project_group}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 shrink-0 sm:border-l sm:border-border/60 sm:pl-4">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Total</span>
-            <span className="text-[15px] font-semibold text-foreground tabular-nums">{totalHeadcount}</span>
-            <span className="text-muted-foreground text-xs">/ {rows.length} row{rows.length === 1 ? "" : "s"}</span>
-          </div>
-        </div>
-      )}
-
-      {/* No project selected — premium empty state */}
+      {/* No project selected */}
       {mastersLoaded && projects.length > 0 && !projectId && (
         <Card className="border-dashed border-border/70 bg-muted/20 shadow-none">
           <CardContent className="py-16 text-center space-y-4">
-            <div className="mx-auto h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center">
-              <ClipboardList className="h-8 w-8 text-muted-foreground/60" />
-            </div>
+            <div className="mx-auto h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center"><ClipboardList className="h-8 w-8 text-muted-foreground/60" /></div>
             <div className="space-y-1">
               <p className="text-base font-semibold text-foreground">Select a project to begin</p>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Choose a project from the picker above to load today's manpower entries.
-              </p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">Choose a project from the picker above to load today's manpower register.</p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {projectId && rows.length > 0 && (
+      {/* No contractors */}
+      {projectId && contractors.length === 0 && (
+        <Card className="border-dashed border-border/70 bg-muted/20 shadow-none">
+          <CardContent className="py-14 text-center space-y-3">
+            <div className="mx-auto h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center"><Inbox className="h-7 w-7 text-muted-foreground/60" /></div>
+            <p className="text-base font-medium text-foreground">No contractors set up yet</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">Add contractors under <span className="font-medium text-foreground">Masters → Contractors</span> with their nature of work to populate this register.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Spreadsheet */}
+      {projectId && contractors.length > 0 && categories.length > 0 && (
         <Card className="overflow-hidden border border-border/70 rounded-xl shadow-none surface-elevated">
           <CardContent className="p-0">
-            {/* Desktop / tablet table */}
-            <div className="hidden md:block overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border/70">
-                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Contractor</TableHead>
-                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Department</TableHead>
-                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Category</TableHead>
-                    <TableHead className="h-11 w-24 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground text-right">Count</TableHead>
-                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Remarks</TableHead>
-                    <TableHead className="h-11 w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row, idx) => {
-                    const linked = deptCategoryMap[row.department_id];
-                    const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
-                    const isLast = idx === rows.length - 1;
-                    return (
-                      <TableRow key={idx} className={cn("group transition-colors hover:bg-muted/30", !isLast && "border-b border-border/40")}>
-                        <TableCell className="py-2">
-                          <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
-                            <SelectTrigger className="w-[170px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus:border-input transition-colors"><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
-                            <SelectTrigger className="w-[150px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus:border-input transition-colors"><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                            <SelectTrigger className="w-[140px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus:border-input transition-colors"><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-right py-2">
-                          <Input type="number" inputMode="numeric" min={0} value={row.headcount}
-                            onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)}
-                            className="w-20 ml-auto h-9 text-right tabular-nums font-semibold border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus-visible:border-input transition-colors" />
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)}
-                            placeholder="Add notes…" className="w-[200px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus-visible:bg-background focus-visible:border-input transition-colors" />
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <Button variant="ghost" size="icon" onClick={() => removeRow(idx)}
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-opacity">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Mobile card list */}
-            <div className="md:hidden divide-y divide-border/40">
-              {rows.map((row, idx) => {
-                const linked = deptCategoryMap[row.department_id];
-                const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
-                return (
-                  <div key={idx} className="p-3 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Row {idx + 1}</span>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => removeRow(idx)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Contractor</label>
-                      <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
-                        <SelectTrigger className="w-full h-11 bg-background mt-1"><SelectValue placeholder="Select contractor" /></SelectTrigger>
-                        <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Department</label>
-                        <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
-                          <SelectTrigger className="w-full h-11 bg-background mt-1"><SelectValue placeholder="Dept" /></SelectTrigger>
-                          <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Category</label>
-                        <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                          <SelectTrigger className="w-full h-11 bg-background mt-1"><SelectValue placeholder="Category" /></SelectTrigger>
-                          <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Count</label>
-                        <Input type="number" inputMode="numeric" min={0} value={row.headcount}
-                          onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)}
-                          className="h-11 text-base font-semibold tabular-nums bg-background mt-1" />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="text-xs font-medium text-muted-foreground">Remarks</label>
-                        <Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)}
-                          placeholder="Notes..." className="h-11 bg-background mt-1" />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <SpreadsheetGrid
+              groupedCategories={groupedCategories}
+              flatCategories={flatCategories}
+              groupedContractors={groupedContractors}
+              cells={cells}
+              extras={extras}
+              setCell={setCell}
+              setExtra={setExtra}
+              rowTotal={rowTotal}
+              colTotal={colTotal}
+              grandTotal={grandTotal}
+              securityTotal={securityTotal}
+            />
           </CardContent>
         </Card>
       )}
 
-      {/* Save bar — desktop sticky footer */}
-      {projectId && rows.length > 0 && (
-        <>
-          <div className="hidden md:flex fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] z-30 border-t border-border/70 bg-background/85 backdrop-blur-md px-6 py-3">
-            <div className="absolute top-0 left-0 right-0 h-px hairline-x-primary" aria-hidden />
-            <div className="flex items-center justify-between gap-4 w-full max-w-screen-2xl mx-auto">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="h-4 w-4 text-muted-foreground/70" />
-                <span>Total <span className="font-semibold text-foreground tabular-nums">{totalHeadcount}</span></span>
-                <span className="text-border">·</span>
-                <span>{rows.length} row{rows.length === 1 ? "" : "s"}</span>
-                <span className="text-border">·</span>
-                <span>{format(date, "dd MMM yyyy")}</span>
-              </div>
-              <Button onClick={save} disabled={saving} className="shadow-sm hover:shadow transition-shadow">
-                <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
-              </Button>
+      {/* Save bar */}
+      {projectId && contractors.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] z-30 border-t border-border/70 bg-background/85 backdrop-blur-md px-4 md:px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="absolute top-0 left-0 right-0 h-px hairline-x-primary" aria-hidden />
+          <div className="flex items-center justify-between gap-4 w-full max-w-screen-2xl mx-auto">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Total <span className="font-semibold text-foreground tabular-nums">{grandTotal}</span></span>
+              <span className="text-border">·</span>
+              <span>Security <span className="font-semibold text-foreground tabular-nums">{securityTotal}</span></span>
+              <span className="text-border hidden sm:inline">·</span>
+              <span className="hidden sm:inline">{format(date, "dd MMM yyyy")}</span>
             </div>
+            <Button onClick={save} disabled={saving} className="shadow-sm hover:shadow transition-shadow">
+              <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
+            </Button>
           </div>
-          <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/70 bg-background/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
-            <div className="absolute top-0 left-0 right-0 h-px hairline-x-primary" aria-hidden />
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-muted-foreground">
-                <span className="font-bold text-foreground tabular-nums text-base">{totalHeadcount}</span> total · {rows.length} row{rows.length === 1 ? "" : "s"}
-              </div>
-              <Button onClick={save} disabled={saving} size="lg" className="flex-shrink-0 shadow-sm">
-                <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save"}
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {projectId && rows.length === 0 && (
-        <Card className="border-dashed border-border/70 bg-muted/20 shadow-none">
-          <CardContent className="py-14 text-center space-y-4">
-            <div className="mx-auto h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
-              <ClipboardList className="h-7 w-7 text-muted-foreground/60" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-base font-semibold text-foreground">No entries yet for this date</p>
-              <p className="text-sm text-muted-foreground">Add a row manually or copy from the previous day to get started.</p>
-            </div>
-            <div className="flex gap-2 justify-center pt-1">
-              <Button variant="outline" size="sm" onClick={copyPreviousDay}><Copy className="mr-2 h-3.5 w-3.5" />Copy Previous Day</Button>
-              <Button size="sm" onClick={addRow} className="shadow-sm"><Plus className="mr-2 h-3.5 w-3.5" />Add first row</Button>
-            </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
     </div>
+  );
+}
+
+/* ───────────────────────── Spreadsheet Grid ───────────────────────── */
+
+interface GridProps {
+  groupedCategories: { group: string; cats: any[] }[];
+  flatCategories: any[];
+  groupedContractors: { name: string; list: any[] }[];
+  cells: CellMap;
+  extras: ExtraMap;
+  setCell: (contractorId: string, categoryId: string, value: number) => void;
+  setExtra: (contractorId: string, field: "security" | "deficiency" | "remarks", value: any) => void;
+  rowTotal: (contractorId: string) => number;
+  colTotal: (categoryId: string) => number;
+  grandTotal: number;
+  securityTotal: number;
+}
+
+const GROUP_BG: Record<string, string> = {
+  CIVIL: "bg-sky-100 dark:bg-sky-950/30 text-sky-900 dark:text-sky-100",
+  MEP: "bg-blue-100 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100",
+  NMR: "bg-orange-100 dark:bg-orange-950/30 text-orange-900 dark:text-orange-100",
+  OTHER: "bg-muted text-muted-foreground",
+};
+
+function SpreadsheetGrid({
+  groupedCategories, flatCategories, groupedContractors,
+  cells, extras, setCell, setExtra,
+  rowTotal, colTotal, grandTotal, securityTotal,
+}: GridProps) {
+  // sl no counter
+  let sl = 0;
+
+  const cellClass = "border-r border-b border-border/60 px-1 py-0.5 text-center tabular-nums";
+  const stickyText = "bg-card";
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-max min-w-full text-[12px] border-collapse">
+        <thead>
+          {/* Top group row */}
+          <tr>
+            <th rowSpan={2} className={cn("sticky left-0 z-20 bg-muted/60 border-r border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-muted-foreground w-10", stickyText)}>Sl.no</th>
+            <th rowSpan={2} className={cn("sticky left-10 z-20 bg-muted/60 border-r border-b border-border/60 px-2 py-1 text-left text-[11px] font-semibold text-muted-foreground min-w-[200px]", stickyText)}>Name of the Contractor</th>
+            <th rowSpan={2} className="bg-muted/60 border-r border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-muted-foreground min-w-[110px]">Contact No</th>
+            <th rowSpan={2} className="bg-muted/60 border-r border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-muted-foreground min-w-[160px] text-left">Work Place</th>
+            {groupedCategories.map((g) => (
+              <th key={g.group} colSpan={g.cats.length} className={cn("border-r border-b border-border/60 px-2 py-1 text-center text-[11px] font-bold uppercase tracking-wide", GROUP_BG[g.group] || GROUP_BG.OTHER)}>
+                {GROUP_LABELS[g.group] || g.group}
+              </th>
+            ))}
+            <th rowSpan={2} className="bg-emerald-100 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-100 border-r border-b border-border/60 px-2 py-1 text-[11px] font-bold uppercase w-16">Total</th>
+            <th rowSpan={2} className="bg-muted/60 border-r border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-muted-foreground w-20">Security</th>
+            <th rowSpan={2} className="bg-muted/60 border-r border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-muted-foreground w-24">Deficiency<br />Manpower</th>
+            <th rowSpan={2} className="bg-muted/60 border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-muted-foreground min-w-[180px] text-left">Remarks</th>
+          </tr>
+          {/* Sub-header per category */}
+          <tr>
+            {groupedCategories.flatMap((g) =>
+              g.cats.map((c) => (
+                <th key={c.id} className={cn("border-r border-b border-border/60 px-1.5 py-1 text-center text-[10.5px] font-semibold min-w-[58px]", GROUP_BG[g.group] || GROUP_BG.OTHER, "bg-opacity-50")}>
+                  {c.name}
+                </th>
+              ))
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {groupedContractors.map((g) => (
+            <FragmentGroup
+              key={g.name}
+              group={g}
+              flatCategories={flatCategories}
+              cells={cells}
+              extras={extras}
+              setCell={setCell}
+              setExtra={setExtra}
+              rowTotal={rowTotal}
+              slStart={sl}
+              advanceSl={(n) => { sl += n; }}
+              colSpan={4 + flatCategories.length + 4}
+            />
+          ))}
+
+          {/* Grand totals row */}
+          <tr className="bg-yellow-200 dark:bg-yellow-900/40 font-bold">
+            <td className={cn("sticky left-0 z-10 bg-yellow-200 dark:bg-yellow-900/40 border-r border-b border-border/60 px-2 py-1.5 text-center")}></td>
+            <td className={cn("sticky left-10 z-10 bg-yellow-200 dark:bg-yellow-900/40 border-r border-b border-border/60 px-2 py-1.5 text-right uppercase text-[11px]")} colSpan={1}>TOTAL</td>
+            <td className="border-r border-b border-border/60" />
+            <td className="border-r border-b border-border/60" />
+            {flatCategories.map((cat) => (
+              <td key={cat.id} className={cn(cellClass, "py-1.5 font-bold")}>{colTotal(cat.id) || ""}</td>
+            ))}
+            <td className={cn(cellClass, "py-1.5 bg-emerald-200 dark:bg-emerald-900/40")}>{grandTotal || ""}</td>
+            <td className={cn(cellClass, "py-1.5")}>{securityTotal || ""}</td>
+            <td className="border-r border-b border-border/60" />
+            <td className="border-b border-border/60" />
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+interface FragmentGroupProps {
+  group: { name: string; list: any[] };
+  flatCategories: any[];
+  cells: CellMap;
+  extras: ExtraMap;
+  setCell: (c: string, cat: string, v: number) => void;
+  setExtra: (c: string, f: "security" | "deficiency" | "remarks", v: any) => void;
+  rowTotal: (c: string) => number;
+  slStart: number;
+  advanceSl: (n: number) => void;
+  colSpan: number;
+}
+
+function FragmentGroup({ group, flatCategories, cells, extras, setCell, setExtra, rowTotal, slStart, advanceSl, colSpan }: FragmentGroupProps) {
+  advanceSl(group.list.length);
+  return (
+    <>
+      {/* Band header for nature_of_work */}
+      <tr>
+        <td colSpan={colSpan} className="bg-amber-100/70 dark:bg-amber-950/30 border-y border-border/60 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-900 dark:text-amber-100 sticky left-0">
+          {group.name}
+        </td>
+      </tr>
+      {group.list.map((c, idx) => {
+        const sl = slStart + idx + 1;
+        const ex = extras[c.id] || { security: 0, deficiency: 0, remarks: "" };
+        const total = rowTotal(c.id);
+        return (
+          <tr key={c.id} className="hover:bg-muted/30 group">
+            <td className="sticky left-0 z-10 bg-card group-hover:bg-muted/30 border-r border-b border-border/60 px-2 py-1 text-center text-muted-foreground tabular-nums w-10">{sl}</td>
+            <td className="sticky left-10 z-10 bg-card group-hover:bg-muted/30 border-r border-b border-border/60 px-2 py-1 text-left font-medium min-w-[200px]">{c.company_name}</td>
+            <td className="border-r border-b border-border/60 px-2 py-1 text-center text-muted-foreground tabular-nums">{c.contact_number || ""}</td>
+            <td className="border-r border-b border-border/60 px-2 py-1 text-left text-muted-foreground">{c.work_place || ""}</td>
+            {flatCategories.map((cat) => {
+              const v = cells[`${c.id}:${cat.id}`] || 0;
+              return (
+                <td key={cat.id} className="border-r border-b border-border/60 p-0 text-center min-w-[58px]">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={v || ""}
+                    onChange={(e) => setCell(c.id, cat.id, parseInt(e.target.value) || 0)}
+                    className="w-full h-7 text-center tabular-nums bg-transparent border-0 outline-none focus:bg-primary/5 focus:ring-1 focus:ring-primary/40 px-1"
+                  />
+                </td>
+              );
+            })}
+            <td className="border-r border-b border-border/60 px-1 py-1 text-center font-bold tabular-nums bg-emerald-50/60 dark:bg-emerald-950/20">{total || ""}</td>
+            <td className="border-r border-b border-border/60 p-0">
+              <input
+                type="number" inputMode="numeric" min={0}
+                value={ex.security || ""}
+                onChange={(e) => setExtra(c.id, "security", parseInt(e.target.value) || 0)}
+                className="w-full h-7 text-center tabular-nums bg-transparent border-0 outline-none focus:bg-primary/5 focus:ring-1 focus:ring-primary/40 px-1"
+              />
+            </td>
+            <td className="border-r border-b border-border/60 p-0">
+              <input
+                type="number" inputMode="numeric" min={0}
+                value={ex.deficiency || ""}
+                onChange={(e) => setExtra(c.id, "deficiency", parseInt(e.target.value) || 0)}
+                className="w-full h-7 text-center tabular-nums bg-transparent border-0 outline-none focus:bg-primary/5 focus:ring-1 focus:ring-primary/40 px-1"
+              />
+            </td>
+            <td className="border-b border-border/60 p-0 min-w-[180px]">
+              <input
+                type="text"
+                value={ex.remarks}
+                onChange={(e) => setExtra(c.id, "remarks", e.target.value)}
+                placeholder=""
+                className="w-full h-7 bg-transparent border-0 outline-none focus:bg-primary/5 focus:ring-1 focus:ring-primary/40 px-2 text-left"
+              />
+            </td>
+          </tr>
+        );
+      })}
+    </>
   );
 }
