@@ -114,15 +114,29 @@ function DailyEntryPage() {
     })();
   }, []);
 
-  // Load contractors
+  // Load contractors + subscribe to realtime updates
   useEffect(() => {
-    (async () => {
+    const fetchContractors = async () => {
       const { data } = await supabase
         .from("contractors")
         .select("id,company_name,contact_number,work_place")
         .order("company_name");
       setContractors(data || []);
-    })();
+    };
+    fetchContractors();
+
+    const channel = supabase
+      .channel("contractors-daily-entry")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contractors" },
+        () => fetchContractors()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Initialize rows when contractors change
