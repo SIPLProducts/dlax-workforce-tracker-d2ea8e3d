@@ -298,14 +298,20 @@ function DailyEntryPage() {
     }
   };
 
-  const selProj = projects.find((p) => p.id === projectId);
+  const totalHeadcount = rows.reduce((s, r) => s + (r.headcount || 0), 0);
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-24 md:pb-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">Daily Manpower Entry</h1>
-          <p className="text-xs md:text-sm text-muted-foreground">Record daily workforce data</p>
+    <div className="space-y-5 md:space-y-6 pb-28 md:pb-24">
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap pb-4 border-b">
+        <div className="flex items-start gap-3">
+          <div className="hidden sm:flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+            <ClipboardList className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">Daily Manpower Entry</h1>
+            <p className="text-xs md:text-sm text-muted-foreground mt-0.5">Record daily workforce data</p>
+          </div>
         </div>
         <div className="flex gap-2 flex-wrap">
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkUpload} className="hidden" />
@@ -318,68 +324,98 @@ function DailyEntryPage() {
 
       {mastersLoaded && projects.length === 0 && (
         <Card>
-          <CardContent className="py-8 text-center space-y-2">
+          <CardContent className="py-12 text-center space-y-3">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+              <Inbox className="h-6 w-6 text-muted-foreground" />
+            </div>
             <p className="text-base font-medium text-foreground">No projects assigned to your account</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
               Ask an administrator to assign projects to you under <span className="font-medium">User Management → Projects</span>.
             </p>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 items-end">
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Date</label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-full sm:w-[200px] justify-start text-left", !date && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date ? format(date, "dd MMM yyyy") : "Pick date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
-            </PopoverContent>
-          </Popover>
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Project</label>
-          <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger className="w-full sm:w-[260px]"><SelectValue placeholder="Select project" /></SelectTrigger>
-            <SelectContent>
-              {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        {projectId && (
-          <div className="flex gap-2 col-span-1 sm:col-span-2 lg:col-span-1">
-            <Button variant="outline" onClick={copyPreviousDay} className="flex-1 sm:flex-none"><Copy className="mr-2 h-4 w-4" />Copy Previous Day</Button>
-            <Button onClick={addRow} className="flex-1 sm:flex-none"><Plus className="mr-2 h-4 w-4" />Add Row</Button>
+      {/* Filters card */}
+      <Card className="border shadow-sm bg-gradient-to-br from-secondary/40 to-background">
+        <CardContent className="p-4 md:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 lg:items-end">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full sm:w-[200px] justify-start text-left bg-background", !date && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "dd MMM yyyy") : "Pick date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Project</label>
+              <Select value={projectId} onValueChange={setProjectId}>
+                <SelectTrigger className="w-full sm:w-[280px] bg-background"><SelectValue placeholder="Select project" /></SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {projectId && (
+              <div className="flex gap-2 col-span-1 sm:col-span-2 lg:col-span-1 lg:ml-auto">
+                <Button variant="outline" onClick={copyPreviousDay} className="flex-1 sm:flex-none bg-background">
+                  <Copy className="mr-2 h-4 w-4" />Copy Previous Day
+                </Button>
+                <Button onClick={addRow} className="flex-1 sm:flex-none">
+                  <Plus className="mr-2 h-4 w-4" />Add Row
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
+
+      {/* Project info chips */}
+      {projectId && selProj && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="stat-tint-blue rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Code</p>
+            <p className="text-sm font-mono font-semibold mt-0.5 truncate">{selProj.code || "—"}</p>
+          </div>
+          <div className="stat-tint-purple rounded-lg px-4 py-3 col-span-2 md:col-span-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Project</p>
+            <p className="text-sm font-semibold mt-0.5 truncate">{selProj.name}</p>
+          </div>
+          <div className="stat-tint-teal rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Group</p>
+            <p className="text-sm font-semibold mt-0.5 truncate">{selProj.project_group || "—"}</p>
+          </div>
+          <div className="stat-tint-green rounded-lg px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total</p>
+            <p className="text-sm font-semibold mt-0.5 tabular-nums">
+              <span className="text-base">{totalHeadcount}</span>
+              <span className="text-muted-foreground"> · {rows.length} row{rows.length === 1 ? "" : "s"}</span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {projectId && rows.length > 0 && (
-        <Card>
-          {selProj && (
-            <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 py-3 border-b text-xs sm:text-sm">
-              <span><span className="text-muted-foreground">Code:</span> <span className="font-mono font-medium">{selProj.code || "—"}</span></span>
-              <span><span className="text-muted-foreground">Project:</span> <span className="font-medium">{selProj.name}</span></span>
-              <span><span className="text-muted-foreground">Group:</span> <span className="font-medium">{selProj.project_group || "—"}</span></span>
-            </div>
-          )}
+        <Card className="overflow-hidden shadow-sm">
           <CardContent className="p-0">
             {/* Desktop / tablet table */}
             <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Contractor</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="w-20">Count</TableHead>
-                    <TableHead>Remarks</TableHead>
-                    <TableHead className="w-10"></TableHead>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="font-semibold text-foreground">Contractor</TableHead>
+                    <TableHead className="font-semibold text-foreground">Department</TableHead>
+                    <TableHead className="font-semibold text-foreground">Category</TableHead>
+                    <TableHead className="w-24 font-semibold text-foreground text-right">Count</TableHead>
+                    <TableHead className="font-semibold text-foreground">Remarks</TableHead>
+                    <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -387,28 +423,40 @@ function DailyEntryPage() {
                     const linked = deptCategoryMap[row.department_id];
                     const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
                     return (
-                      <TableRow key={idx}>
+                      <TableRow key={idx} className={cn("group transition-colors", idx % 2 === 1 && "bg-muted/20")}>
                         <TableCell>
                           <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
-                            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectTrigger className="w-[170px] bg-background"><SelectValue placeholder="Select" /></SelectTrigger>
                             <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
                           </Select>
                         </TableCell>
                         <TableCell>
                           <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
-                            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectTrigger className="w-[150px] bg-background"><SelectValue placeholder="Select" /></SelectTrigger>
                             <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                           </Select>
                         </TableCell>
                         <TableCell>
                           <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                            <SelectTrigger className="w-[130px]"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectTrigger className="w-[140px] bg-background"><SelectValue placeholder="Select" /></SelectTrigger>
                             <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell><Input type="number" inputMode="numeric" min={0} value={row.headcount} onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)} className="w-20" /></TableCell>
-                        <TableCell><Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)} placeholder="Notes..." className="w-[150px]" /></TableCell>
-                        <TableCell><Button variant="ghost" size="icon" onClick={() => removeRow(idx)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                        <TableCell className="text-right">
+                          <Input type="number" inputMode="numeric" min={0} value={row.headcount}
+                            onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)}
+                            className="w-20 ml-auto text-right tabular-nums font-semibold bg-background" />
+                        </TableCell>
+                        <TableCell>
+                          <Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)}
+                            placeholder="Notes..." className="w-[180px] bg-background" />
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={() => removeRow(idx)}
+                            className="opacity-60 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -421,48 +469,49 @@ function DailyEntryPage() {
               {rows.map((row, idx) => {
                 const linked = deptCategoryMap[row.department_id];
                 const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
+                const tints = ["stat-tint-blue", "stat-tint-green", "stat-tint-amber", "stat-tint-purple", "stat-tint-teal", "stat-tint-rose"];
                 return (
-                  <div key={idx} className="p-3 space-y-2.5">
+                  <div key={idx} className={cn("p-3 space-y-2.5", tints[idx % tints.length])}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-muted-foreground">Row {idx + 1}</span>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeRow(idx)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                      <span className="text-xs font-bold text-foreground">Row {idx + 1}</span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => removeRow(idx)}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                     <div>
-                      <label className="text-xs text-muted-foreground">Contractor</label>
+                      <label className="text-xs font-medium text-muted-foreground">Contractor</label>
                       <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
-                        <SelectTrigger className="w-full h-11"><SelectValue placeholder="Select contractor" /></SelectTrigger>
+                        <SelectTrigger className="w-full h-11 bg-background mt-1"><SelectValue placeholder="Select contractor" /></SelectTrigger>
                         <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs text-muted-foreground">Department</label>
+                        <label className="text-xs font-medium text-muted-foreground">Department</label>
                         <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
-                          <SelectTrigger className="w-full h-11"><SelectValue placeholder="Dept" /></SelectTrigger>
+                          <SelectTrigger className="w-full h-11 bg-background mt-1"><SelectValue placeholder="Dept" /></SelectTrigger>
                           <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">Category</label>
+                        <label className="text-xs font-medium text-muted-foreground">Category</label>
                         <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                          <SelectTrigger className="w-full h-11"><SelectValue placeholder="Category" /></SelectTrigger>
+                          <SelectTrigger className="w-full h-11 bg-background mt-1"><SelectValue placeholder="Category" /></SelectTrigger>
                           <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-xs text-muted-foreground">Count</label>
+                        <label className="text-xs font-medium text-muted-foreground">Count</label>
                         <Input type="number" inputMode="numeric" min={0} value={row.headcount}
                           onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)}
-                          className="h-11 text-base font-semibold tabular-nums" />
+                          className="h-11 text-base font-semibold tabular-nums bg-background mt-1" />
                       </div>
                       <div className="col-span-2">
-                        <label className="text-xs text-muted-foreground">Remarks</label>
+                        <label className="text-xs font-medium text-muted-foreground">Remarks</label>
                         <Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)}
-                          placeholder="Notes..." className="h-11" />
+                          placeholder="Notes..." className="h-11 bg-background mt-1" />
                       </div>
                     </div>
                   </div>
@@ -473,17 +522,26 @@ function DailyEntryPage() {
         </Card>
       )}
 
+      {/* Save bar — desktop sticky footer */}
       {projectId && rows.length > 0 && (
         <>
-          <div className="hidden md:flex justify-end">
-            <Button onClick={save} disabled={saving} size="lg">
-              <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
-            </Button>
+          <div className="hidden md:flex fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] z-30 border-t bg-background/95 backdrop-blur px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+            <div className="flex items-center justify-between gap-4 w-full max-w-screen-2xl mx-auto">
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Total headcount:</span>
+                <span className="font-bold text-foreground tabular-nums text-base">{totalHeadcount}</span>
+                <span className="text-muted-foreground">· {rows.length} row{rows.length === 1 ? "" : "s"}</span>
+              </div>
+              <Button onClick={save} disabled={saving} size="lg">
+                <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
+              </Button>
+            </div>
           </div>
           <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground tabular-nums">{rows.reduce((s, r) => s + (r.headcount || 0), 0)}</span> total · {rows.length} row{rows.length === 1 ? "" : "s"}
+                <span className="font-bold text-foreground tabular-nums text-base">{totalHeadcount}</span> total · {rows.length} row{rows.length === 1 ? "" : "s"}
               </div>
               <Button onClick={save} disabled={saving} size="lg" className="flex-shrink-0">
                 <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save"}
@@ -494,9 +552,19 @@ function DailyEntryPage() {
       )}
 
       {projectId && rows.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No entries yet. Click "Add Row" or "Copy Previous Day" to start.</p>
+        <Card className="border-dashed">
+          <CardContent className="py-14 text-center space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <ClipboardList className="h-7 w-7" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-base font-semibold text-foreground">No entries yet</p>
+              <p className="text-sm text-muted-foreground">Add a row manually or copy from the previous day to get started.</p>
+            </div>
+            <div className="flex gap-2 justify-center pt-2">
+              <Button variant="outline" onClick={copyPreviousDay}><Copy className="mr-2 h-4 w-4" />Copy Previous Day</Button>
+              <Button onClick={addRow}><Plus className="mr-2 h-4 w-4" />Add Row</Button>
+            </div>
           </CardContent>
         </Card>
       )}
