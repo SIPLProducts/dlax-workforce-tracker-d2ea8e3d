@@ -302,41 +302,64 @@ function DailyEntryPage() {
   const totalHeadcount = rows.reduce((s, r) => s + (r.headcount || 0), 0);
 
   return (
-    <div className="space-y-4 md:space-y-5 pb-28 md:pb-24">
+    <div className="space-y-5 md:space-y-6 pb-28 md:pb-24">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap pb-4 border-b border-border/60">
-        <div>
-          <h1 className="text-[22px] font-semibold text-foreground tracking-tight leading-tight">Daily Manpower Entry</h1>
-          <p className="text-[13px] text-muted-foreground mt-1">Record daily workforce data</p>
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Daily Operations</p>
+            <h1 className="text-[24px] font-semibold text-foreground tracking-tight leading-tight mt-1">Daily Manpower Entry</h1>
+            <p className="text-[13px] text-muted-foreground mt-1">Record daily workforce data across projects, contractors and departments.</p>
+          </div>
+          <div className="inline-flex items-center -space-x-px rounded-md shadow-sm">
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkUpload} className="hidden" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-r-none focus:z-10"
+              onClick={downloadTemplate}
+            >
+              <FileDown className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />Template
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-l-none focus:z-10"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={bulkUploading}
+            >
+              <Upload className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkUpload} className="hidden" />
-          <Button variant="outline" size="sm" className="h-9" onClick={downloadTemplate}>
-            <FileDown className="mr-1.5 h-3.5 w-3.5" />Template
-          </Button>
-          <Button variant="outline" size="sm" className="h-9" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
-            <Upload className="mr-1.5 h-3.5 w-3.5" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
-          </Button>
-        </div>
+        <div className="hairline-x h-px w-full" />
       </div>
 
       {mastersLoaded && projects.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center space-y-3">
-            <Inbox className="h-8 w-8 text-muted-foreground/60 mx-auto" />
+        <Card className="border-dashed border-border/70 bg-muted/20 shadow-none">
+          <CardContent className="py-14 text-center space-y-3">
+            <div className="mx-auto h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
+              <Inbox className="h-7 w-7 text-muted-foreground/60" />
+            </div>
             <p className="text-base font-medium text-foreground">No projects assigned to your account</p>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Ask an administrator to assign projects to you under <span className="font-medium">User Management → Projects</span>.
+              Ask an administrator to assign projects to you under <span className="font-medium text-foreground">User Management → Projects</span>.
             </p>
           </CardContent>
         </Card>
       )}
 
       {/* Toolbar */}
-      <div className="bg-card border border-border rounded-lg px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2">
+      <div className="bg-card border border-border/70 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2 surface-elevated">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className={cn("h-9 justify-start text-left font-normal w-full sm:w-[180px]", !date && "text-muted-foreground")}>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 justify-start text-left font-medium w-full sm:w-[180px] bg-background hover:bg-muted/40 transition-colors",
+                !date && "text-muted-foreground"
+              )}
+            >
               <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
               {date ? format(date, "dd MMM yyyy") : "Pick date"}
             </Button>
@@ -345,18 +368,24 @@ function DailyEntryPage() {
             <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
+
+        <div className="hidden sm:block h-6 w-px bg-border/70" />
+
         <Select value={projectId} onValueChange={setProjectId}>
-          <SelectTrigger className="h-9 w-full sm:w-[280px]"><SelectValue placeholder="Select project" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-full sm:w-[280px] bg-background hover:bg-muted/40 transition-colors font-medium data-[placeholder]:font-normal">
+            <SelectValue placeholder="Select project" />
+          </SelectTrigger>
           <SelectContent>
             {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
           </SelectContent>
         </Select>
+
         {projectId && (
-          <div className="flex items-center gap-2 sm:ml-auto">
-            <Button variant="ghost" size="sm" className="h-9" onClick={copyPreviousDay}>
+          <div className="flex items-center gap-1.5 sm:ml-auto">
+            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground" onClick={copyPreviousDay}>
               <Copy className="mr-1.5 h-3.5 w-3.5" />Copy Previous Day
             </Button>
-            <Button size="sm" className="h-9" onClick={addRow}>
+            <Button size="sm" className="h-9 shadow-sm hover:shadow transition-shadow" onClick={addRow}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />Add Row
             </Button>
           </div>
@@ -365,79 +394,98 @@ function DailyEntryPage() {
 
       {/* Project context strip */}
       {projectId && selProj && (
-        <div className="bg-muted/30 border border-border/60 rounded-md px-4 py-2.5 text-sm flex flex-col sm:flex-row sm:items-center gap-y-1.5 gap-x-4">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">Project</span>
+        <div className="bg-gradient-to-r from-muted/50 via-muted/25 to-muted/10 border border-border/60 rounded-lg px-4 py-3 text-sm flex flex-col sm:flex-row sm:items-center gap-y-2 gap-x-4">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary/80 shrink-0" aria-hidden />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shrink-0">Project</span>
             {selProj.code && (
-              <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-background border border-border/60 text-foreground shrink-0">
+              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-background border border-border/60 text-foreground shrink-0">
                 {selProj.code}
               </span>
             )}
             <span className="font-medium text-foreground truncate">{selProj.name}</span>
             {selProj.project_group && (
-              <span className="text-muted-foreground truncate">· {selProj.project_group}</span>
+              <span className="text-muted-foreground truncate hidden sm:inline">· {selProj.project_group}</span>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total</span>
-            <span className="font-semibold text-foreground tabular-nums">{totalHeadcount}</span>
-            <span className="text-muted-foreground text-xs">across {rows.length} row{rows.length === 1 ? "" : "s"}</span>
+          <div className="flex items-center gap-3 shrink-0 sm:border-l sm:border-border/60 sm:pl-4">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Total</span>
+            <span className="text-[15px] font-semibold text-foreground tabular-nums">{totalHeadcount}</span>
+            <span className="text-muted-foreground text-xs">/ {rows.length} row{rows.length === 1 ? "" : "s"}</span>
           </div>
         </div>
       )}
 
+      {/* No project selected — premium empty state */}
+      {mastersLoaded && projects.length > 0 && !projectId && (
+        <Card className="border-dashed border-border/70 bg-muted/20 shadow-none">
+          <CardContent className="py-16 text-center space-y-4">
+            <div className="mx-auto h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center">
+              <ClipboardList className="h-8 w-8 text-muted-foreground/60" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-base font-semibold text-foreground">Select a project to begin</p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Choose a project from the picker above to load today's manpower entries.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {projectId && rows.length > 0 && (
-        <Card className="overflow-hidden border border-border shadow-none">
+        <Card className="overflow-hidden border border-border/70 rounded-xl shadow-none surface-elevated">
           <CardContent className="p-0">
             {/* Desktop / tablet table */}
             <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
-                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Contractor</TableHead>
-                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Department</TableHead>
-                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Category</TableHead>
-                    <TableHead className="h-10 w-24 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-right">Count</TableHead>
-                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Remarks</TableHead>
-                    <TableHead className="h-10 w-12"></TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border/70">
+                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Contractor</TableHead>
+                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Department</TableHead>
+                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Category</TableHead>
+                    <TableHead className="h-11 w-24 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground text-right">Count</TableHead>
+                    <TableHead className="h-11 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Remarks</TableHead>
+                    <TableHead className="h-11 w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((row, idx) => {
                     const linked = deptCategoryMap[row.department_id];
                     const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
+                    const isLast = idx === rows.length - 1;
                     return (
-                      <TableRow key={idx} className="group transition-colors hover:bg-muted/30 border-b border-border/60">
-                        <TableCell>
+                      <TableRow key={idx} className={cn("group transition-colors hover:bg-muted/30", !isLast && "border-b border-border/40")}>
+                        <TableCell className="py-2">
                           <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
-                            <SelectTrigger className="w-[170px] bg-background"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectTrigger className="w-[170px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus:border-input transition-colors"><SelectValue placeholder="Select" /></SelectTrigger>
                             <SelectContent>{contractors.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-2">
                           <Select value={row.department_id} onValueChange={(v) => updateRow(idx, "department_id", v)}>
-                            <SelectTrigger className="w-[150px] bg-background"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectTrigger className="w-[150px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus:border-input transition-colors"><SelectValue placeholder="Select" /></SelectTrigger>
                             <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-2">
                           <Select value={row.category_id} onValueChange={(v) => updateRow(idx, "category_id", v)}>
-                            <SelectTrigger className="w-[140px] bg-background"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectTrigger className="w-[140px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus:border-input transition-colors"><SelectValue placeholder="Select" /></SelectTrigger>
                             <SelectContent>{filteredCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right py-2">
                           <Input type="number" inputMode="numeric" min={0} value={row.headcount}
                             onChange={(e) => updateRow(idx, "headcount", parseInt(e.target.value) || 0)}
-                            className="w-20 ml-auto text-right tabular-nums font-semibold bg-background" />
+                            className="w-20 ml-auto h-9 text-right tabular-nums font-semibold border-transparent bg-transparent shadow-none hover:bg-muted/50 focus:bg-background focus-visible:border-input transition-colors" />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-2">
                           <Input value={row.remarks} onChange={(e) => updateRow(idx, "remarks", e.target.value)}
-                            placeholder="Notes..." className="w-[180px] bg-background" />
+                            placeholder="Add notes…" className="w-[200px] h-9 border-transparent bg-transparent shadow-none hover:bg-muted/50 focus-visible:bg-background focus-visible:border-input transition-colors" />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-2">
                           <Button variant="ghost" size="icon" onClick={() => removeRow(idx)}
-                            className="opacity-60 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10">
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-opacity">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
@@ -449,15 +497,15 @@ function DailyEntryPage() {
             </div>
 
             {/* Mobile card list */}
-            <div className="md:hidden divide-y">
+            <div className="md:hidden divide-y divide-border/40">
               {rows.map((row, idx) => {
                 const linked = deptCategoryMap[row.department_id];
                 const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
                 return (
                   <div key={idx} className="p-3 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-foreground">Row {idx + 1}</span>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => removeRow(idx)}>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Row {idx + 1}</span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => removeRow(idx)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -508,24 +556,29 @@ function DailyEntryPage() {
       {/* Save bar — desktop sticky footer */}
       {projectId && rows.length > 0 && (
         <>
-          <div className="hidden md:flex fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] z-30 border-t border-border bg-background/95 backdrop-blur-sm px-6 py-3">
+          <div className="hidden md:flex fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] z-30 border-t border-border/70 bg-background/85 backdrop-blur-md px-6 py-3">
+            <div className="absolute top-0 left-0 right-0 h-px hairline-x-primary" aria-hidden />
             <div className="flex items-center justify-between gap-4 w-full max-w-screen-2xl mx-auto">
-              <div className="text-sm text-muted-foreground">
-                Total: <span className="font-semibold text-foreground tabular-nums">{totalHeadcount}</span>
-                <span className="mx-1.5">·</span>
-                {rows.length} row{rows.length === 1 ? "" : "s"}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="h-4 w-4 text-muted-foreground/70" />
+                <span>Total <span className="font-semibold text-foreground tabular-nums">{totalHeadcount}</span></span>
+                <span className="text-border">·</span>
+                <span>{rows.length} row{rows.length === 1 ? "" : "s"}</span>
+                <span className="text-border">·</span>
+                <span>{format(date, "dd MMM yyyy")}</span>
               </div>
-              <Button onClick={save} disabled={saving}>
+              <Button onClick={save} disabled={saving} className="shadow-sm hover:shadow transition-shadow">
                 <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Entries"}
               </Button>
             </div>
           </div>
-          <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+          <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/70 bg-background/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+            <div className="absolute top-0 left-0 right-0 h-px hairline-x-primary" aria-hidden />
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs text-muted-foreground">
                 <span className="font-bold text-foreground tabular-nums text-base">{totalHeadcount}</span> total · {rows.length} row{rows.length === 1 ? "" : "s"}
               </div>
-              <Button onClick={save} disabled={saving} size="lg" className="flex-shrink-0">
+              <Button onClick={save} disabled={saving} size="lg" className="flex-shrink-0 shadow-sm">
                 <Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save"}
               </Button>
             </div>
@@ -534,16 +587,18 @@ function DailyEntryPage() {
       )}
 
       {projectId && rows.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center space-y-4">
-            <ClipboardList className="h-8 w-8 text-muted-foreground/60 mx-auto" />
+        <Card className="border-dashed border-border/70 bg-muted/20 shadow-none">
+          <CardContent className="py-14 text-center space-y-4">
+            <div className="mx-auto h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
+              <ClipboardList className="h-7 w-7 text-muted-foreground/60" />
+            </div>
             <div className="space-y-1">
-              <p className="text-base font-semibold text-foreground">No entries yet</p>
+              <p className="text-base font-semibold text-foreground">No entries yet for this date</p>
               <p className="text-sm text-muted-foreground">Add a row manually or copy from the previous day to get started.</p>
             </div>
-            <div className="flex gap-2 justify-center pt-2">
+            <div className="flex gap-2 justify-center pt-1">
               <Button variant="outline" size="sm" onClick={copyPreviousDay}><Copy className="mr-2 h-3.5 w-3.5" />Copy Previous Day</Button>
-              <Button size="sm" onClick={addRow}><Plus className="mr-2 h-3.5 w-3.5" />Add Row</Button>
+              <Button size="sm" onClick={addRow} className="shadow-sm"><Plus className="mr-2 h-3.5 w-3.5" />Add first row</Button>
             </div>
           </CardContent>
         </Card>
