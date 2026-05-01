@@ -387,19 +387,19 @@ function DailyEntryPage() {
       )}
 
       {projectId && rows.length > 0 && (
-        <Card className="overflow-hidden shadow-sm">
+        <Card className="overflow-hidden border border-border shadow-none">
           <CardContent className="p-0">
             {/* Desktop / tablet table */}
             <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="font-semibold text-foreground">Contractor</TableHead>
-                    <TableHead className="font-semibold text-foreground">Department</TableHead>
-                    <TableHead className="font-semibold text-foreground">Category</TableHead>
-                    <TableHead className="w-24 font-semibold text-foreground text-right">Count</TableHead>
-                    <TableHead className="font-semibold text-foreground">Remarks</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Contractor</TableHead>
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Department</TableHead>
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Category</TableHead>
+                    <TableHead className="h-10 w-24 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-right">Count</TableHead>
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Remarks</TableHead>
+                    <TableHead className="h-10 w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
