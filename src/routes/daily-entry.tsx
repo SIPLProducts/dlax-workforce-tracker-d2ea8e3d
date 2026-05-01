@@ -393,23 +393,46 @@ function DailyEntryPage() {
 
       {/* Toolbar */}
       <div className="bg-card border border-border/70 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2 surface-elevated">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "h-9 justify-start text-left font-medium w-full sm:w-[180px] bg-background hover:bg-muted/40 transition-colors",
-                !date && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-              {date ? format(date, "dd MMM yyyy") : "Pick date"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
+        <div className={cn(
+          "flex items-center w-full sm:w-[200px] h-9 rounded-md border bg-background overflow-hidden transition-colors",
+          dateError ? "border-destructive" : "border-input hover:border-ring/40 focus-within:border-ring"
+        )}>
+          <Input
+            value={dateText}
+            onChange={(e) => handleDateTextChange(e.target.value)}
+            onBlur={handleDateBlur}
+            placeholder="dd/mm/yyyy"
+            inputMode="numeric"
+            maxLength={10}
+            className="h-full border-0 shadow-none focus-visible:ring-0 font-medium tabular-nums px-3"
+          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Open calendar"
+                className="h-full w-9 flex items-center justify-center border-l border-input bg-muted/30 hover:bg-muted/60 transition-colors"
+              >
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => {
+                  if (d) {
+                    setDate(d);
+                    setDateText(format(d, "dd/MM/yyyy"));
+                    setDateError(false);
+                  }
+                }}
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
 
         <div className="hidden sm:block h-6 w-px bg-border/70" />
 
