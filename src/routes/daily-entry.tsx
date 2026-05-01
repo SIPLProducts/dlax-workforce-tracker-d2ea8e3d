@@ -535,17 +535,15 @@ function DailyEntryPage() {
 
       {projectId && rows.length === 0 && (
         <Card className="border-dashed">
-          <CardContent className="py-14 text-center space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <ClipboardList className="h-7 w-7" />
-            </div>
+          <CardContent className="py-12 text-center space-y-4">
+            <ClipboardList className="h-8 w-8 text-muted-foreground/60 mx-auto" />
             <div className="space-y-1">
               <p className="text-base font-semibold text-foreground">No entries yet</p>
               <p className="text-sm text-muted-foreground">Add a row manually or copy from the previous day to get started.</p>
             </div>
             <div className="flex gap-2 justify-center pt-2">
-              <Button variant="outline" onClick={copyPreviousDay}><Copy className="mr-2 h-4 w-4" />Copy Previous Day</Button>
-              <Button onClick={addRow}><Plus className="mr-2 h-4 w-4" />Add Row</Button>
+              <Button variant="outline" size="sm" onClick={copyPreviousDay}><Copy className="mr-2 h-3.5 w-3.5" />Copy Previous Day</Button>
+              <Button size="sm" onClick={addRow}><Plus className="mr-2 h-3.5 w-3.5" />Add Row</Button>
             </div>
           </CardContent>
         </Card>
