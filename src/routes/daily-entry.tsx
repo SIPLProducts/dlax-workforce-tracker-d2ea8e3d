@@ -302,23 +302,20 @@ function DailyEntryPage() {
   const totalHeadcount = rows.reduce((s, r) => s + (r.headcount || 0), 0);
 
   return (
-    <div className="space-y-5 md:space-y-6 pb-28 md:pb-24">
+    <div className="space-y-4 md:space-y-5 pb-28 md:pb-24">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap pb-4 border-b">
-        <div className="flex items-start gap-3">
-          <div className="hidden sm:flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
-            <ClipboardList className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">Daily Manpower Entry</h1>
-            <p className="text-xs md:text-sm text-muted-foreground mt-0.5">Record daily workforce data</p>
-          </div>
+      <div className="flex items-start justify-between gap-3 flex-wrap pb-4 border-b border-border/60">
+        <div>
+          <h1 className="text-[22px] font-semibold text-foreground tracking-tight leading-tight">Daily Manpower Entry</h1>
+          <p className="text-[13px] text-muted-foreground mt-1">Record daily workforce data</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleBulkUpload} className="hidden" />
-          <Button variant="outline" size="sm" onClick={downloadTemplate}><FileDown className="mr-1.5 h-4 w-4" />Template</Button>
-          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
-            <Upload className="mr-1.5 h-4 w-4" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
+          <Button variant="outline" size="sm" className="h-9" onClick={downloadTemplate}>
+            <FileDown className="mr-1.5 h-3.5 w-3.5" />Template
+          </Button>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
+            <Upload className="mr-1.5 h-3.5 w-3.5" />{bulkUploading ? "Uploading..." : "Bulk Upload"}
           </Button>
         </div>
       </div>
@@ -326,9 +323,7 @@ function DailyEntryPage() {
       {mastersLoaded && projects.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center space-y-3">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <Inbox className="h-6 w-6 text-muted-foreground" />
-            </div>
+            <Inbox className="h-8 w-8 text-muted-foreground/60 mx-auto" />
             <p className="text-base font-medium text-foreground">No projects assigned to your account</p>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
               Ask an administrator to assign projects to you under <span className="font-medium">User Management → Projects</span>.
@@ -337,68 +332,56 @@ function DailyEntryPage() {
         </Card>
       )}
 
-      {/* Filters card */}
-      <Card className="border shadow-sm bg-gradient-to-br from-secondary/40 to-background">
-        <CardContent className="p-4 md:p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 lg:items-end">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full sm:w-[200px] justify-start text-left bg-background", !date && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "dd MMM yyyy") : "Pick date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Project</label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger className="w-full sm:w-[280px] bg-background"><SelectValue placeholder="Select project" /></SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {projectId && (
-              <div className="flex gap-2 col-span-1 sm:col-span-2 lg:col-span-1 lg:ml-auto">
-                <Button variant="outline" onClick={copyPreviousDay} className="flex-1 sm:flex-none bg-background">
-                  <Copy className="mr-2 h-4 w-4" />Copy Previous Day
-                </Button>
-                <Button onClick={addRow} className="flex-1 sm:flex-none">
-                  <Plus className="mr-2 h-4 w-4" />Add Row
-                </Button>
-              </div>
+      {/* Toolbar */}
+      <div className="bg-card border border-border rounded-lg px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("h-9 justify-start text-left font-normal w-full sm:w-[180px]", !date && "text-muted-foreground")}>
+              <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+              {date ? format(date, "dd MMM yyyy") : "Pick date"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
+          </PopoverContent>
+        </Popover>
+        <Select value={projectId} onValueChange={setProjectId}>
+          <SelectTrigger className="h-9 w-full sm:w-[280px]"><SelectValue placeholder="Select project" /></SelectTrigger>
+          <SelectContent>
+            {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {projectId && (
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Button variant="ghost" size="sm" className="h-9" onClick={copyPreviousDay}>
+              <Copy className="mr-1.5 h-3.5 w-3.5" />Copy Previous Day
+            </Button>
+            <Button size="sm" className="h-9" onClick={addRow}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />Add Row
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Project context strip */}
+      {projectId && selProj && (
+        <div className="bg-muted/30 border border-border/60 rounded-md px-4 py-2.5 text-sm flex flex-col sm:flex-row sm:items-center gap-y-1.5 gap-x-4">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">Project</span>
+            {selProj.code && (
+              <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-background border border-border/60 text-foreground shrink-0">
+                {selProj.code}
+              </span>
+            )}
+            <span className="font-medium text-foreground truncate">{selProj.name}</span>
+            {selProj.project_group && (
+              <span className="text-muted-foreground truncate">· {selProj.project_group}</span>
             )}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Project info chips */}
-      {projectId && selProj && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="stat-tint-blue rounded-lg px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Code</p>
-            <p className="text-sm font-mono font-semibold mt-0.5 truncate">{selProj.code || "—"}</p>
-          </div>
-          <div className="stat-tint-purple rounded-lg px-4 py-3 col-span-2 md:col-span-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Project</p>
-            <p className="text-sm font-semibold mt-0.5 truncate">{selProj.name}</p>
-          </div>
-          <div className="stat-tint-teal rounded-lg px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Group</p>
-            <p className="text-sm font-semibold mt-0.5 truncate">{selProj.project_group || "—"}</p>
-          </div>
-          <div className="stat-tint-green rounded-lg px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total</p>
-            <p className="text-sm font-semibold mt-0.5 tabular-nums">
-              <span className="text-base">{totalHeadcount}</span>
-              <span className="text-muted-foreground"> · {rows.length} row{rows.length === 1 ? "" : "s"}</span>
-            </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total</span>
+            <span className="font-semibold text-foreground tabular-nums">{totalHeadcount}</span>
+            <span className="text-muted-foreground text-xs">across {rows.length} row{rows.length === 1 ? "" : "s"}</span>
           </div>
         </div>
       )}
