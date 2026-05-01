@@ -86,12 +86,14 @@ export type Database = {
           contractor_id: string
           created_at: string
           created_by: string | null
+          deficiency_manpower: number
           department_id: string
           entry_date: string
           headcount: number
           id: string
           project_id: string
           remarks: string | null
+          security_count: number
           updated_at: string
         }
         Insert: {
@@ -99,12 +101,14 @@ export type Database = {
           contractor_id: string
           created_at?: string
           created_by?: string | null
+          deficiency_manpower?: number
           department_id: string
           entry_date: string
           headcount?: number
           id?: string
           project_id: string
           remarks?: string | null
+          security_count?: number
           updated_at?: string
         }
         Update: {
@@ -112,12 +116,14 @@ export type Database = {
           contractor_id?: string
           created_at?: string
           created_by?: string | null
+          deficiency_manpower?: number
           department_id?: string
           entry_date?: string
           headcount?: number
           id?: string
           project_id?: string
           remarks?: string | null
+          security_count?: number
           updated_at?: string
         }
         Relationships: [
@@ -467,19 +473,25 @@ export type Database = {
       }
       worker_categories: {
         Row: {
+          category_group: string | null
           created_at: string
+          display_order: number
           id: string
           name: string
           updated_at: string
         }
         Insert: {
+          category_group?: string | null
           created_at?: string
+          display_order?: number
           id?: string
           name: string
           updated_at?: string
         }
         Update: {
+          category_group?: string | null
           created_at?: string
+          display_order?: number
           id?: string
           name?: string
           updated_at?: string
