@@ -33,6 +33,48 @@ type ManpowerRow = {
 function DailyEntryPage() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date>(new Date());
+  const [dateText, setDateText] = useState<string>(format(new Date(), "dd/MM/yyyy"));
+  const [dateError, setDateError] = useState(false);
+
+  const tryParseDate = (s: string): Date | null => {
+    const formats = ["dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "d/M/yyyy", "d-M-yyyy"];
+    for (const f of formats) {
+      const d = parseDate(s, f, new Date());
+      if (isValid(d)) return d;
+    }
+    return null;
+  };
+
+  const handleDateTextChange = (raw: string) => {
+    // Auto-insert slashes for digit-only input up to 8 digits
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    let formatted = raw;
+    if (raw === digits && digits.length > 0) {
+      if (digits.length <= 2) formatted = digits;
+      else if (digits.length <= 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      else formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    }
+    setDateText(formatted);
+    const parsed = tryParseDate(formatted);
+    if (parsed) {
+      setDate(parsed);
+      setDateError(false);
+    }
+  };
+
+  const handleDateBlur = () => {
+    const parsed = tryParseDate(dateText);
+    if (parsed) {
+      setDate(parsed);
+      setDateText(format(parsed, "dd/MM/yyyy"));
+      setDateError(false);
+    } else {
+      setDateError(true);
+      setDateText(format(date, "dd/MM/yyyy"));
+      setTimeout(() => setDateError(false), 1500);
+    }
+  };
+
   const [projectId, setProjectId] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
