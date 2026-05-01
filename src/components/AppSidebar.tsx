@@ -9,7 +9,6 @@ import {
   Layers,
   Tag,
   BarChart3,
-  FileSpreadsheet,
   LogOut,
   HardHat,
   UserCog,
