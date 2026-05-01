@@ -14,7 +14,6 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DailyEntryRouteImport } from './routes/daily-entry'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ReportsConsolidatedRouteImport } from './routes/reports.consolidated'
 import { Route as MastersProjectsRouteImport } from './routes/masters.projects'
 import { Route as MastersDepartmentsRouteImport } from './routes/masters.departments'
 import { Route as MastersContractorsRouteImport } from './routes/masters.contractors'
@@ -45,11 +44,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReportsConsolidatedRoute = ReportsConsolidatedRouteImport.update({
-  id: '/consolidated',
-  path: '/consolidated',
-  getParentRoute: () => ReportsRoute,
-} as any)
 const MastersProjectsRoute = MastersProjectsRouteImport.update({
   id: '/masters/projects',
   path: '/masters/projects',
@@ -75,38 +69,35 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
-  '/reports': typeof ReportsRouteWithChildren
+  '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
   '/masters/projects': typeof MastersProjectsRoute
-  '/reports/consolidated': typeof ReportsConsolidatedRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
-  '/reports': typeof ReportsRouteWithChildren
+  '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
   '/masters/projects': typeof MastersProjectsRoute
-  '/reports/consolidated': typeof ReportsConsolidatedRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
-  '/reports': typeof ReportsRouteWithChildren
+  '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
   '/masters/projects': typeof MastersProjectsRoute
-  '/reports/consolidated': typeof ReportsConsolidatedRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,7 +111,6 @@ export interface FileRouteTypes {
     | '/masters/contractors'
     | '/masters/departments'
     | '/masters/projects'
-    | '/reports/consolidated'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -132,7 +122,6 @@ export interface FileRouteTypes {
     | '/masters/contractors'
     | '/masters/departments'
     | '/masters/projects'
-    | '/reports/consolidated'
   id:
     | '__root__'
     | '/'
@@ -144,14 +133,13 @@ export interface FileRouteTypes {
     | '/masters/contractors'
     | '/masters/departments'
     | '/masters/projects'
-    | '/reports/consolidated'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DailyEntryRoute: typeof DailyEntryRoute
   LoginRoute: typeof LoginRoute
-  ReportsRoute: typeof ReportsRouteWithChildren
+  ReportsRoute: typeof ReportsRoute
   UsersRoute: typeof UsersRoute
   MastersCategoriesRoute: typeof MastersCategoriesRoute
   MastersContractorsRoute: typeof MastersContractorsRoute
@@ -196,13 +184,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reports/consolidated': {
-      id: '/reports/consolidated'
-      path: '/consolidated'
-      fullPath: '/reports/consolidated'
-      preLoaderRoute: typeof ReportsConsolidatedRouteImport
-      parentRoute: typeof ReportsRoute
-    }
     '/masters/projects': {
       id: '/masters/projects'
       path: '/masters/projects'
@@ -234,22 +215,11 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface ReportsRouteChildren {
-  ReportsConsolidatedRoute: typeof ReportsConsolidatedRoute
-}
-
-const ReportsRouteChildren: ReportsRouteChildren = {
-  ReportsConsolidatedRoute: ReportsConsolidatedRoute,
-}
-
-const ReportsRouteWithChildren =
-  ReportsRoute._addFileChildren(ReportsRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DailyEntryRoute: DailyEntryRoute,
   LoginRoute: LoginRoute,
-  ReportsRoute: ReportsRouteWithChildren,
+  ReportsRoute: ReportsRoute,
   UsersRoute: UsersRoute,
   MastersCategoriesRoute: MastersCategoriesRoute,
   MastersContractorsRoute: MastersContractorsRoute,
