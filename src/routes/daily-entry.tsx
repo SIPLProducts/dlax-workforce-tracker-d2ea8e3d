@@ -153,10 +153,10 @@ function DailyEntryPage() {
     setCells((prev) => ({ ...prev, [`${contractorId}:${categoryId}`]: value }));
   };
   const setExtra = (contractorId: string, field: "security" | "deficiency" | "remarks", value: any) => {
-    setExtras((prev) => ({
-      ...prev,
-      [contractorId]: { ...{ security: 0, deficiency: 0, remarks: "" }, ...(prev[contractorId] || {}), [field]: value },
-    }));
+    setExtras((prev) => {
+      const current = prev[contractorId] || { security: 0, deficiency: 0, remarks: "" };
+      return { ...prev, [contractorId]: { ...current, [field]: value } };
+    });
   };
 
   const rowTotal = (contractorId: string) =>
