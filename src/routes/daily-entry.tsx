@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, Plus, Copy, Trash2, Save, FileDown, Upload, ClipboardList, Users, Inbox } from "lucide-react";
-import { format, subDays, parse as parseDate } from "date-fns";
+import { format, subDays, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -33,6 +33,48 @@ type ManpowerRow = {
 function DailyEntryPage() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date>(new Date());
+  const [dateText, setDateText] = useState<string>(format(new Date(), "dd/MM/yyyy"));
+  const [dateError, setDateError] = useState(false);
+
+  const tryParseDate = (s: string): Date | null => {
+    const formats = ["dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "d/M/yyyy", "d-M-yyyy"];
+    for (const f of formats) {
+      const d = parseDate(s, f, new Date());
+      if (isValid(d)) return d;
+    }
+    return null;
+  };
+
+  const handleDateTextChange = (raw: string) => {
+    // Auto-insert slashes for digit-only input up to 8 digits
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    let formatted = raw;
+    if (raw === digits && digits.length > 0) {
+      if (digits.length <= 2) formatted = digits;
+      else if (digits.length <= 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      else formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    }
+    setDateText(formatted);
+    const parsed = tryParseDate(formatted);
+    if (parsed) {
+      setDate(parsed);
+      setDateError(false);
+    }
+  };
+
+  const handleDateBlur = () => {
+    const parsed = tryParseDate(dateText);
+    if (parsed) {
+      setDate(parsed);
+      setDateText(format(parsed, "dd/MM/yyyy"));
+      setDateError(false);
+    } else {
+      setDateError(true);
+      setDateText(format(date, "dd/MM/yyyy"));
+      setTimeout(() => setDateError(false), 1500);
+    }
+  };
+
   const [projectId, setProjectId] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -351,23 +393,46 @@ function DailyEntryPage() {
 
       {/* Toolbar */}
       <div className="bg-card border border-border/70 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2 surface-elevated">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "h-9 justify-start text-left font-medium w-full sm:w-[180px] bg-background hover:bg-muted/40 transition-colors",
-                !date && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-              {date ? format(date, "dd MMM yyyy") : "Pick date"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
+        <div className={cn(
+          "flex items-center w-full sm:w-[200px] h-9 rounded-md border bg-background overflow-hidden transition-colors",
+          dateError ? "border-destructive" : "border-input hover:border-ring/40 focus-within:border-ring"
+        )}>
+          <Input
+            value={dateText}
+            onChange={(e) => handleDateTextChange(e.target.value)}
+            onBlur={handleDateBlur}
+            placeholder="dd/mm/yyyy"
+            inputMode="numeric"
+            maxLength={10}
+            className="h-full border-0 shadow-none focus-visible:ring-0 font-medium tabular-nums px-3"
+          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Open calendar"
+                className="h-full w-9 flex items-center justify-center border-l border-input bg-muted/30 hover:bg-muted/60 transition-colors"
+              >
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => {
+                  if (d) {
+                    setDate(d);
+                    setDateText(format(d, "dd/MM/yyyy"));
+                    setDateError(false);
+                  }
+                }}
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
 
         <div className="hidden sm:block h-6 w-px bg-border/70" />
 
