@@ -172,15 +172,15 @@ function DepartmentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Departments</h1>
-          <p className="text-sm text-muted-foreground">Manage departments / trades and their worker categories</p>
+          <h1 className="text-2xl font-bold">Category of Labour</h1>
+          <p className="text-sm text-muted-foreground">Manage categories of labour and their worker sub-categories</p>
         </div>
         <Button onClick={startAdd} disabled={!!isFormVisible}>
-          <Plus className="mr-2 h-4 w-4" />Add Department
+          <Plus className="mr-2 h-4 w-4" />Add Category of Labour
         </Button>
       </div>
 
-      <Input placeholder="Search departments..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+      <Input placeholder="Search categories of labour..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
 
       <Card>
         <CardContent className="p-0">
