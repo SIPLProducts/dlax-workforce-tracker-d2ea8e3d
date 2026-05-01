@@ -407,7 +407,7 @@ function DailyEntryPage() {
                     const linked = deptCategoryMap[row.department_id];
                     const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
                     return (
-                      <TableRow key={idx} className={cn("group transition-colors", idx % 2 === 1 && "bg-muted/20")}>
+                      <TableRow key={idx} className="group transition-colors hover:bg-muted/30 border-b border-border/60">
                         <TableCell>
                           <Select value={row.contractor_id} onValueChange={(v) => updateRow(idx, "contractor_id", v)}>
                             <SelectTrigger className="w-[170px] bg-background"><SelectValue placeholder="Select" /></SelectTrigger>
