@@ -227,7 +227,7 @@ function DepartmentsPage() {
               {filtered.length === 0 && !showInlineForm && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                    No departments found
+                    No categories of labour found
                   </TableCell>
                 </TableRow>
               )}
