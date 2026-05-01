@@ -155,7 +155,7 @@ function DailyEntryPage() {
   const setExtra = (contractorId: string, field: "security" | "deficiency" | "remarks", value: any) => {
     setExtras((prev) => ({
       ...prev,
-      [contractorId]: { security: 0, deficiency: 0, remarks: "", ...prev[contractorId], [field]: value },
+      [contractorId]: { ...{ security: 0, deficiency: 0, remarks: "" }, ...(prev[contractorId] || {}), [field]: value },
     }));
   };
 
