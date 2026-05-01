@@ -88,7 +88,7 @@ function DepartmentsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this department?")) return;
+    if (!confirm("Delete this category of labour?")) return;
     await supabase.from("departments").delete().eq("id", id);
     toast.success("Deleted");
     load();
@@ -116,7 +116,7 @@ function DepartmentsPage() {
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Civil, Electrical"
+          placeholder="e.g. Civil, MEP, Security"
           className="h-9 max-w-[200px]"
           autoFocus
           onKeyDown={(e) => {
@@ -172,15 +172,15 @@ function DepartmentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Departments</h1>
-          <p className="text-sm text-muted-foreground">Manage departments / trades and their worker categories</p>
+          <h1 className="text-2xl font-bold">Category of Labour</h1>
+          <p className="text-sm text-muted-foreground">Manage categories of labour and their worker sub-categories</p>
         </div>
         <Button onClick={startAdd} disabled={!!isFormVisible}>
-          <Plus className="mr-2 h-4 w-4" />Add Department
+          <Plus className="mr-2 h-4 w-4" />Add Category of Labour
         </Button>
       </div>
 
-      <Input placeholder="Search departments..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+      <Input placeholder="Search categories of labour..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
 
       <Card>
         <CardContent className="p-0">
@@ -227,7 +227,7 @@ function DepartmentsPage() {
               {filtered.length === 0 && !showInlineForm && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                    No departments found
+                    No categories of labour found
                   </TableCell>
                 </TableRow>
               )}
