@@ -116,7 +116,7 @@ function DepartmentsPage() {
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Civil, Electrical"
+          placeholder="e.g. Civil, MEP, Security"
           className="h-9 max-w-[200px]"
           autoFocus
           onKeyDown={(e) => {
