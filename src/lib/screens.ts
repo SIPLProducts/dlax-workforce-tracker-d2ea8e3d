@@ -6,7 +6,7 @@ export const APP_SCREENS = [
   { key: "reports", label: "Reports", path: "/reports" },
   { key: "masters_projects", label: "Projects (Master)", path: "/masters/projects" },
   { key: "masters_contractors", label: "Contractors (Master)", path: "/masters/contractors" },
-  { key: "masters_departments", label: "Departments (Master)", path: "/masters/departments" },
+  { key: "masters_departments", label: "Category of Labour (Master)", path: "/masters/departments" },
   { key: "masters_categories", label: "Categories (Master)", path: "/masters/categories" },
   { key: "user_management", label: "User Management", path: "/users" },
 ] as const;
