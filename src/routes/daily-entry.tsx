@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Copy, Trash2, Save, FileDown, Upload } from "lucide-react";
+import { CalendarIcon, Plus, Copy, Trash2, Save, FileDown, Upload, ClipboardList, Users, Inbox } from "lucide-react";
 import { format, subDays, parse as parseDate } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
