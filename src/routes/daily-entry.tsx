@@ -453,9 +453,8 @@ function DailyEntryPage() {
               {rows.map((row, idx) => {
                 const linked = deptCategoryMap[row.department_id];
                 const filteredCats = linked && linked.length > 0 ? categories.filter((c) => linked.includes(c.id)) : categories;
-                const tints = ["stat-tint-blue", "stat-tint-green", "stat-tint-amber", "stat-tint-purple", "stat-tint-teal", "stat-tint-rose"];
                 return (
-                  <div key={idx} className={cn("p-3 space-y-2.5", tints[idx % tints.length])}>
+                  <div key={idx} className="p-3 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-foreground">Row {idx + 1}</span>
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => removeRow(idx)}>
