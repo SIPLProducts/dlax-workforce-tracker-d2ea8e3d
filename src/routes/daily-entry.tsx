@@ -298,6 +298,7 @@ function DailyEntryPage() {
     }
   };
 
+  const selProj = projects.find((p) => p.id === projectId);
   const totalHeadcount = rows.reduce((s, r) => s + (r.headcount || 0), 0);
 
   return (
