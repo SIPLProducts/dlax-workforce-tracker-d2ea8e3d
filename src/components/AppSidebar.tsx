@@ -42,6 +42,7 @@ const masterItems = [
 
 const reportItems = [
   { to: "/reports", label: "Reports", icon: BarChart3, screen: "reports" },
+  { to: "/reports/consolidated", label: "Consolidated Report", icon: FileSpreadsheet, screen: "reports" },
 ];
 
 const adminItems = [
