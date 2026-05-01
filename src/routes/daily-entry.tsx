@@ -309,8 +309,9 @@ function DailyEntryPage() {
       </Card>
 
       <Card>
-        <CardContent className="p-0 overflow-auto">
-          <table className="border-collapse text-xs w-full min-w-[1600px]">
+        <CardContent className="p-0">
+          <TableWithTopScroll>
+            <table className="border-collapse text-xs w-full min-w-[1600px]">
             <thead>
               {/* Group super-header */}
               <tr>
