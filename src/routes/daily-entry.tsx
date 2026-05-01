@@ -391,6 +391,7 @@ function DailyEntryPage() {
               </tfoot>
             )}
           </table>
+          </TableWithTopScroll>
         </CardContent>
       </Card>
     </div>
