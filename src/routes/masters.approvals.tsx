@@ -554,17 +554,11 @@ function Page() {
                     <TableCell>
                       <Select
                         value={c.l1_user_id || ""}
-                        onValueChange={(v) => update(p.id, { l1_user_id: v || null })}
+                        onValueChange={(v) => handleUserChange(p.id, "l1", v)}
                         disabled={!c.approval_enabled}
                       >
-                        <SelectTrigger className="h-8 min-w-[140px]"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {pcs.map((u) => (
-                            <SelectItem key={u.user_id} value={u.user_id}>
-                              {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+                        <SelectTrigger className="h-8 min-w-[180px]"><SelectValue placeholder="Select PC" /></SelectTrigger>
+                        {renderUserSelectContent("l1")}
                       </Select>
                     </TableCell>
                   )}
@@ -572,17 +566,11 @@ function Page() {
                     <TableCell>
                       <Select
                         value={c.l2_user_id || ""}
-                        onValueChange={(v) => update(p.id, { l2_user_id: v || null })}
+                        onValueChange={(v) => handleUserChange(p.id, "l2", v)}
                         disabled={!c.approval_enabled}
                       >
-                        <SelectTrigger className="h-8 min-w-[140px]"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {pms.map((u) => (
-                            <SelectItem key={u.user_id} value={u.user_id}>
-                              {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+                        <SelectTrigger className="h-8 min-w-[180px]"><SelectValue placeholder="Select PM" /></SelectTrigger>
+                        {renderUserSelectContent("l2")}
                       </Select>
                     </TableCell>
                   )}
