@@ -63,10 +63,10 @@ function Page() {
   }, [isAdmin]);
 
   const update = (pid: string, patch: Partial<Config>) => {
-    setConfigs((prev) => ({
-      ...prev,
-      [pid]: { project_id: pid, approval_enabled: false, l1_user_id: null, l2_user_id: null, ...prev[pid], ...patch },
-    }));
+    setConfigs((prev) => {
+      const cur = prev[pid] || { project_id: pid, approval_enabled: false, l1_user_id: null, l2_user_id: null };
+      return { ...prev, [pid]: { ...cur, ...patch } };
+    });
   };
 
   const save = async (pid: string) => {

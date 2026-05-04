@@ -13,11 +13,13 @@ import { Route as UsersRouteImport } from './routes/users'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DailyEntryRouteImport } from './routes/daily-entry'
+import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MastersProjectsRouteImport } from './routes/masters.projects'
 import { Route as MastersDepartmentsRouteImport } from './routes/masters.departments'
 import { Route as MastersContractorsRouteImport } from './routes/masters.contractors'
 import { Route as MastersCategoriesRouteImport } from './routes/masters.categories'
+import { Route as MastersApprovalsRouteImport } from './routes/masters.approvals'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -37,6 +39,11 @@ const LoginRoute = LoginRouteImport.update({
 const DailyEntryRoute = DailyEntryRouteImport.update({
   id: '/daily-entry',
   path: '/daily-entry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApprovalsRoute = ApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -64,13 +71,20 @@ const MastersCategoriesRoute = MastersCategoriesRouteImport.update({
   path: '/masters/categories',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MastersApprovalsRoute = MastersApprovalsRouteImport.update({
+  id: '/masters/approvals',
+  path: '/masters/approvals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
+  '/masters/approvals': typeof MastersApprovalsRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -78,10 +92,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
+  '/masters/approvals': typeof MastersApprovalsRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -90,10 +106,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
+  '/masters/approvals': typeof MastersApprovalsRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -103,10 +121,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/approvals'
     | '/daily-entry'
     | '/login'
     | '/reports'
     | '/users'
+    | '/masters/approvals'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -114,10 +134,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/approvals'
     | '/daily-entry'
     | '/login'
     | '/reports'
     | '/users'
+    | '/masters/approvals'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -125,10 +147,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/approvals'
     | '/daily-entry'
     | '/login'
     | '/reports'
     | '/users'
+    | '/masters/approvals'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -137,10 +161,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApprovalsRoute: typeof ApprovalsRoute
   DailyEntryRoute: typeof DailyEntryRoute
   LoginRoute: typeof LoginRoute
   ReportsRoute: typeof ReportsRoute
   UsersRoute: typeof UsersRoute
+  MastersApprovalsRoute: typeof MastersApprovalsRoute
   MastersCategoriesRoute: typeof MastersCategoriesRoute
   MastersContractorsRoute: typeof MastersContractorsRoute
   MastersDepartmentsRoute: typeof MastersDepartmentsRoute
@@ -175,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/daily-entry'
       fullPath: '/daily-entry'
       preLoaderRoute: typeof DailyEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/approvals': {
+      id: '/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof ApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -212,15 +245,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MastersCategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/masters/approvals': {
+      id: '/masters/approvals'
+      path: '/masters/approvals'
+      fullPath: '/masters/approvals'
+      preLoaderRoute: typeof MastersApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApprovalsRoute: ApprovalsRoute,
   DailyEntryRoute: DailyEntryRoute,
   LoginRoute: LoginRoute,
   ReportsRoute: ReportsRoute,
   UsersRoute: UsersRoute,
+  MastersApprovalsRoute: MastersApprovalsRoute,
   MastersCategoriesRoute: MastersCategoriesRoute,
   MastersContractorsRoute: MastersContractorsRoute,
   MastersDepartmentsRoute: MastersDepartmentsRoute,
