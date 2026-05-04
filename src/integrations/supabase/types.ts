@@ -106,6 +106,7 @@ export type Database = {
           submitted_at: string | null
           submitted_by: string | null
           updated_at: string
+          weather_condition: string | null
         }
         Insert: {
           category_id: string
@@ -132,6 +133,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           updated_at?: string
+          weather_condition?: string | null
         }
         Update: {
           category_id?: string
@@ -158,6 +160,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           updated_at?: string
+          weather_condition?: string | null
         }
         Relationships: [
           {
