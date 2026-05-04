@@ -160,44 +160,47 @@ function DailyEntryPage() {
   }, [contractors]);
 
   // Load existing daily_manpower for this date+project; map remarks JSON into typed columns
-  useEffect(() => {
+  const loadEntries = async () => {
     if (!projectId) return;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("daily_manpower")
-        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status,rejection_remarks")
-        .eq("project_id", projectId)
-        .eq("entry_date", format(date, "yyyy-MM-dd"));
-      setLoading(false);
-      if (error) return;
-      const next: Record<string, RowData> = {};
-      const stat: Record<string, { status: string; rejection?: string | null }> = {};
-      contractors.forEach((c) => (next[c.id] = emptyRow()));
-      (data || []).forEach((rec: any) => {
-        const r = next[rec.contractor_id] || emptyRow();
-        r.security = rec.security_count || 0;
-        r.deficiency = rec.deficiency_manpower || 0;
-        try {
-          const parsed = rec.remarks ? JSON.parse(rec.remarks) : null;
-          if (parsed && typeof parsed === "object") {
-            r.remarks = parsed._remarks || "";
-            ALL_COLS.forEach((c) => {
-              if (typeof parsed[c.key] === "number") (r as any)[c.key] = parsed[c.key];
-            });
-          } else if (typeof rec.remarks === "string") {
-            r.remarks = rec.remarks;
-          }
-        } catch {
-          r.remarks = rec.remarks || "";
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("daily_manpower")
+      .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status,rejection_remarks")
+      .eq("project_id", projectId)
+      .eq("entry_date", format(date, "yyyy-MM-dd"));
+    setLoading(false);
+    if (error) return;
+    const next: Record<string, RowData> = {};
+    const stat: Record<string, { status: string; rejection?: string | null }> = {};
+    contractors.forEach((c) => (next[c.id] = emptyRow()));
+    (data || []).forEach((rec: any) => {
+      const r = next[rec.contractor_id] || emptyRow();
+      r.security = rec.security_count || 0;
+      r.deficiency = rec.deficiency_manpower || 0;
+      try {
+        const parsed = rec.remarks ? JSON.parse(rec.remarks) : null;
+        if (parsed && typeof parsed === "object") {
+          r.remarks = parsed._remarks || "";
+          ALL_COLS.forEach((c) => {
+            if (typeof parsed[c.key] === "number") (r as any)[c.key] = parsed[c.key];
+          });
+        } else if (typeof rec.remarks === "string") {
+          r.remarks = rec.remarks;
         }
-        r.weather = rec.weather_condition || "";
-        next[rec.contractor_id] = r;
-        stat[rec.contractor_id] = { status: rec.status, rejection: rec.rejection_remarks };
-      });
-      setRows(next);
-      setStatuses(stat);
-    })();
+      } catch {
+        r.remarks = rec.remarks || "";
+      }
+      r.weather = rec.weather_condition || "";
+      next[rec.contractor_id] = r;
+      stat[rec.contractor_id] = { status: rec.status, rejection: rec.rejection_remarks };
+    });
+    setRows(next);
+    setStatuses(stat);
+  };
+
+  useEffect(() => {
+    loadEntries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, date, contractors]);
 
   const updateCell = (cid: string, key: string, val: number) => {
