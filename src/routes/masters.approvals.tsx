@@ -786,7 +786,7 @@ function Page() {
           </Select>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkSetL1Open(false)}>Cancel</Button>
-            <Button onClick={() => { bulkApply({ l1_user_id: bulkUserPick || null, approval_enabled: true }); setBulkSetL1Open(false); }} disabled={!bulkUserPick}>Apply</Button>
+            <Button onClick={() => { const v = bulkUserPick === "__none__" ? null : (bulkUserPick || null); bulkApply({ l1_user_id: v, approval_enabled: true }); setBulkSetL1Open(false); }} disabled={!bulkUserPick}>Apply</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
