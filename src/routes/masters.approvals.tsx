@@ -22,10 +22,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Loader2, Save, ShieldCheck, Plus, Pencil, Trash2, Search, Columns3,
-  LayoutGrid, List, ChevronDown,
+  LayoutGrid, List, ChevronDown, Info, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/masters/approvals")({
   component: () => <AuthGuard><Page /></AuthGuard>,
@@ -42,7 +43,7 @@ type Project = {
   status: string;
   created_at?: string;
 };
-type UserLite = { user_id: string; login_id: string | null; display_name: string | null };
+type UserLite = { user_id: string; login_id: string | null; display_name: string | null; role?: string | null };
 type Config = {
   project_id: string;
   approval_enabled: boolean;
@@ -84,6 +85,8 @@ function Page() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [pcs, setPcs] = useState<UserLite[]>([]);
   const [pms, setPms] = useState<UserLite[]>([]);
+  const [otherUsers, setOtherUsers] = useState<UserLite[]>([]);
+  const [hintDismissed, setHintDismissed] = useState(false);
   const [configs, setConfigs] = useState<Record<string, Config>>({});
   const [original, setOriginal] = useState<Record<string, Config>>({});
   const [loading, setLoading] = useState(true);
@@ -134,10 +137,13 @@ function Page() {
 
   const loadAll = async () => {
     setLoading(true);
+    try {
+      setHintDismissed(localStorage.getItem("dlax.approvals.hint.dismissed") === "1");
+    } catch {/* ignore */}
     const [proj, cfg, roles, profiles] = await Promise.all([
       supabase.from("projects").select("*").order("name"),
       (supabase as any).from("project_approval_config").select("*"),
-      supabase.from("user_roles").select("user_id, role").in("role", ["project_coordinator", "project_manager"] as any),
+      supabase.from("user_roles").select("user_id, role"),
       supabase.from("profiles").select("user_id, login_id, display_name"),
     ]);
     setProjects((proj.data || []) as Project[]);
@@ -145,17 +151,31 @@ function Page() {
     (cfg.data || []).forEach((c: any) => { cfgMap[c.project_id] = c; });
     setConfigs(cfgMap);
     setOriginal(JSON.parse(JSON.stringify(cfgMap)));
-    const profMap = new Map((profiles.data || []).map((p: any) => [p.user_id, p]));
+
+    // Aggregate roles per user (a user may have multiple)
+    const rolesByUser = new Map<string, string[]>();
+    (roles.data || []).forEach((r: any) => {
+      const arr = rolesByUser.get(r.user_id) || [];
+      arr.push(r.role);
+      rolesByUser.set(r.user_id, arr);
+    });
+
     const pcList: UserLite[] = [];
     const pmList: UserLite[] = [];
-    (roles.data || []).forEach((r: any) => {
-      const p = profMap.get(r.user_id);
-      if (!p) return;
-      if (r.role === "project_coordinator") pcList.push(p as UserLite);
-      if (r.role === "project_manager") pmList.push(p as UserLite);
+    const otherList: UserLite[] = [];
+    (profiles.data || []).forEach((p: any) => {
+      const userRoles = rolesByUser.get(p.user_id) || [];
+      const primary = userRoles[0] || null;
+      const u: UserLite = { ...p, role: primary };
+      if (userRoles.includes("project_coordinator")) pcList.push(u);
+      if (userRoles.includes("project_manager")) pmList.push(u);
+      if (!userRoles.includes("project_coordinator") && !userRoles.includes("project_manager")) {
+        otherList.push(u);
+      }
     });
     setPcs(pcList);
     setPms(pmList);
+    setOtherUsers(otherList);
     setLoading(false);
   };
 
@@ -351,6 +371,67 @@ function Page() {
     return <div className="p-8 text-muted-foreground">Admin access required.</div>;
   }
 
+  const labelFor = (u: UserLite) => {
+    const name = u.display_name || u.login_id || u.user_id.slice(0, 8);
+    const lid = u.login_id ? ` (${u.login_id})` : "";
+    const role = u.role ? ` — ${u.role.replace(/_/g, " ")}` : "";
+    return `${name}${lid}${role}`;
+  };
+
+  const renderUserSelectContent = (level: "l1" | "l2") => {
+    const primary = level === "l1" ? pcs : pms;
+    const primaryLabel = level === "l1" ? "Project Coordinators" : "Project Managers";
+    const totalUsers = pcs.length + pms.length + otherUsers.length;
+    if (totalUsers === 0) {
+      return (
+        <SelectContent>
+          <div className="px-2 py-2 text-xs text-muted-foreground">
+            No users found.{" "}
+            <Link to="/users" className="text-primary underline">Add users</Link>
+          </div>
+        </SelectContent>
+      );
+    }
+    return (
+      <SelectContent className="max-h-[320px]">
+        <SelectItem value="__none__">— None —</SelectItem>
+        {primary.length === 0 && (
+          <div className="px-2 py-2 text-xs text-muted-foreground border-b">
+            No {primaryLabel} assigned.{" "}
+            <Link to="/users" className="text-primary underline">Assign role</Link>
+          </div>
+        )}
+        {primary.length > 0 && (
+          <>
+            <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">{primaryLabel}</div>
+            {primary.map((u) => (
+              <SelectItem key={`p-${u.user_id}`} value={u.user_id}>{labelFor(u)}</SelectItem>
+            ))}
+          </>
+        )}
+        {otherUsers.length > 0 && (
+          <>
+            <div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground border-t mt-1">Other users</div>
+            {otherUsers.map((u) => (
+              <SelectItem key={`o-${u.user_id}`} value={u.user_id}>{labelFor(u)}</SelectItem>
+            ))}
+          </>
+        )}
+      </SelectContent>
+    );
+  };
+
+  const handleUserChange = (pid: string, level: "l1" | "l2", v: string) => {
+    const val = v === "__none__" ? null : v;
+    update(pid, level === "l1" ? { l1_user_id: val } : { l2_user_id: val });
+  };
+
+  const showRoleHint = !hintDismissed && (pcs.length === 0 || pms.length === 0);
+  const dismissHint = () => {
+    setHintDismissed(true);
+    try { localStorage.setItem("dlax.approvals.hint.dismissed", "1"); } catch {/* ignore */}
+  };
+
   // ---- Reusable row content (for card view) ----
   const renderCard = (p: Project) => {
     const c = cfgFor(p.id);
@@ -393,36 +474,22 @@ function Page() {
             <label className="text-xs font-medium">L1 — Project Coordinator</label>
             <Select
               value={c.l1_user_id || ""}
-              onValueChange={(v) => update(p.id, { l1_user_id: v || null })}
+              onValueChange={(v) => handleUserChange(p.id, "l1", v)}
               disabled={!c.approval_enabled}
             >
-              <SelectTrigger><SelectValue placeholder="Select PC" /></SelectTrigger>
-              <SelectContent>
-                {pcs.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">No PC users</div>}
-                {pcs.map((u) => (
-                  <SelectItem key={u.user_id} value={u.user_id}>
-                    {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger><SelectValue placeholder="Select Project Coordinator" /></SelectTrigger>
+              {renderUserSelectContent("l1")}
             </Select>
           </div>
           <div className="space-y-2">
             <label className="text-xs font-medium">L2 — Project Manager</label>
             <Select
               value={c.l2_user_id || ""}
-              onValueChange={(v) => update(p.id, { l2_user_id: v || null })}
+              onValueChange={(v) => handleUserChange(p.id, "l2", v)}
               disabled={!c.approval_enabled}
             >
-              <SelectTrigger><SelectValue placeholder="Select PM" /></SelectTrigger>
-              <SelectContent>
-                {pms.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">No PM users</div>}
-                {pms.map((u) => (
-                  <SelectItem key={u.user_id} value={u.user_id}>
-                    {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger><SelectValue placeholder="Select Project Manager" /></SelectTrigger>
+              {renderUserSelectContent("l2")}
             </Select>
           </div>
           <Button onClick={() => saveOne(p.id)} disabled={savingId === p.id || !dirty} variant={dirty ? "default" : "outline"}>
@@ -487,17 +554,11 @@ function Page() {
                     <TableCell>
                       <Select
                         value={c.l1_user_id || ""}
-                        onValueChange={(v) => update(p.id, { l1_user_id: v || null })}
+                        onValueChange={(v) => handleUserChange(p.id, "l1", v)}
                         disabled={!c.approval_enabled}
                       >
-                        <SelectTrigger className="h-8 min-w-[140px]"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {pcs.map((u) => (
-                            <SelectItem key={u.user_id} value={u.user_id}>
-                              {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+                        <SelectTrigger className="h-8 min-w-[180px]"><SelectValue placeholder="Select PC" /></SelectTrigger>
+                        {renderUserSelectContent("l1")}
                       </Select>
                     </TableCell>
                   )}
@@ -505,17 +566,11 @@ function Page() {
                     <TableCell>
                       <Select
                         value={c.l2_user_id || ""}
-                        onValueChange={(v) => update(p.id, { l2_user_id: v || null })}
+                        onValueChange={(v) => handleUserChange(p.id, "l2", v)}
                         disabled={!c.approval_enabled}
                       >
-                        <SelectTrigger className="h-8 min-w-[140px]"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {pms.map((u) => (
-                            <SelectItem key={u.user_id} value={u.user_id}>
-                              {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+                        <SelectTrigger className="h-8 min-w-[180px]"><SelectValue placeholder="Select PM" /></SelectTrigger>
+                        {renderUserSelectContent("l2")}
                       </Select>
                     </TableCell>
                   )}
@@ -570,6 +625,20 @@ function Page() {
           </Button>
         </div>
       </div>
+
+      {showRoleHint && (
+        <div className="flex items-start gap-2 p-3 rounded-md border border-amber-300 bg-amber-50 text-amber-900 text-sm">
+          <Info className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            Tip: Assign the <strong>Project Coordinator</strong> and <strong>Project Manager</strong> roles to users in{" "}
+            <Link to="/users" className="underline font-medium">User Management</Link> so they appear in the L1/L2 lists.
+            {pcs.length === 0 && <span className="block text-xs mt-1">• No Project Coordinators yet.</span>}
+            {pms.length === 0 && <span className="block text-xs">• No Project Managers yet.</span>}
+            <span className="block text-xs mt-1 opacity-80">In the meantime, any user can be picked from the "Other users" group.</span>
+          </div>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={dismissHint}><X className="w-4 h-4" /></Button>
+        </div>
+      )}
 
       {/* Toolbar */}
       <Card>
@@ -726,16 +795,12 @@ function Page() {
         <DialogContent>
           <DialogHeader><DialogTitle>Set L1 (Project Coordinator) for {selected.size} project(s)</DialogTitle></DialogHeader>
           <Select value={bulkUserPick} onValueChange={setBulkUserPick}>
-            <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
-            <SelectContent>
-              {pcs.map((u) => (
-                <SelectItem key={u.user_id} value={u.user_id}>{u.display_name || u.login_id}</SelectItem>
-              ))}
-            </SelectContent>
+            <SelectTrigger><SelectValue placeholder="Select Project Coordinator" /></SelectTrigger>
+            {renderUserSelectContent("l1")}
           </Select>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkSetL1Open(false)}>Cancel</Button>
-            <Button onClick={() => { bulkApply({ l1_user_id: bulkUserPick || null, approval_enabled: true }); setBulkSetL1Open(false); }} disabled={!bulkUserPick}>Apply</Button>
+            <Button onClick={() => { const v = bulkUserPick === "__none__" ? null : (bulkUserPick || null); bulkApply({ l1_user_id: v, approval_enabled: true }); setBulkSetL1Open(false); }} disabled={!bulkUserPick}>Apply</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -743,16 +808,12 @@ function Page() {
         <DialogContent>
           <DialogHeader><DialogTitle>Set L2 (Project Manager) for {selected.size} project(s)</DialogTitle></DialogHeader>
           <Select value={bulkUserPick} onValueChange={setBulkUserPick}>
-            <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
-            <SelectContent>
-              {pms.map((u) => (
-                <SelectItem key={u.user_id} value={u.user_id}>{u.display_name || u.login_id}</SelectItem>
-              ))}
-            </SelectContent>
+            <SelectTrigger><SelectValue placeholder="Select Project Manager" /></SelectTrigger>
+            {renderUserSelectContent("l2")}
           </Select>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkSetL2Open(false)}>Cancel</Button>
-            <Button onClick={() => { bulkApply({ l2_user_id: bulkUserPick || null, approval_enabled: true }); setBulkSetL2Open(false); }} disabled={!bulkUserPick}>Apply</Button>
+            <Button onClick={() => { const v = bulkUserPick === "__none__" ? null : (bulkUserPick || null); bulkApply({ l2_user_id: v, approval_enabled: true }); setBulkSetL2Open(false); }} disabled={!bulkUserPick}>Apply</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
