@@ -626,6 +626,20 @@ function Page() {
         </div>
       </div>
 
+      {showRoleHint && (
+        <div className="flex items-start gap-2 p-3 rounded-md border border-amber-300 bg-amber-50 text-amber-900 text-sm">
+          <Info className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            Tip: Assign the <strong>Project Coordinator</strong> and <strong>Project Manager</strong> roles to users in{" "}
+            <Link to="/users" className="underline font-medium">User Management</Link> so they appear in the L1/L2 lists.
+            {pcs.length === 0 && <span className="block text-xs mt-1">• No Project Coordinators yet.</span>}
+            {pms.length === 0 && <span className="block text-xs">• No Project Managers yet.</span>}
+            <span className="block text-xs mt-1 opacity-80">In the meantime, any user can be picked from the "Other users" group.</span>
+          </div>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={dismissHint}><X className="w-4 h-4" /></Button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <Card>
         <CardContent className="p-3 flex flex-wrap gap-2 items-center">
