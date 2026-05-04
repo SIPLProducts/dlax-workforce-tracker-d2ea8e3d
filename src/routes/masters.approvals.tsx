@@ -474,36 +474,22 @@ function Page() {
             <label className="text-xs font-medium">L1 — Project Coordinator</label>
             <Select
               value={c.l1_user_id || ""}
-              onValueChange={(v) => update(p.id, { l1_user_id: v || null })}
+              onValueChange={(v) => handleUserChange(p.id, "l1", v)}
               disabled={!c.approval_enabled}
             >
-              <SelectTrigger><SelectValue placeholder="Select PC" /></SelectTrigger>
-              <SelectContent>
-                {pcs.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">No PC users</div>}
-                {pcs.map((u) => (
-                  <SelectItem key={u.user_id} value={u.user_id}>
-                    {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger><SelectValue placeholder="Select Project Coordinator" /></SelectTrigger>
+              {renderUserSelectContent("l1")}
             </Select>
           </div>
           <div className="space-y-2">
             <label className="text-xs font-medium">L2 — Project Manager</label>
             <Select
               value={c.l2_user_id || ""}
-              onValueChange={(v) => update(p.id, { l2_user_id: v || null })}
+              onValueChange={(v) => handleUserChange(p.id, "l2", v)}
               disabled={!c.approval_enabled}
             >
-              <SelectTrigger><SelectValue placeholder="Select PM" /></SelectTrigger>
-              <SelectContent>
-                {pms.length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">No PM users</div>}
-                {pms.map((u) => (
-                  <SelectItem key={u.user_id} value={u.user_id}>
-                    {u.display_name || u.login_id || u.user_id.slice(0, 8)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger><SelectValue placeholder="Select Project Manager" /></SelectTrigger>
+              {renderUserSelectContent("l2")}
             </Select>
           </div>
           <Button onClick={() => saveOne(p.id)} disabled={savingId === p.id || !dirty} variant={dirty ? "default" : "outline"}>
