@@ -21,11 +21,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { adminCreateUser } from "@/utils/admin-users.functions";
 
 export const Route = createFileRoute("/users")({
-  component: () => (
-    <AuthGuard>
-      <UsersPage />
-    </AuthGuard>
-  ),
+  component: UsersPage,
 });
 
 type UserWithRoles = {
