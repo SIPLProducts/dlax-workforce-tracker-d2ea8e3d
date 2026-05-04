@@ -83,6 +83,7 @@ function DailyEntryPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
+  const [statuses, setStatuses] = useState<Record<string, { status: string; rejection?: string | null }>>({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -155,18 +156,18 @@ function DailyEntryPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("daily_manpower")
-        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks")
+        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,status,rejection_remarks")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"));
       setLoading(false);
       if (error) return;
       const next: Record<string, RowData> = {};
+      const stat: Record<string, { status: string; rejection?: string | null }> = {};
       contractors.forEach((c) => (next[c.id] = emptyRow()));
       (data || []).forEach((rec: any) => {
         const r = next[rec.contractor_id] || emptyRow();
         r.security = rec.security_count || 0;
         r.deficiency = rec.deficiency_manpower || 0;
-        // Parse remarks JSON: { _remarks: "...", civil_mason: 5, ... }
         try {
           const parsed = rec.remarks ? JSON.parse(rec.remarks) : null;
           if (parsed && typeof parsed === "object") {
@@ -181,8 +182,10 @@ function DailyEntryPage() {
           r.remarks = rec.remarks || "";
         }
         next[rec.contractor_id] = r;
+        stat[rec.contractor_id] = { status: rec.status, rejection: rec.rejection_remarks };
       });
       setRows(next);
+      setStatuses(stat);
     })();
   }, [projectId, date, contractors]);
 
