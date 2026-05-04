@@ -451,6 +451,7 @@ function DailyEntryPage() {
                   <td className="border text-center">{colTotals.deficiency || ""}</td>
                   <td className="border"></td>
                   <td className="border"></td>
+                  <td className="border"></td>
                 </tr>
               </tfoot>
             )}
