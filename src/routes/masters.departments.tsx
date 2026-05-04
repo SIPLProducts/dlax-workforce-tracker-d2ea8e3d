@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { AuthGuard } from "@/components/AuthGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,7 @@ import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/departments")({
-  component: () => <AuthGuard><DepartmentsPage /></AuthGuard>,
+  component: DepartmentsPage,
 });
 
 function DepartmentsPage() {

@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
-import { AuthGuard } from "@/components/AuthGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +13,7 @@ import { Plus, Pencil, Trash2, Download, Upload, FileDown, Briefcase, CheckCircl
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/projects")({
-  component: () => <AuthGuard><ProjectsPage /></AuthGuard>,
+  component: ProjectsPage,
 });
 
 const TONE: Record<string, string> = {
