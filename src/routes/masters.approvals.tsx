@@ -781,12 +781,8 @@ function Page() {
         <DialogContent>
           <DialogHeader><DialogTitle>Set L1 (Project Coordinator) for {selected.size} project(s)</DialogTitle></DialogHeader>
           <Select value={bulkUserPick} onValueChange={setBulkUserPick}>
-            <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
-            <SelectContent>
-              {pcs.map((u) => (
-                <SelectItem key={u.user_id} value={u.user_id}>{u.display_name || u.login_id}</SelectItem>
-              ))}
-            </SelectContent>
+            <SelectTrigger><SelectValue placeholder="Select Project Coordinator" /></SelectTrigger>
+            {renderUserSelectContent("l1")}
           </Select>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkSetL1Open(false)}>Cancel</Button>
