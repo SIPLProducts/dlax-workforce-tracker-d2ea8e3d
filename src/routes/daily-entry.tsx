@@ -373,10 +373,10 @@ function DailyEntryPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={4 + ALL_COLS.length + 6} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
               )}
               {!loading && contractors.length === 0 && (
-                <tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>
+                <tr><td colSpan={4 + ALL_COLS.length + 6} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>
               )}
               {contractors.map((c, idx) => {
                 const r = rows[c.id] || emptyRow();
