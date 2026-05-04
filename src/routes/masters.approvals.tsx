@@ -43,7 +43,7 @@ type Project = {
   status: string;
   created_at?: string;
 };
-type UserLite = { user_id: string; login_id: string | null; display_name: string | null };
+type UserLite = { user_id: string; login_id: string | null; display_name: string | null; role?: string | null };
 type Config = {
   project_id: string;
   approval_enabled: boolean;
