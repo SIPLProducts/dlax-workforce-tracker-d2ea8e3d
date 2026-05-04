@@ -20,11 +20,9 @@ import { ClientOnly } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
-    <AuthGuard>
-      <ClientOnly fallback={<div className="p-8 text-center text-muted-foreground">Loading reports...</div>}>
-        <ReportsPage />
-      </ClientOnly>
-    </AuthGuard>
+    <ClientOnly fallback={<div className="p-8 text-center text-muted-foreground">Loading reports...</div>}>
+      <ReportsPage />
+    </ClientOnly>
   ),
 });
 
