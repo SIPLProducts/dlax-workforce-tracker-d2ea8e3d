@@ -12,6 +12,8 @@ import {
   LogOut,
   HardHat,
   UserCog,
+  CheckCircle2,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,6 +32,7 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, screen: "dashboard" },
   { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, screen: "daily_entry" },
+  { to: "/approvals", label: "Approvals", icon: CheckCircle2, screen: "approvals" },
 ];
 
 const masterItems = [
@@ -37,6 +40,7 @@ const masterItems = [
   { to: "/masters/contractors", label: "Contractors", icon: Users, screen: "masters_contractors" },
   { to: "/masters/departments", label: "Departments", icon: Layers, screen: "masters_departments" },
   { to: "/masters/categories", label: "Categories", icon: Tag, screen: "masters_categories" },
+  { to: "/masters/approvals", label: "Approval Settings", icon: ShieldCheck, screen: "masters_approval_config" },
 ];
 
 const reportItems = [

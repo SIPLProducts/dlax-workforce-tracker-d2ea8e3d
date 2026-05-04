@@ -49,7 +49,7 @@ type CustomRole = {
 
 type RolePerm = { role_id: string; screen_key: string; permission: string };
 
-const ALL_ROLES = ["admin", "supervisor", "manager"] as const;
+const ALL_ROLES = ["admin", "supervisor", "manager", "project_coordinator", "project_manager"] as const;
 
 function UsersPage() {
   const { hasRole } = useAuth();

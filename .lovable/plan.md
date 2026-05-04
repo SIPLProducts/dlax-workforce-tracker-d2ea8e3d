@@ -1,74 +1,84 @@
 ## Goal
 
-Rebuild the **Daily Manpower Entry** screen to look and behave like the uploaded reference sheet:
-contractors as rows, worker categories as columns (grouped under CIVIL / MEP / NMR), nature-of-work bands separating contractor groups, plus Security, Deficiency Manpower, Remarks, and a yellow totals row.
+Add a configurable two-level approval workflow for **Daily Manpower Entries**:
+- **Level 1**: Project Coordinator (PC)
+- **Level 2**: Project Manager (PM)
+- Either level can **Reject with remarks** → entry returns to Supervisor for edit & resubmit
+- Approval flow can be **enabled/disabled per project**, and PC/PM users picked per project
 
-## What changes
+## New Roles
 
-### 1. Database — small additions
+Extend `app_role` enum with two new system roles:
+- `project_coordinator`
+- `project_manager`
 
-Add to `daily_manpower`:
-- `security_count` (integer, default 0) — single value per contractor row
-- `deficiency_manpower` (integer, default 0)
+These are assignable in the existing **User Management** screen alongside Admin/Supervisor/Manager.
 
-Add to `worker_categories`:
-- `category_group` (text, nullable) — values: `CIVIL`, `MEP`, `NMR`
-- `display_order` (integer, default 0)
+## Database Changes
 
-No data is deleted. Existing rows continue to work; new columns default to 0/null.
+1. **`daily_manpower`** — add workflow columns:
+   - `status` (`draft` | `pending_l1` | `pending_l2` | `approved` | `rejected`) default `pending_l1`
+   - `submitted_by`, `submitted_at`
+   - `l1_approver_id`, `l1_action_at`, `l1_remarks`
+   - `l2_approver_id`, `l2_action_at`, `l2_remarks`
+   - `rejection_remarks`, `rejected_by_level`
 
-### 2. Daily Entry screen rebuild (`src/routes/daily-entry.tsx`)
+2. **`project_approval_config`** (new table) — per-project setup:
+   - `project_id` (unique)
+   - `approval_enabled` (bool)
+   - `l1_user_id` (PC for this project)
+   - `l2_user_id` (PM for this project)
 
-Replace the current row-based editor with a **wide grid**:
+3. **RLS policies**:
+   - Supervisors: insert/update only their own entries while `status` is `draft` or `rejected`
+   - PC: update entries where they are the project's L1 and `status = pending_l1`
+   - PM: update entries where they are the project's L2 and `status = pending_l2`
+   - Admins: full access
 
-```
-                                                CIVIL — Item rate / Subcontract        MEP — Item rate / Subcontract        NMR Man powers
-Sl  Contractor          Contact   Work Place    Rod  Shutt Mason Scaff Paint Helper    Plumb Carp Fit Weld Elec Helper    Mason M/C F/C    Total Sec  Defic  Remarks
-─── Shuttering & Rod Benders (band header) ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-1   J V INFRA           961...    Guest House    8    12    .    .     .     3         .     .   .   .    .    .         .     .   .       23    .    .      ...
-2   Sobha / SD          984...    Block C        10   11    .    .     .     2         .     .   .   .    .    .         .     .   .       23    .    17     ...
-─── Brick Work & Plastering ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-1   AARKA               901...    Block E1...    .    .    48    .     .    49         .     .   .   .    .    .         .     .   .       97    .   153     ...
-...
-═══ TOTAL (yellow band) ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-                                                51   52   174    0    22     0        12     0  28   4    8  333         8    42   8      742   12
-```
+4. On insert: trigger sets `status` to `pending_l1` if project has approval enabled, otherwise `approved`.
 
-**Behaviour:**
-- One **editable row per contractor** for the selected date + project.
-- Contact No and Work Place auto-fill (read-only) from the Contractors master.
-- Headcount cells are inline number inputs; empty/zero cells show as blank.
-- Row Total auto-calculates (sum of all category cells).
-- **Footer total row** (yellow band) auto-sums every column across all rows.
-- Contractors are grouped into bands by their `nature_of_work` field (e.g. "Shuttering & Rod Benders", "Brick Work & Plastering", "ELECTRICAL WORKS"). Contractors without a nature_of_work go under "Uncategorised".
-- Group headers use a soft tinted band (light amber/peach like the screenshot) with bold uppercase label.
-- Category columns are grouped under three coloured super-headers: CIVIL (light blue), MEP (light blue), NMR Man powers (light peach), with sub-headers per category.
-- Sticky header + sticky first 4 columns (Sl / Contractor / Contact / Work Place) on horizontal scroll.
+## New Screen: **Approvals**
 
-**Toolbar (kept):** date picker, project picker, Copy Previous Day, Save, Template + Bulk Upload.
-- "Add Row" is removed — rows are derived from the contractor master.
-- Optional filter: "Show only contractors with entries" toggle (default off, so the full register is visible like the sheet).
+Sidebar entry under "Workflow" → `/approvals`. Visible to PC, PM, Admin.
 
-**Save logic:**
-- For each contractor row that has any non-zero value (in any category, security, or deficiency, or remarks), upsert one `daily_manpower` record per (contractor × category) with headcount > 0 — this preserves the existing per-category schema.
-- Security and Deficiency are stored once per contractor — written onto the first inserted row for that contractor for that day, or onto a dedicated marker row using a sentinel category. **Recommended:** store `security_count` and `deficiency_manpower` on every row for that contractor on that date (same value duplicated) so reports stay simple. Will confirm during implementation if a different shape is preferred.
+Layout:
+- **Tabs**: `Pending My Approval` · `My Submissions` · `All History`
+- **Filters**: Project, Date range, Status
+- Table columns: Date · Project · Contractor · Department · Headcount · Submitted by · Status badge · Actions
+- Row actions:
+  - **View details** (drawer with full entry breakdown)
+  - **Approve** (advances L1→L2, or L2→approved)
+  - **Reject** (modal requires remarks; sends back to supervisor as `rejected`)
+- Status badges color-coded: pending_l1 (amber), pending_l2 (blue), approved (green), rejected (red)
 
-### 3. Master data prep (one-time)
+## New Screen: **Project Approval Settings**
 
-Add a small admin helper in **Categories master** to set `category_group` (CIVIL / MEP / NMR) and `display_order` for each existing worker_category. Until those are set, all categories fall under a single "OTHERS" group so the screen still works.
+Admin-only, accessible from Masters → Projects (new "Approval" button per row) and as a standalone page `/masters/approvals`.
 
-Same for Contractors: ensure `nature_of_work` is editable in Contractors master (already a column, just expose it cleanly in the form). Without it, contractors fall under "Uncategorised".
+Per project row:
+- Toggle: **Enable Approval Workflow**
+- Dropdown: **Level 1 — Project Coordinator** (lists users with `project_coordinator` role)
+- Dropdown: **Level 2 — Project Manager** (lists users with `project_manager` role)
+- Save button
 
-## Out of scope
+## Daily Entry Screen Changes
 
-- No changes to Reports, Dashboard, Worker Attendance, or auth.
-- No change to RLS policies (existing daily_manpower policies still apply to the new columns).
-- No printing/PDF export in this pass — Excel template/upload remain.
+- After save, entries respect workflow: if project has approval enabled → entry goes to `pending_l1`
+- Show status badge on each row in the supervisor's daily entry list
+- **Rejected** rows show rejection remarks and an **Edit & Resubmit** button (resets to `pending_l1`)
 
-## Technical notes
+## Sidebar / Permissions
 
-- New file `src/components/DailyEntryGrid.tsx` to keep the wide table out of the main route file.
-- Use CSS Grid + sticky `position: sticky; left: 0` on the first 4 columns; sticky `top: 0` on the two header rows.
-- Tailwind tints: amber/peach for nature-of-work bands and NMR header, sky/blue for CIVIL & MEP headers, yellow for the totals row — defined in `src/styles.css` as utility classes (`band-amber`, `band-sky`, `band-peach`, `band-yellow`) so the design system stays consistent.
-- All numeric inputs use `tabular-nums` and right-aligned text.
-- Mobile: horizontal scroll with sticky contractor column; the existing mobile card list is removed since the sheet format is inherently spreadsheet-shaped.
+- Add `approvals` and `masters_approval_config` to `src/lib/screens.ts`
+- Update `use-permissions.tsx` baseline:
+  - `project_coordinator`: `approvals: edit`, `dashboard: view`, `reports: view`
+  - `project_manager`: `approvals: edit`, `dashboard: view`, `reports: view`
+- Add nav item "Approvals" in `AppSidebar.tsx`
+
+## Out of Scope (this iteration)
+
+- Email/push notifications on submission/approval (can be added later)
+- Bulk approve
+- Approval workflow for Worker Attendance (only Daily Manpower per your answer)
+
+Ready to implement on approval.
