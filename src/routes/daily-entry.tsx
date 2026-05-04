@@ -203,7 +203,7 @@ function DailyEntryPage() {
   const updateCell = (cid: string, key: string, val: number) => {
     setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
   };
-  const updateField = (cid: string, key: "security" | "deficiency" | "remarks", val: any) => {
+  const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) => {
     setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
   };
 
