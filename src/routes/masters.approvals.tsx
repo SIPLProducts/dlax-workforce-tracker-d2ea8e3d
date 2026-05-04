@@ -137,10 +137,13 @@ function Page() {
 
   const loadAll = async () => {
     setLoading(true);
+    try {
+      setHintDismissed(localStorage.getItem("dlax.approvals.hint.dismissed") === "1");
+    } catch {/* ignore */}
     const [proj, cfg, roles, profiles] = await Promise.all([
       supabase.from("projects").select("*").order("name"),
       (supabase as any).from("project_approval_config").select("*"),
-      supabase.from("user_roles").select("user_id, role").in("role", ["project_coordinator", "project_manager"] as any),
+      supabase.from("user_roles").select("user_id, role"),
       supabase.from("profiles").select("user_id, login_id, display_name"),
     ]);
     setProjects((proj.data || []) as Project[]);
@@ -148,17 +151,31 @@ function Page() {
     (cfg.data || []).forEach((c: any) => { cfgMap[c.project_id] = c; });
     setConfigs(cfgMap);
     setOriginal(JSON.parse(JSON.stringify(cfgMap)));
-    const profMap = new Map((profiles.data || []).map((p: any) => [p.user_id, p]));
+
+    // Aggregate roles per user (a user may have multiple)
+    const rolesByUser = new Map<string, string[]>();
+    (roles.data || []).forEach((r: any) => {
+      const arr = rolesByUser.get(r.user_id) || [];
+      arr.push(r.role);
+      rolesByUser.set(r.user_id, arr);
+    });
+
     const pcList: UserLite[] = [];
     const pmList: UserLite[] = [];
-    (roles.data || []).forEach((r: any) => {
-      const p = profMap.get(r.user_id);
-      if (!p) return;
-      if (r.role === "project_coordinator") pcList.push(p as UserLite);
-      if (r.role === "project_manager") pmList.push(p as UserLite);
+    const otherList: UserLite[] = [];
+    (profiles.data || []).forEach((p: any) => {
+      const userRoles = rolesByUser.get(p.user_id) || [];
+      const primary = userRoles[0] || null;
+      const u: UserLite = { ...p, role: primary };
+      if (userRoles.includes("project_coordinator")) pcList.push(u);
+      if (userRoles.includes("project_manager")) pmList.push(u);
+      if (!userRoles.includes("project_coordinator") && !userRoles.includes("project_manager")) {
+        otherList.push(u);
+      }
     });
     setPcs(pcList);
     setPms(pmList);
+    setOtherUsers(otherList);
     setLoading(false);
   };
 
