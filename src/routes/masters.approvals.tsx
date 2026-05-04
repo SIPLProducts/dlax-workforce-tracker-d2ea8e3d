@@ -22,10 +22,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Loader2, Save, ShieldCheck, Plus, Pencil, Trash2, Search, Columns3,
-  LayoutGrid, List, ChevronDown,
+  LayoutGrid, List, ChevronDown, Info, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/masters/approvals")({
   component: () => <AuthGuard><Page /></AuthGuard>,
