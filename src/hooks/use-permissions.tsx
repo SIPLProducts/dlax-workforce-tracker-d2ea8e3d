@@ -6,9 +6,10 @@ import type { ScreenKey, PermissionLevel } from "@/lib/screens";
 // System role baseline permissions
 const SYSTEM_BASELINE: Record<string, Partial<Record<ScreenKey, PermissionLevel>>> = {
   admin: {
-    dashboard: "edit", daily_entry: "edit", reports: "edit",
+    dashboard: "edit", daily_entry: "edit", approvals: "edit", reports: "edit",
     masters_projects: "edit", masters_contractors: "edit",
     masters_departments: "edit", masters_categories: "edit",
+    masters_approval_config: "edit",
     user_management: "edit",
   },
   supervisor: {
@@ -16,6 +17,12 @@ const SYSTEM_BASELINE: Record<string, Partial<Record<ScreenKey, PermissionLevel>
   },
   manager: {
     dashboard: "view", reports: "view",
+  },
+  project_coordinator: {
+    dashboard: "view", approvals: "edit", reports: "view",
+  },
+  project_manager: {
+    dashboard: "view", approvals: "edit", reports: "view",
   },
 };
 
