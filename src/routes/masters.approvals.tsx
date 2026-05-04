@@ -799,7 +799,7 @@ function Page() {
           </Select>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkSetL2Open(false)}>Cancel</Button>
-            <Button onClick={() => { bulkApply({ l2_user_id: bulkUserPick || null, approval_enabled: true }); setBulkSetL2Open(false); }} disabled={!bulkUserPick}>Apply</Button>
+            <Button onClick={() => { const v = bulkUserPick === "__none__" ? null : (bulkUserPick || null); bulkApply({ l2_user_id: v, approval_enabled: true }); setBulkSetL2Open(false); }} disabled={!bulkUserPick}>Apply</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
