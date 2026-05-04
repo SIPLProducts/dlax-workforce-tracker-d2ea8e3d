@@ -191,6 +191,7 @@ function DailyEntryPage() {
         } catch {
           r.remarks = rec.remarks || "";
         }
+        r.weather = rec.weather_condition || "";
         next[rec.contractor_id] = r;
         stat[rec.contractor_id] = { status: rec.status, rejection: rec.rejection_remarks };
       });
