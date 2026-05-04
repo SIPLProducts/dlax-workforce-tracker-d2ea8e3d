@@ -358,6 +358,7 @@ function DailyEntryPage() {
                 <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[70px]">Security</th>
                 <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[90px]">Deficieny<br/>Manpower</th>
                 <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px]">Remarks</th>
+                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
                 <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[120px]">Status</th>
               </tr>
               <tr>
