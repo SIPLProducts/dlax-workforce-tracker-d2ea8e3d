@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
-import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,11 +20,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { adminCreateUser } from "@/utils/admin-users.functions";
 
 export const Route = createFileRoute("/users")({
-  component: () => (
-    <AuthGuard>
-      <UsersPage />
-    </AuthGuard>
-  ),
+  component: UsersPage,
 });
 
 type UserWithRoles = {

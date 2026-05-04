@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { AuthGuard } from "@/components/AuthGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,11 +19,9 @@ import { ClientOnly } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
-    <AuthGuard>
-      <ClientOnly fallback={<div className="p-8 text-center text-muted-foreground">Loading reports...</div>}>
-        <ReportsPage />
-      </ClientOnly>
-    </AuthGuard>
+    <ClientOnly fallback={<div className="p-8 text-center text-muted-foreground">Loading reports...</div>}>
+      <ReportsPage />
+    </ClientOnly>
   ),
 });
 

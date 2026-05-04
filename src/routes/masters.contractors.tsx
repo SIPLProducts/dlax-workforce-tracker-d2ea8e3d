@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { AuthGuard } from "@/components/AuthGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/contractors")({
-  component: () => <AuthGuard><ContractorsPage /></AuthGuard>,
+  component: ContractorsPage,
 });
 
 function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) {

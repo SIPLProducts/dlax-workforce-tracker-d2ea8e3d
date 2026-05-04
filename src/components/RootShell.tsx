@@ -1,0 +1,56 @@
+import { Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { ClientOnly } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
+import { AppLayout } from "@/components/AppLayout";
+
+/**
+ * Persistent app shell. Mounted once at the root.
+ * - On /login: renders the page bare (no sidebar).
+ * - Everywhere else: renders <AppLayout> (which hosts SidebarProvider + AppSidebar)
+ *   so the sidebar stays mounted across navigation (no flash on link clicks).
+ */
+function ShellInner() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const isPublic = pathname === "/login";
+
+  useEffect(() => {
+    if (!isPublic && !loading && !user) {
+      navigate({ to: "/login" });
+    }
+  }, [isPublic, loading, user, navigate]);
+
+  if (isPublic) return <Outlet />;
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  return (
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  );
+}
+
+export function RootShell() {
+  return (
+    <ClientOnly
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      }
+    >
+      <ShellInner />
+    </ClientOnly>
+  );
+}

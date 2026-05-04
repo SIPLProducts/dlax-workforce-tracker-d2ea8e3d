@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +28,7 @@ import { format } from "date-fns";
 import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/masters/approvals")({
-  component: () => <AuthGuard><Page /></AuthGuard>,
+  component: Page,
 });
 
 type Project = {
