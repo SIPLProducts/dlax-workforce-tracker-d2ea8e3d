@@ -166,7 +166,7 @@ function DailyEntryPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("daily_manpower")
-        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,status,rejection_remarks")
+        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status,rejection_remarks")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"));
       setLoading(false);
