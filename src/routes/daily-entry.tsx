@@ -65,12 +65,23 @@ const GROUPS: GroupDef[] = [
 
 const ALL_COLS: ColDef[] = GROUPS.flatMap((g) => g.cols);
 
-type RowData = Record<string, number> & { security: number; deficiency: number; remarks: string };
+type RowData = Record<string, number> & { security: number; deficiency: number; remarks: string; weather: string };
 const emptyRow = (): RowData => {
-  const r: any = { security: 0, deficiency: 0, remarks: "" };
+  const r: any = { security: 0, deficiency: 0, remarks: "", weather: "" };
   ALL_COLS.forEach((c) => (r[c.key] = 0));
   return r as RowData;
 };
+
+const WEATHER_OPTIONS = [
+  "Sunny",
+  "Cloudy",
+  "Rainy",
+  "Heavy Rain",
+  "Stormy",
+  "Foggy",
+  "Hot",
+  "Windy",
+];
 
 function DailyEntryPage() {
   const { user } = useAuth();
@@ -155,7 +166,7 @@ function DailyEntryPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("daily_manpower")
-        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,status,rejection_remarks")
+        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status,rejection_remarks")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"));
       setLoading(false);
@@ -180,6 +191,7 @@ function DailyEntryPage() {
         } catch {
           r.remarks = rec.remarks || "";
         }
+        r.weather = rec.weather_condition || "";
         next[rec.contractor_id] = r;
         stat[rec.contractor_id] = { status: rec.status, rejection: rec.rejection_remarks };
       });
@@ -191,7 +203,7 @@ function DailyEntryPage() {
   const updateCell = (cid: string, key: string, val: number) => {
     setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
   };
-  const updateField = (cid: string, key: "security" | "deficiency" | "remarks", val: any) => {
+  const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) => {
     setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
   };
 

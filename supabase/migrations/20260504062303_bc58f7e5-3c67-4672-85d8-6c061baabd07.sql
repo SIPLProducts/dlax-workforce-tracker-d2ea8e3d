@@ -1,0 +1,1 @@
+ALTER TABLE public.daily_manpower ADD COLUMN IF NOT EXISTS weather_condition text;
