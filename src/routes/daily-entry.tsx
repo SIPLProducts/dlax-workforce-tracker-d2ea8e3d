@@ -274,13 +274,16 @@ function DailyEntryPage() {
 
     if (inserts.length === 0) {
       setSaving(false);
-      return toast.success("Saved (no entries)");
+      toast.success("Saved (no entries)");
+      await loadEntries();
+      return;
     }
 
     const { error } = await supabase.from("daily_manpower").insert(inserts as any);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Daily entry saved");
+    await loadEntries();
   };
 
   const numCell = (val: number, onChange: (n: number) => void, extraClass = "") => (
