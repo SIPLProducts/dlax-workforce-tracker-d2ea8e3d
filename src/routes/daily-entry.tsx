@@ -403,6 +403,18 @@ function DailyEntryPage() {
                         className="w-full h-9 px-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40"
                       />
                     </td>
+                    <td className="border">
+                      <Select value={r.weather || undefined} onValueChange={(v) => updateField(c.id, "weather", v)}>
+                        <SelectTrigger className="h-9 border-0 bg-transparent rounded-none focus:ring-2 focus:ring-primary/40 min-w-[120px]">
+                          <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WEATHER_OPTIONS.map((w) => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
                     <td className="border px-2 text-xs text-center" title={statuses[c.id]?.rejection || ""}>
                       {(() => {
                         const s = statuses[c.id]?.status;
