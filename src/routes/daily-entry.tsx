@@ -252,6 +252,8 @@ function DailyEntryPage() {
           deficiency_manpower: Number(r.deficiency) || 0,
           remarks: JSON.stringify(payload),
           created_by: user.id,
+          submitted_by: user.id,
+          submitted_at: new Date().toISOString(),
         };
       })
       .filter(Boolean);
