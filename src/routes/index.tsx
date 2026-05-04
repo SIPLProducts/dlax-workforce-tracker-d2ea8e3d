@@ -31,11 +31,7 @@ export const Route = createFileRoute("/")({
 });
 
 function IndexPage() {
-  return (
-    <AuthGuard>
-      <DashboardContent />
-    </AuthGuard>
-  );
+  return <DashboardContent />;
 }
 
 const PALETTE = [
