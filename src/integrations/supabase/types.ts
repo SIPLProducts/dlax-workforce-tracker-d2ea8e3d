@@ -91,9 +91,20 @@ export type Database = {
           entry_date: string
           headcount: number
           id: string
+          l1_action_at: string | null
+          l1_approver_id: string | null
+          l1_remarks: string | null
+          l2_action_at: string | null
+          l2_approver_id: string | null
+          l2_remarks: string | null
           project_id: string
+          rejected_by_level: number | null
+          rejection_remarks: string | null
           remarks: string | null
           security_count: number
+          status: Database["public"]["Enums"]["approval_status"]
+          submitted_at: string | null
+          submitted_by: string | null
           updated_at: string
         }
         Insert: {
@@ -106,9 +117,20 @@ export type Database = {
           entry_date: string
           headcount?: number
           id?: string
+          l1_action_at?: string | null
+          l1_approver_id?: string | null
+          l1_remarks?: string | null
+          l2_action_at?: string | null
+          l2_approver_id?: string | null
+          l2_remarks?: string | null
           project_id: string
+          rejected_by_level?: number | null
+          rejection_remarks?: string | null
           remarks?: string | null
           security_count?: number
+          status?: Database["public"]["Enums"]["approval_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
         }
         Update: {
@@ -121,9 +143,20 @@ export type Database = {
           entry_date?: string
           headcount?: number
           id?: string
+          l1_action_at?: string | null
+          l1_approver_id?: string | null
+          l1_remarks?: string | null
+          l2_action_at?: string | null
+          l2_approver_id?: string | null
+          l2_remarks?: string | null
           project_id?: string
+          rejected_by_level?: number | null
+          rejection_remarks?: string | null
           remarks?: string | null
           security_count?: number
+          status?: Database["public"]["Enums"]["approval_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -241,6 +274,36 @@ export type Database = {
           login_id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      project_approval_config: {
+        Row: {
+          approval_enabled: boolean
+          created_at: string
+          id: string
+          l1_user_id: string | null
+          l2_user_id: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          approval_enabled?: boolean
+          created_at?: string
+          id?: string
+          l1_user_id?: string | null
+          l2_user_id?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          approval_enabled?: boolean
+          created_at?: string
+          id?: string
+          l1_user_id?: string | null
+          l2_user_id?: string | null
+          project_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -519,6 +582,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_project_l1: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_project_l2: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       list_assignable_projects: {
         Args: never
         Returns: {
@@ -529,7 +600,18 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "supervisor" | "manager"
+      app_role:
+        | "admin"
+        | "supervisor"
+        | "manager"
+        | "project_coordinator"
+        | "project_manager"
+      approval_status:
+        | "draft"
+        | "pending_l1"
+        | "pending_l2"
+        | "approved"
+        | "rejected"
       permission_level: "none" | "view" | "edit"
     }
     CompositeTypes: {
@@ -658,7 +740,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "supervisor", "manager"],
+      app_role: [
+        "admin",
+        "supervisor",
+        "manager",
+        "project_coordinator",
+        "project_manager",
+      ],
+      approval_status: [
+        "draft",
+        "pending_l1",
+        "pending_l2",
+        "approved",
+        "rejected",
+      ],
       permission_level: ["none", "view", "edit"],
     },
   },
