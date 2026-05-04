@@ -347,6 +347,7 @@ function DailyEntryPage() {
                 <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[70px]">Security</th>
                 <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[90px]">Deficieny<br/>Manpower</th>
                 <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px]">Remarks</th>
+                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[120px]">Status</th>
               </tr>
               <tr>
                 {GROUPS.flatMap((g) =>
@@ -360,10 +361,10 @@ function DailyEntryPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={4 + ALL_COLS.length + 4} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
               )}
               {!loading && contractors.length === 0 && (
-                <tr><td colSpan={4 + ALL_COLS.length + 4} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>
+                <tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>
               )}
               {contractors.map((c, idx) => {
                 const r = rows[c.id] || emptyRow();
@@ -390,6 +391,25 @@ function DailyEntryPage() {
                         className="w-full h-9 px-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40"
                       />
                     </td>
+                    <td className="border px-2 text-xs text-center" title={statuses[c.id]?.rejection || ""}>
+                      {(() => {
+                        const s = statuses[c.id]?.status;
+                        if (!s) return <span className="text-muted-foreground">—</span>;
+                        const m: Record<string, string> = {
+                          pending_l1: "bg-amber-100 text-amber-900",
+                          pending_l2: "bg-blue-100 text-blue-900",
+                          approved: "bg-emerald-100 text-emerald-900",
+                          rejected: "bg-red-100 text-red-900",
+                        };
+                        const lbl: Record<string, string> = {
+                          pending_l1: "Pending L1",
+                          pending_l2: "Pending L2",
+                          approved: "Approved",
+                          rejected: "Rejected",
+                        };
+                        return <span className={cn("px-2 py-0.5 rounded text-[11px] font-medium", m[s])}>{lbl[s] || s}</span>;
+                      })()}
+                    </td>
                   </tr>
                 );
               })}
@@ -405,6 +425,7 @@ function DailyEntryPage() {
                   <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                   <td className="border text-center">{colTotals.security || ""}</td>
                   <td className="border text-center">{colTotals.deficiency || ""}</td>
+                  <td className="border"></td>
                   <td className="border"></td>
                 </tr>
               </tfoot>
