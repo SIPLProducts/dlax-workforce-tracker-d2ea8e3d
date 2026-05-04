@@ -85,6 +85,8 @@ function Page() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [pcs, setPcs] = useState<UserLite[]>([]);
   const [pms, setPms] = useState<UserLite[]>([]);
+  const [otherUsers, setOtherUsers] = useState<UserLite[]>([]);
+  const [hintDismissed, setHintDismissed] = useState(false);
   const [configs, setConfigs] = useState<Record<string, Config>>({});
   const [original, setOriginal] = useState<Record<string, Config>>({});
   const [loading, setLoading] = useState(true);
