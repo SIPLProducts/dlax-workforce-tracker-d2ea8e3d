@@ -65,12 +65,23 @@ const GROUPS: GroupDef[] = [
 
 const ALL_COLS: ColDef[] = GROUPS.flatMap((g) => g.cols);
 
-type RowData = Record<string, number> & { security: number; deficiency: number; remarks: string };
+type RowData = Record<string, number> & { security: number; deficiency: number; remarks: string; weather: string };
 const emptyRow = (): RowData => {
-  const r: any = { security: 0, deficiency: 0, remarks: "" };
+  const r: any = { security: 0, deficiency: 0, remarks: "", weather: "" };
   ALL_COLS.forEach((c) => (r[c.key] = 0));
   return r as RowData;
 };
+
+const WEATHER_OPTIONS = [
+  "Sunny",
+  "Cloudy",
+  "Rainy",
+  "Heavy Rain",
+  "Stormy",
+  "Foggy",
+  "Hot",
+  "Windy",
+];
 
 function DailyEntryPage() {
   const { user } = useAuth();
