@@ -1,6 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -55,8 +57,34 @@ export function AppSidebar() {
   const { user, roles, signOut } = useAuth();
   const { canView } = usePermissions();
   const location = useLocation();
+  const [customRoleNames, setCustomRoleNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!user?.id) { setCustomRoleNames([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("user_custom_roles")
+        .select("custom_roles(name)")
+        .eq("user_id", user.id);
+      if (cancelled) return;
+      const names = (data || [])
+        .map((r: any) => r.custom_roles?.name)
+        .filter(Boolean) as string[];
+      setCustomRoleNames(names);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const isAdmin = roles.includes("admin");
+  const roleLabel = isAdmin
+    ? "Admin"
+    : customRoleNames.length > 0
+      ? customRoleNames.join(", ")
+      : roles.join(", ") || "No role";
 
   const canSee = (screen: string) => canView(screen);
+
 
   return (
     <Sidebar>
@@ -150,7 +178,7 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
         <div className="flex flex-col gap-2">
           <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email}</p>
-          <p className="text-xs text-sidebar-primary font-medium capitalize">{roles.join(", ") || "No role"}</p>
+          <p className="text-xs text-sidebar-primary font-medium capitalize">{roleLabel}</p>
           <Button variant="ghost" size="sm" className="justify-start text-sidebar-foreground/60 hover:text-sidebar-foreground" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
