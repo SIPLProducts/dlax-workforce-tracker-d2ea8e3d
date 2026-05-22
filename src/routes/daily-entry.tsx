@@ -67,30 +67,21 @@ type SheetRow = {
   sheet_code: string;
   project_id: string;
   entry_date: string;
-  status: string; // aggregated
+  status: string;
+  current_level: number;
+  total_levels: number;
   total: number;
 };
 
 function statusMeta(s: string) {
   const map: Record<string, { cls: string; label: string }> = {
     draft: { cls: "bg-slate-100 text-slate-900 border-slate-300", label: "Draft" },
-    pending_l1: { cls: "bg-amber-100 text-amber-900 border-amber-300", label: "Pending L1" },
-    pending_l2: { cls: "bg-blue-100 text-blue-900 border-blue-300", label: "Pending L2" },
+    pending: { cls: "bg-amber-100 text-amber-900 border-amber-300", label: "Pending Approval" },
     approved: { cls: "bg-emerald-100 text-emerald-900 border-emerald-300", label: "Approved" },
     rejected: { cls: "bg-red-100 text-red-900 border-red-300", label: "Rejected" },
     empty: { cls: "bg-slate-50 text-slate-600 border-slate-200", label: "No entries yet" },
   };
   return map[s] || { cls: "", label: s };
-}
-
-// Aggregate per-row statuses → sheet status
-function aggregateStatus(rowStatuses: string[]): string {
-  if (rowStatuses.length === 0) return "empty";
-  if (rowStatuses.some((s) => s === "rejected")) return "rejected";
-  if (rowStatuses.some((s) => s === "pending_l1")) return "pending_l1";
-  if (rowStatuses.some((s) => s === "pending_l2")) return "pending_l2";
-  if (rowStatuses.every((s) => s === "approved")) return "approved";
-  return "draft";
 }
 
 function DailyEntryPage() {
