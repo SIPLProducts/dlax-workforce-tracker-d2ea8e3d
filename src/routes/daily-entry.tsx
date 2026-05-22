@@ -67,30 +67,21 @@ type SheetRow = {
   sheet_code: string;
   project_id: string;
   entry_date: string;
-  status: string; // aggregated
+  status: string;
+  current_level: number;
+  total_levels: number;
   total: number;
 };
 
 function statusMeta(s: string) {
   const map: Record<string, { cls: string; label: string }> = {
     draft: { cls: "bg-slate-100 text-slate-900 border-slate-300", label: "Draft" },
-    pending_l1: { cls: "bg-amber-100 text-amber-900 border-amber-300", label: "Pending L1" },
-    pending_l2: { cls: "bg-blue-100 text-blue-900 border-blue-300", label: "Pending L2" },
+    pending: { cls: "bg-amber-100 text-amber-900 border-amber-300", label: "Pending Approval" },
     approved: { cls: "bg-emerald-100 text-emerald-900 border-emerald-300", label: "Approved" },
     rejected: { cls: "bg-red-100 text-red-900 border-red-300", label: "Rejected" },
     empty: { cls: "bg-slate-50 text-slate-600 border-slate-200", label: "No entries yet" },
   };
   return map[s] || { cls: "", label: s };
-}
-
-// Aggregate per-row statuses → sheet status
-function aggregateStatus(rowStatuses: string[]): string {
-  if (rowStatuses.length === 0) return "empty";
-  if (rowStatuses.some((s) => s === "rejected")) return "rejected";
-  if (rowStatuses.some((s) => s === "pending_l1")) return "pending_l1";
-  if (rowStatuses.some((s) => s === "pending_l2")) return "pending_l2";
-  if (rowStatuses.every((s) => s === "approved")) return "approved";
-  return "draft";
 }
 
 function DailyEntryPage() {
@@ -103,23 +94,29 @@ function DailyEntryPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
-  const [rowStatuses, setRowStatuses] = useState<string[]>([]);
-  const [sheetCode, setSheetCode] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number } | null>(null);
+  const [rowCount, setRowCount] = useState(0);
   const [approvalEnabled, setApprovalEnabled] = useState(false);
+  const [levels, setLevels] = useState<{ level_no: number; approver_user_id: string; label: string | null }[]>([]);
+  const [approverNames, setApproverNames] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"view" | "edit">("view"); // default view; flips to edit when nothing exists yet
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
 
-  const sheetStatus = useMemo(() => aggregateStatus(rowStatuses), [rowStatuses]);
+  const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
   const isEmpty = sheetStatus === "empty";
   const canEdit = isEmpty || sheetStatus === "draft" || sheetStatus === "rejected";
+  const currentApproverName = sheet && sheet.status === "pending"
+    ? approverNames[levels.find((l) => l.level_no === sheet.current_level)?.approver_user_id || ""] || `Level ${sheet.current_level}`
+    : "";
   const editLockReason =
     sheetStatus === "approved" ? "Approved — cannot modify" :
-    sheetStatus === "pending_l1" || sheetStatus === "pending_l2" ? "Awaiting approval — cannot modify" :
+    sheetStatus === "pending" ? `Awaiting approval at Level ${sheet?.current_level} (${currentApproverName})` :
     "";
   const readOnly = mode === "view" || !canEdit;
+
 
   const tryParseDate = (s: string): Date | null => {
     for (const f of ["dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "d/M/yyyy", "d-M-yyyy"]) {
@@ -167,23 +164,24 @@ function DailyEntryPage() {
   const loadEntries = async () => {
     if (!projectId) return;
     setLoading(true);
-    const [{ data: dm }, { data: sheet }, { data: cfg }] = await Promise.all([
+    const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
         .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
-      supabase.from("daily_manpower_sheets" as any)
-        .select("sheet_code")
+      supabase.from("daily_manpower_sheets")
+        .select("id, sheet_code, status, current_level, total_levels")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"))
         .maybeSingle(),
       supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
+      supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
     ]);
     setLoading(false);
 
     const next: Record<string, RowData> = {};
     contractors.forEach((c) => (next[c.id] = emptyRow()));
-    const statuses: string[] = [];
+    let nRows = 0;
     (dm || []).forEach((rec: any) => {
       const r = next[rec.contractor_id] || emptyRow();
       r.security = rec.security_count || 0;
@@ -199,14 +197,27 @@ function DailyEntryPage() {
       } catch { r.remarks = rec.remarks || ""; }
       r.weather = rec.weather_condition || "";
       next[rec.contractor_id] = r;
-      statuses.push(rec.status);
+      nRows += 1;
     });
     setRows(next);
-    setRowStatuses(statuses);
-    setSheetCode((sheet as any)?.sheet_code || null);
+    setRowCount(nRows);
+    setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
-    // Default mode: if sheet exists & not editable, go view; if no sheet, go edit (new entry)
-    if (statuses.length === 0) setMode("edit");
+    const levelList = (lvs || []) as any[];
+    setLevels(levelList);
+
+    // Fetch approver display names
+    const ids = Array.from(new Set(levelList.map((l) => l.approver_user_id)));
+    if (ids.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("user_id, display_name, login_id").in("user_id", ids);
+      const map: Record<string, string> = {};
+      (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name || p.login_id || p.user_id.slice(0, 8); });
+      setApproverNames(map);
+    } else {
+      setApproverNames({});
+    }
+
+    if (nRows === 0) setMode("edit");
     else setMode("view");
   };
 
@@ -215,32 +226,32 @@ function DailyEntryPage() {
   // Load all sheets for the saved-entries table below
   const loadAllSheets = async () => {
     const { data: sheets } = await supabase
-      .from("daily_manpower_sheets" as any)
-      .select("id, sheet_code, project_id, entry_date")
+      .from("daily_manpower_sheets")
+      .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels")
       .order("entry_date", { ascending: false })
       .limit(500);
     const sheetIds = (sheets || []).map((s: any) => s.id);
-    if (sheetIds.length === 0) { setAllSheets([]); return; }
-    const { data: dm } = await supabase
-      .from("daily_manpower")
-      .select("sheet_id, status, headcount")
-      .in("sheet_id", sheetIds);
-    const byId: Record<string, { statuses: string[]; total: number }> = {};
-    (dm || []).forEach((r: any) => {
-      if (!byId[r.sheet_id]) byId[r.sheet_id] = { statuses: [], total: 0 };
-      byId[r.sheet_id].statuses.push(r.status);
-      byId[r.sheet_id].total += r.headcount || 0;
-    });
+    let totals: Record<string, number> = {};
+    if (sheetIds.length > 0) {
+      const { data: dm } = await supabase
+        .from("daily_manpower")
+        .select("sheet_id, headcount")
+        .in("sheet_id", sheetIds);
+      (dm || []).forEach((r: any) => { totals[r.sheet_id] = (totals[r.sheet_id] || 0) + (r.headcount || 0); });
+    }
     setAllSheets((sheets || []).map((s: any) => ({
       id: s.id,
       sheet_code: s.sheet_code,
       project_id: s.project_id,
       entry_date: s.entry_date,
-      status: aggregateStatus(byId[s.id]?.statuses || []),
-      total: byId[s.id]?.total || 0,
+      status: s.status,
+      current_level: s.current_level,
+      total_levels: s.total_levels,
+      total: totals[s.id] || 0,
     })));
   };
   useEffect(() => { loadAllSheets(); }, []);
+
 
   const updateCell = (cid: string, key: string, val: number) =>
     setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
@@ -318,20 +329,19 @@ function DailyEntryPage() {
   };
 
   const handleSendToApproval = async () => {
-    if (!approvalEnabled) return toast.error("Approval is not configured for this project");
-    if (rowStatuses.length === 0) return toast.error("Save the sheet first");
-    if (sheetStatus !== "draft" && sheetStatus !== "rejected") return toast.error("Sheet is already submitted");
+    if (!sheet) return toast.error("Save the sheet first");
+    if (sheet.status !== "draft" && sheet.status !== "rejected") return toast.error("Sheet is already submitted");
     setSending(true);
-    const entry_date = format(date, "yyyy-MM-dd");
-    const patch: any = { status: "pending_l1", submitted_at: new Date().toISOString(), submitted_by: user?.id };
-    const { error } = await supabase.from("daily_manpower")
-      .update(patch)
-      .eq("project_id", projectId)
-      .eq("entry_date", entry_date)
-      .in("status", ["draft", "rejected"]);
+    const { data, error } = await supabase.rpc("submit_sheet", { _sheet_id: sheet.id });
     setSending(false);
     if (error) return toast.error(error.message);
-    toast.success("Sent for approval");
+    const updated: any = data;
+    if (updated?.status === "approved") {
+      toast.success("Approval not configured — sheet auto-approved");
+    } else {
+      const firstApprover = approverNames[levels.find((l) => l.level_no === 1)?.approver_user_id || ""] || "Level 1 approver";
+      toast.success(`Sent for approval to ${firstApprover}`);
+    }
     await loadEntries(); await loadAllSheets();
   };
 
@@ -345,18 +355,13 @@ function DailyEntryPage() {
 
   const sendFromList = async (s: SheetRow) => {
     if (s.status !== "draft" && s.status !== "rejected") return toast.error("Sheet already submitted");
-    const { data: cfg } = await supabase.from("project_approval_config").select("approval_enabled").eq("project_id", s.project_id).maybeSingle();
-    if (!(cfg as any)?.approval_enabled) return toast.error("Approval not configured for this project");
-    const { error } = await supabase.from("daily_manpower")
-      .update({ status: "pending_l1", submitted_at: new Date().toISOString(), submitted_by: user?.id })
-      .eq("project_id", s.project_id)
-      .eq("entry_date", s.entry_date)
-      .in("status", ["draft", "rejected"]);
+    const { error } = await supabase.rpc("submit_sheet", { _sheet_id: s.id });
     if (error) return toast.error(error.message);
     toast.success(`${s.sheet_code} sent for approval`);
     await loadAllSheets();
     if (s.project_id === projectId && s.entry_date === format(date, "yyyy-MM-dd")) await loadEntries();
   };
+
 
   const projectName = (id: string) => {
     const p = projects.find((x) => x.id === id);
@@ -407,7 +412,7 @@ function DailyEntryPage() {
               <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save"}
             </Button>
           )}
-          {!isEmpty && approvalEnabled && (sheetStatus === "draft" || sheetStatus === "rejected") && (
+          {!isEmpty && approvalEnabled && levels.length > 0 && (sheetStatus === "draft" || sheetStatus === "rejected") && (
             <Button variant="default" onClick={handleSendToApproval} disabled={sending}>
               <Send className="w-4 h-4 mr-2" /> {sending ? "Sending..." : "Send to Approval"}
             </Button>
@@ -440,9 +445,12 @@ function DailyEntryPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            {sheetCode && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheetCode}</span></div>}
-            <Badge variant="outline" className={sMeta.cls}>{sMeta.label}</Badge>
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {sheet?.sheet_code && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheet.sheet_code}</span></div>}
+            <Badge variant="outline" className={sMeta.cls}>
+              {sMeta.label}
+              {sheet?.status === "pending" && ` — Level ${sheet.current_level}/${sheet.total_levels}${currentApproverName ? ` (${currentApproverName})` : ""}`}
+            </Badge>
             {mode === "edit" && <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300">Editing</Badge>}
           </div>
         </CardContent>

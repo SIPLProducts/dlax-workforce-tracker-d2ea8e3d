@@ -1,51 +1,75 @@
 ## Goal
 
-Make the Daily Entry screen workflow-aware: save a draft sheet per project+date, list it below with a unique ID, and provide View / Edit / Send to Approval actions. Approved sheets are read-only; rejected sheets become editable again.
+Replace the fixed L1/L2 approval model with a configurable N-level sequential approval per project. The Daily Entry screen exposes View / Edit / Send to Approval, and approval requests route only to the user assigned to the current level — no one else.
 
 ## Database changes
 
-1. New `daily_manpower_sheets` table (one row per project + entry_date):
-   - `sheet_code` text — auto sequence `DE-000001` (generated from a Postgres sequence)
-   - `project_id`, `entry_date`, `status` (draft / pending_l1 / pending_l2 / approved / rejected)
-   - submitted_by/at, l1/l2 approver+remarks+action_at, rejection_remarks
-   - unique (`project_id`, `entry_date`)
-2. Add `sheet_id` FK column to existing `daily_manpower` rows so each contractor row belongs to a sheet.
-3. Trigger: on insert, assign `sheet_code` from a sequence; default `status='draft'`.
-4. Update existing approval trigger to operate at the sheet level instead of per row. Per-row `status` is removed from UI logic (kept only for backward compatibility; UI reads sheet status).
-5. RLS:
-   - Sheet: view if `has_project_access`; insert/update if user has `daily_entry` edit + project access AND sheet is in `draft`/`rejected`; L1/L2 can update status transitions; admin full.
-   - Tighten `daily_manpower` UPDATE policy to also require parent sheet status ∈ (draft, rejected) for non-approvers.
+1. **New `project_approval_levels` table** (one row per level per project):
+   - `project_id`, `level_no` (smallint, 1..N), `approver_user_id` (uuid → profiles.user_id), `label` (text, optional e.g. "Project Coordinator")
+   - unique (`project_id`, `level_no`)
+2. **`daily_manpower_sheets`** additions:
+   - `current_level` smallint (0 = draft, 1..N = pending that level, N+1 = approved)
+   - `total_levels` smallint (snapshot of level count at submission)
+   - `status` enum already exists: keep `draft / pending / approved / rejected` (rename `pending_l1/l2` usage to single `pending`, with `current_level` indicating which step).
+3. **New `sheet_approval_history` table** — append-only audit:
+   - `sheet_id`, `level_no`, `approver_user_id`, `action` ('approve'|'reject'), `remarks`, `action_at`.
+4. **Replace `is_project_l1` / `is_project_l2`** with `is_project_level_approver(_user, _project, _level)` and `is_current_sheet_approver(_user, _sheet)` (security definer). Drop old L1/L2 helpers after migration.
+5. **Auto-migrate existing config**:
+   - For every row in `project_approval_config` with `approval_enabled=true`: insert level 1 = `l1_user_id`, level 2 = `l2_user_id` (if not null) into `project_approval_levels`.
+   - Keep `project_approval_config.approval_enabled` flag (controls whether approval is required at all). Drop `l1_user_id`/`l2_user_id` after backfill.
+6. **RLS updates**:
+   - `daily_manpower_sheets` UPDATE: status transition from `pending` allowed only if `is_current_sheet_approver(auth.uid(), id)`.
+   - `daily_manpower` UPDATE: same lock as today (draft/rejected for editors).
+   - `sheet_approval_history`: INSERT only via SECURITY DEFINER function `approve_sheet` / `reject_sheet`.
 
-## Daily Entry UI changes (`src/routes/daily-entry.tsx`)
+## Server-side logic
 
-1. **Mode state** on page: `mode = 'view' | 'edit' | 'new'`. When a sheet exists for selected project+date, default to `view` (inputs disabled). When none exists, default to `new`.
-2. **Save button** now upserts a `draft` sheet + replaces its `daily_manpower` rows. Toast shows the assigned `sheet_code`.
-3. **Send to Approval button** (next to Save, visible only when sheet exists and status ∈ draft/rejected): confirms, sets sheet status to `pending_l1`, locks the sheet.
-4. **Action bar** above the table reflects current sheet:
-   - Shows `Sheet ID: DE-000123 · Status: <badge>` when a sheet exists.
-   - Buttons: **View** (read-only), **Edit** (enabled only if status ∈ draft/rejected), **Send to Approval**, **Save**.
-   - Edit disabled with tooltip "Approved — cannot modify" when status = approved; disabled when pending_l1/l2 with tooltip "Awaiting approval".
-5. **Saved Entries table** below the sheet:
-   - Columns: Sheet ID, Date, Project, Total Headcount, Status badge, Submitted by, Actions (View / Edit / Send to Approval).
-   - Lists sheets the user has project access to, newest first, with date+project filters.
-   - Clicking View/Edit loads that sheet into the editor above and scrolls up; sets mode accordingly.
+Two RPC functions (SECURITY DEFINER) so routing is enforced server-side, not in UI:
 
-## Behavior rules
+- `submit_sheet(sheet_id)` — caller must own sheet + have `daily_entry` edit; sets `status='pending'`, `current_level=1`, `total_levels=count`. If no levels configured or approval disabled, sets `status='approved'` directly.
+- `approve_sheet(sheet_id, remarks)` — caller must equal approver at `current_level`. Appends history; if `current_level == total_levels` → `status='approved'`, else `current_level += 1`.
+- `reject_sheet(sheet_id, remarks)` — caller must equal approver at `current_level`. Appends history; sets `status='rejected'`, `current_level=0`.
 
-- **View**: all inputs disabled, Save/Send hidden.
-- **Edit**: inputs enabled, Save visible. Allowed when status is draft or rejected. Saving keeps status as draft (or moves rejected → draft) until Send to Approval is pressed.
-- **Send to Approval**: project+date sheet → status `pending_l1`. Edit disabled afterwards until rejected.
-- **Approved**: row locked permanently in Daily Entry; only Admin can override (via existing admin RLS).
-- **Rejected**: Edit re-enabled; Save keeps draft; Send to Approval re-submits to L1.
+This guarantees the approval request is actionable **only** by the assigned approver for the current level.
 
-## Files touched
+## Approval Settings UI (`src/routes/masters.approvals.tsx`)
 
-- New migration: sheets table, sequence, trigger, RLS, FK on `daily_manpower`.
-- `src/routes/daily-entry.tsx`: mode state, sheet header bar, action buttons, saved-entries list, load-on-click.
-- `src/routes/approvals.tsx`: switch to acting on `sheet_id` (group rows by sheet) — minimal change so existing approvers still work.
-- Memory update: `mem://features/daily-manpower-tracking` to mention sheet model + sheet_code.
+Per project card:
+- **Approval Workflow** toggle (existing).
+- **Levels list** (replaces the static L1/L2 dropdowns):
+  - Rows show `Level 1`, `Level 2`, … each with an optional label input + approver user dropdown + delete (✕) button.
+  - **+ Add Level** button appends Level N+1.
+  - Reorder via up/down arrows (renumbers).
+- **Save** persists `project_approval_levels` for the project (replace-all).
+- Validation: at least one level required when approval enabled; each level must have an approver.
+
+## Daily Entry UI (`src/routes/daily-entry.tsx`)
+
+Action bar above the sheet:
+- **View** button — read-only mode.
+- **Edit** button — enabled only when `status ∈ draft / rejected`. Disabled with tooltip when `pending` ("Awaiting Level X approval") or `approved` ("Approved — locked").
+- **Save** — upserts sheet + rows as `draft`.
+- **Send to Approval** — visible when `status ∈ draft / rejected` and project has approval enabled with ≥1 level. Calls `submit_sheet` RPC; toast shows "Sent to {Level 1 approver name}".
+- Status badge shows e.g. `Pending — Level 2 (harshini)`.
+
+## Approvals queue (`src/routes/approvals.tsx`)
+
+- Query sheets where `status='pending'` AND `is_current_sheet_approver(auth.uid(), id)`.
+- Users only see sheets where they are the approver for the **current** level. No other levels, no other users.
+- Approve / Reject buttons call the RPCs above.
+- History panel shows each level's action from `sheet_approval_history`.
 
 ## Out of scope
 
-- Bulk approval UI redesign (kept as-is; just operates on sheet status now).
-- Editing individual contractor rows after approval (Admin-only path unchanged).
+- Parallel/multi-user-per-level approvals (chose single user, sequential).
+- Notifications/email — only in-app queue and toasts.
+- Editing levels mid-approval: changing levels on a project does not affect sheets already in flight (they use snapshot `total_levels`; approver lookup still uses the live `project_approval_levels` table for the matching `level_no`).
+
+## Files touched
+
+- New migration: `project_approval_levels`, `sheet_approval_history`, sheet columns, new helper funcs, `submit_sheet`/`approve_sheet`/`reject_sheet` RPCs, backfill from old config, drop old L1/L2 columns + helpers, RLS updates.
+- `src/routes/masters.approvals.tsx` — replace L1/L2 dropdowns with dynamic levels editor + Add Level.
+- `src/routes/daily-entry.tsx` — wire Send to Approval to `submit_sheet`; refresh status badge with `current_level`.
+- `src/routes/approvals.tsx` — filter via `is_current_sheet_approver`; call new RPCs.
+- `src/integrations/supabase/types.ts` regenerates after migration.
+- Memory update: `mem://features/approval-workflow` to reflect N-level sequential model.
