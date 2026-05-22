@@ -1,25 +1,32 @@
+## Root cause
 
-# Issue
+The error is from Row Level Security on the role-management tables:
 
-"Only admins can create users" error appears because `adminCreateUser` server function (`src/utils/admin-users.functions.ts`) hard-checks the system `admin` role and rejects everyone else — including custom-role users granted **Edit** on `user_management`.
+- `custom_roles` currently allows role creation/edit/delete only for system admins.
+- `role_screen_permissions` currently allows screen-permission insert/delete/update only for system admins.
+- `user_custom_roles` currently allows assigning custom roles only for system admins.
 
-# Fix
+So a user who has **User Management - edit** can open the screen, but database writes still fail with: `new row violates row-level security policy for table "custom_roles"`.
 
-Update the authorization check in `adminCreateUser.handler` to allow either:
-- system `admin` role, OR
-- `has_screen_edit(auth.uid(), 'user_management') = true`
+## Plan
 
-Implementation:
-- Replace the single `has_role` RPC call with parallel checks: `has_role(admin)` and `has_screen_edit(_, 'user_management')`.
-- If neither is true → throw "Forbidden: requires User Management edit permission".
-- Keep the rest (login_id uniqueness, auth admin createUser, profile upsert) unchanged.
-- Service-role admin client is still used internally (needed to create auth users); the gate above is what enforces who may call it.
+1. **Update database access rules for custom roles**
+   - Allow users with `user_management` edit permission to create, edit, and delete `custom_roles`.
+   - Keep system admins fully allowed.
+   - Keep authenticated users able to view role definitions.
 
-# Out of scope
+2. **Update database access rules for screen permissions**
+   - Allow users with `user_management` edit permission to create, update, and delete rows in `role_screen_permissions`.
+   - This fixes saving the selected screen permissions after a role is created.
 
-- Granting the system `admin` role to other users stays admin-only (already handled in UI).
-- RLS on `profiles` / `user_roles` / `user_projects` already permits user-mgr custom-role users (prior migration).
+3. **Update database access rules for role assignment**
+   - Allow users with `user_management` edit permission to assign and remove `user_custom_roles`.
+   - Keep existing protection that users can view only their own custom-role assignment unless they have management access.
 
-# Files
+4. **Preserve security boundary**
+   - Do not make these tables public.
+   - Do not allow anonymous access.
+   - Do not grant unrelated screens this ability; only `user_management` edit permission can manage users/roles.
 
-- `src/utils/admin-users.functions.ts`
+5. **Optional UI cleanup after the migration**
+   - If needed, adjust the error message in the role dialog to show a clearer message like “You need User Management edit permission to save roles” instead of the raw database error.
