@@ -59,23 +59,37 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
   }, [open, roleId]);
 
   const handleSave = async () => {
-    if (!name.trim()) {
+    const trimmed = name.trim();
+    if (!trimmed) {
       toast.error("Role name is required");
       return;
     }
     setSaving(true);
     try {
+      // Pre-check for duplicate name (case-insensitive)
+      const { data: dup } = await supabase
+        .from("custom_roles")
+        .select("id")
+        .ilike("name", trimmed)
+        .limit(1);
+      const duplicate = (dup || []).find((r: any) => r.id !== roleId);
+      if (duplicate) {
+        toast.error(`A role named "${trimmed}" already exists`);
+        setSaving(false);
+        return;
+      }
+
       let id = roleId;
       if (id) {
         const { error } = await supabase
           .from("custom_roles")
-          .update({ name: name.trim(), description: description.trim() || null })
+          .update({ name: trimmed, description: description.trim() || null })
           .eq("id", id);
         if (error) throw error;
       } else {
         const { data, error } = await supabase
           .from("custom_roles")
-          .insert({ name: name.trim(), description: description.trim() || null })
+          .insert({ name: trimmed, description: description.trim() || null })
           .select("id")
           .single();
         if (error) throw error;
@@ -96,7 +110,12 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
       onSaved();
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.message || "Failed to save role");
+      const msg = err?.message || "Failed to save role";
+      if (/custom_roles_name_key|duplicate key/i.test(msg)) {
+        toast.error(`A role named "${trimmed}" already exists`);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setSaving(false);
     }

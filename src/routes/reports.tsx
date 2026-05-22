@@ -16,12 +16,15 @@ import { format, subDays, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientOnly } from "@tanstack/react-router";
+import { ScreenGuard } from "@/components/ScreenGuard";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
-    <ClientOnly fallback={<div className="p-8 text-center text-muted-foreground">Loading reports...</div>}>
-      <ReportsPage />
-    </ClientOnly>
+    <ScreenGuard screen="reports">
+      <ClientOnly fallback={<div className="p-8 text-center text-muted-foreground">Loading reports...</div>}>
+        <ReportsPage />
+      </ClientOnly>
+    </ScreenGuard>
   ),
 });
 

@@ -585,6 +585,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_screen_edit: {
+        Args: { _screen_key: string; _user_id: string }
+        Returns: boolean
+      }
       is_project_l1: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean

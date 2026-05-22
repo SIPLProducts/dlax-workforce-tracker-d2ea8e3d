@@ -1,3 +1,4 @@
+import { ScreenGuard } from "@/components/ScreenGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/approvals")({
-  component: Page,
+  component: () => <ScreenGuard screen="approvals"><Page /></ScreenGuard>,
 });
 
 type Entry = {

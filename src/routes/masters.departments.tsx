@@ -1,3 +1,4 @@
+import { ScreenGuard } from "@/components/ScreenGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +12,7 @@ import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/departments")({
-  component: DepartmentsPage,
+  component: () => <ScreenGuard screen="masters_departments"><DepartmentsPage /></ScreenGuard>,
 });
 
 function DepartmentsPage() {

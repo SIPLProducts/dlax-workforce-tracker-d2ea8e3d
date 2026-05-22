@@ -1,3 +1,4 @@
+import { ScreenGuard } from "@/components/ScreenGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/contractors")({
-  component: ContractorsPage,
+  component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
 });
 
 function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) {

@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import type { ScreenKey, PermissionLevel } from "@/lib/screens";
 
-// System role baseline permissions
+// System role baseline permissions (only used when the user has NO custom role).
 const SYSTEM_BASELINE: Record<string, Partial<Record<ScreenKey, PermissionLevel>>> = {
   admin: {
     dashboard: "edit", daily_entry: "edit", approvals: "edit", reports: "edit",
@@ -52,19 +52,31 @@ export function usePermissions() {
     (async () => {
       try {
         const merged: Record<string, PermissionLevel> = {};
-        rolesKey.split(",").filter(Boolean).forEach((r) => {
-          const baseline = SYSTEM_BASELINE[r] || {};
-          Object.entries(baseline).forEach(([k, v]) => {
-            merged[k] = merged[k] ? maxPerm(merged[k], v as PermissionLevel) : (v as PermissionLevel);
-          });
-        });
+        const userRoles = rolesKey.split(",").filter(Boolean);
+        const isAdmin = userRoles.includes("admin");
 
+        // Load custom role assignments first — they take precedence over
+        // system-role baselines for non-admin users.
         const { data: ucr } = await supabase
           .from("user_custom_roles")
           .select("role_id")
           .eq("user_id", userId);
         const roleIds = (ucr || []).map((r: any) => r.role_id);
-        if (roleIds.length > 0) {
+        const hasCustomRole = roleIds.length > 0;
+
+        // Admin always gets the full admin baseline (cannot be locked out).
+        // Non-admins with NO custom role fall back to system-role baselines.
+        // Non-admins WITH a custom role are governed only by the custom role.
+        if (isAdmin || !hasCustomRole) {
+          userRoles.forEach((r) => {
+            const baseline = SYSTEM_BASELINE[r] || {};
+            Object.entries(baseline).forEach(([k, v]) => {
+              merged[k] = merged[k] ? maxPerm(merged[k], v as PermissionLevel) : (v as PermissionLevel);
+            });
+          });
+        }
+
+        if (hasCustomRole) {
           const { data: rsp } = await supabase
             .from("role_screen_permissions")
             .select("screen_key, permission")

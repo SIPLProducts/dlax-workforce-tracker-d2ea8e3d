@@ -11,9 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Download, Upload, FileDown, Briefcase, CheckCircle2, PauseCircle, Layers, X } from "lucide-react";
 import { toast } from "sonner";
+import { ScreenGuard } from "@/components/ScreenGuard";
 
 export const Route = createFileRoute("/masters/projects")({
-  component: ProjectsPage,
+  component: () => <ScreenGuard screen="masters_projects"><ProjectsPage /></ScreenGuard>,
 });
 
 const TONE: Record<string, string> = {
