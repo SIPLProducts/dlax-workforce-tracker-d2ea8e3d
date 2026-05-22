@@ -101,7 +101,7 @@ function Page() {
 
   const approve = async (s: Sheet) => {
     setActioning(true);
-    const { error } = await supabase.rpc("approve_sheet", { _sheet_id: s.id, _remarks: null });
+    const { error } = await supabase.rpc("approve_sheet", { _sheet_id: s.id, _remarks: undefined });
     setActioning(false);
     if (error) return toast.error(error.message);
     toast.success("Approved");
