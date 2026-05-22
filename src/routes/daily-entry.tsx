@@ -164,23 +164,24 @@ function DailyEntryPage() {
   const loadEntries = async () => {
     if (!projectId) return;
     setLoading(true);
-    const [{ data: dm }, { data: sheet }, { data: cfg }] = await Promise.all([
+    const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
         .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
-      supabase.from("daily_manpower_sheets" as any)
-        .select("sheet_code")
+      supabase.from("daily_manpower_sheets")
+        .select("id, sheet_code, status, current_level, total_levels")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"))
         .maybeSingle(),
       supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
+      supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
     ]);
     setLoading(false);
 
     const next: Record<string, RowData> = {};
     contractors.forEach((c) => (next[c.id] = emptyRow()));
-    const statuses: string[] = [];
+    let nRows = 0;
     (dm || []).forEach((rec: any) => {
       const r = next[rec.contractor_id] || emptyRow();
       r.security = rec.security_count || 0;
@@ -196,14 +197,27 @@ function DailyEntryPage() {
       } catch { r.remarks = rec.remarks || ""; }
       r.weather = rec.weather_condition || "";
       next[rec.contractor_id] = r;
-      statuses.push(rec.status);
+      nRows += 1;
     });
     setRows(next);
-    setRowStatuses(statuses);
-    setSheetCode((sheet as any)?.sheet_code || null);
+    setRowCount(nRows);
+    setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
-    // Default mode: if sheet exists & not editable, go view; if no sheet, go edit (new entry)
-    if (statuses.length === 0) setMode("edit");
+    const levelList = (lvs || []) as any[];
+    setLevels(levelList);
+
+    // Fetch approver display names
+    const ids = Array.from(new Set(levelList.map((l) => l.approver_user_id)));
+    if (ids.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("user_id, display_name, login_id").in("user_id", ids);
+      const map: Record<string, string> = {};
+      (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name || p.login_id || p.user_id.slice(0, 8); });
+      setApproverNames(map);
+    } else {
+      setApproverNames({});
+    }
+
+    if (nRows === 0) setMode("edit");
     else setMode("view");
   };
 
@@ -212,32 +226,32 @@ function DailyEntryPage() {
   // Load all sheets for the saved-entries table below
   const loadAllSheets = async () => {
     const { data: sheets } = await supabase
-      .from("daily_manpower_sheets" as any)
-      .select("id, sheet_code, project_id, entry_date")
+      .from("daily_manpower_sheets")
+      .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels")
       .order("entry_date", { ascending: false })
       .limit(500);
     const sheetIds = (sheets || []).map((s: any) => s.id);
-    if (sheetIds.length === 0) { setAllSheets([]); return; }
-    const { data: dm } = await supabase
-      .from("daily_manpower")
-      .select("sheet_id, status, headcount")
-      .in("sheet_id", sheetIds);
-    const byId: Record<string, { statuses: string[]; total: number }> = {};
-    (dm || []).forEach((r: any) => {
-      if (!byId[r.sheet_id]) byId[r.sheet_id] = { statuses: [], total: 0 };
-      byId[r.sheet_id].statuses.push(r.status);
-      byId[r.sheet_id].total += r.headcount || 0;
-    });
+    let totals: Record<string, number> = {};
+    if (sheetIds.length > 0) {
+      const { data: dm } = await supabase
+        .from("daily_manpower")
+        .select("sheet_id, headcount")
+        .in("sheet_id", sheetIds);
+      (dm || []).forEach((r: any) => { totals[r.sheet_id] = (totals[r.sheet_id] || 0) + (r.headcount || 0); });
+    }
     setAllSheets((sheets || []).map((s: any) => ({
       id: s.id,
       sheet_code: s.sheet_code,
       project_id: s.project_id,
       entry_date: s.entry_date,
-      status: aggregateStatus(byId[s.id]?.statuses || []),
-      total: byId[s.id]?.total || 0,
+      status: s.status,
+      current_level: s.current_level,
+      total_levels: s.total_levels,
+      total: totals[s.id] || 0,
     })));
   };
   useEffect(() => { loadAllSheets(); }, []);
+
 
   const updateCell = (cid: string, key: string, val: number) =>
     setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
