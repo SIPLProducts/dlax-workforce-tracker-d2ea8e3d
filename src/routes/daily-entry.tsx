@@ -94,23 +94,29 @@ function DailyEntryPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
-  const [rowStatuses, setRowStatuses] = useState<string[]>([]);
-  const [sheetCode, setSheetCode] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number } | null>(null);
+  const [rowCount, setRowCount] = useState(0);
   const [approvalEnabled, setApprovalEnabled] = useState(false);
+  const [levels, setLevels] = useState<{ level_no: number; approver_user_id: string; label: string | null }[]>([]);
+  const [approverNames, setApproverNames] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"view" | "edit">("view"); // default view; flips to edit when nothing exists yet
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
 
-  const sheetStatus = useMemo(() => aggregateStatus(rowStatuses), [rowStatuses]);
+  const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
   const isEmpty = sheetStatus === "empty";
   const canEdit = isEmpty || sheetStatus === "draft" || sheetStatus === "rejected";
+  const currentApproverName = sheet && sheet.status === "pending"
+    ? approverNames[levels.find((l) => l.level_no === sheet.current_level)?.approver_user_id || ""] || `Level ${sheet.current_level}`
+    : "";
   const editLockReason =
     sheetStatus === "approved" ? "Approved — cannot modify" :
-    sheetStatus === "pending_l1" || sheetStatus === "pending_l2" ? "Awaiting approval — cannot modify" :
+    sheetStatus === "pending" ? `Awaiting approval at Level ${sheet?.current_level} (${currentApproverName})` :
     "";
   const readOnly = mode === "view" || !canEdit;
+
 
   const tryParseDate = (s: string): Date | null => {
     for (const f of ["dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "d/M/yyyy", "d-M-yyyy"]) {
