@@ -1,37 +1,62 @@
-## Problem
+# Goal
 
-`pradeep` was assigned the **Management** custom role, but the database still has `supervisor` in `user_roles` for that user. As a result:
+Make custom roles fully dynamic: if a custom role grants **Edit** on a screen, the user with that role should be able to both **open** the screen and **perform all its actions** (create/update/delete) — without needing the system `admin` role.
 
-1. The sidebar shows **"Supervisor"** (it reads `roles` from `user_roles` only).
-2. The previous cleanup migration ran before `pradeep` got the Management role, so it didn't catch this user — and any future user assigned a custom role will hit the same problem because `handleAssignCustomRole` no longer auto-grants `supervisor`, but it also doesn't *remove* an existing one.
+# Root cause
 
-Permission logic (`use-permissions.tsx`) is already correct — it ignores system-role baselines for non-admins who have a custom role. The remaining issue is purely about **stale system roles** + **UI label**.
+Two layers are still hard-coded to `hasRole("admin")`:
 
-## Fix
+1. **Page-level UI gates** — `users.tsx` and `masters.approvals.tsx` block the page body when the user isn't system admin (that's why you see "You don't have permission" even though the sidebar link shows).
+2. **Database RLS policies** — `profiles`, `user_roles`, `user_projects`, `project_approval_config` all use `has_role(auth.uid(), 'admin')`. So even if we open the page, inserts/updates/deletes would fail silently for a custom-role user.
 
-### 1. Strip non-admin system roles when a custom role is assigned
-`src/routes/users.tsx → handleAssignCustomRole`: after inserting into `user_custom_roles`, delete all non-`admin` rows from `user_roles` for that user. Admins keep their admin role (so they can't lock themselves out).
+Both layers must change for true dynamic permissions.
 
-### 2. One-off DB cleanup
-Migration to remove any non-`admin` system role from users who currently have a custom role assigned. This clears pradeep's stale `supervisor` row.
+# Fix
 
-### 3. Sidebar label reflects the effective role
-`src/components/AppSidebar.tsx` (line 153): fetch the user's custom role name (via `user_custom_roles` + `custom_roles`) and show it. Fallback to system roles, else "No role".
+## 1. Database migration — permission-aware RLS
 
-  - Admin → show "Admin"
-  - Else if custom role present → show custom role name (e.g. "Management")
-  - Else → show system role(s)
+Use the existing `has_screen_edit(user_id, screen_key)` helper. Replace admin-only policies on the relevant tables with `admin OR has_screen_edit(...)`.
 
-### 4. Warn when adding a system role to a user who already has a custom role
-`handleAddRole`: if the user already has a custom role and the admin is adding a non-`admin` system role, show a confirmation ("This will override the custom role's restrictions. Continue?"). Prevents accidental re-introduction of the same bug.
+- **`profiles`** — `ALL` policy: `has_role(admin) OR has_screen_edit(auth.uid(), 'user_management')`
+- **`user_roles`** — `ALL` policy: same as above, with one safeguard: a non-admin **cannot** insert/update a row where `role = 'admin'` (prevents privilege escalation). Implement as two policies: one for non-admin rows (custom-role users allowed), one for admin rows (system admin only).
+- **`user_projects`** — `ALL` policy: `has_role(admin) OR has_screen_edit(auth.uid(), 'user_management')`
+- **`project_approval_config`** — `ALL` policy: `has_role(admin) OR has_screen_edit(auth.uid(), 'masters_approval_config')`
+- **`projects`** insert/update/delete** — `has_role(admin) OR has_screen_edit(auth.uid(), 'masters_projects')`
+- **`contractors`** ALL — `... OR has_screen_edit(..., 'masters_contractors')`
+- **`departments`** ALL — `... OR has_screen_edit(..., 'masters_departments')`
+- **`worker_categories`** ALL — `... OR has_screen_edit(..., 'masters_categories')`
+- **`department_categories`** ALL — `... OR has_screen_edit(..., 'masters_categories')`
+- **`custom_roles`** + **`role_screen_permissions`** + **`user_custom_roles`** — kept admin-only (only true admins can mint new roles or grant roles to users; otherwise a custom role could escalate itself).
+- **`has_project_access`** function — extend so a user with `has_screen_edit(_, 'user_management')` who has no project assignments sees all projects (mirrors the existing admin behavior). This lets dynamic admins manage data across projects.
 
-## Out of scope
-- No change to permission merge logic (already correct).
-- No change to RLS (already supports `has_screen_edit`).
-- No change to custom role creation UI.
+## 2. UI — replace `hasRole("admin")` page gates with `canEdit(screenKey)`
 
-## Files
+- **`src/routes/users.tsx`**
+  - Import `usePermissions`.
+  - `const canManageUsers = isAdmin || canEdit("user_management")`.
+  - Use `canManageUsers` for the load `useEffect` guard (line 120-121) and the "no permission" early return (line 318).
+  - **Keep `isAdmin`-only** for the "grant system admin role" UI (lines 404, 618) — only true admins can promote others to admin.
 
-- `src/routes/users.tsx` — update `handleAssignCustomRole`, add guard in `handleAddRole`
-- `src/components/AppSidebar.tsx` — display effective role
-- New migration — cleanup stale `user_roles` for users with custom roles
+- **`src/routes/masters.approvals.tsx`**
+  - Import `usePermissions`.
+  - `const canManageApprovals = isAdmin || canEdit("masters_approval_config")`.
+  - Use it for the load `useEffect` (line 182) and the early return (line 370).
+
+- Other master screens (`projects`, `contractors`, `departments`, `categories`) — already gated only by `ScreenGuard` + RLS, so they'll start working as soon as RLS is updated. No code change needed there.
+
+## 3. Out of scope
+
+- `approvals.tsx` page (approval-flow logic stays role-based by design — L1/L2 approvers are project-specific, not screen-permission-based).
+- Creating/editing custom roles & assigning roles stays admin-only (security boundary).
+- No new screens, no changes to permission UI.
+
+# Files touched
+
+- New SQL migration (RLS rewrites + `has_project_access` update).
+- `src/routes/users.tsx`
+- `src/routes/masters.approvals.tsx`
+
+# Security notes
+
+- A custom role with `user_management = edit` will be able to create users, assign non-admin roles, and assign project access — same powers as today's admin **except** they cannot grant the `admin` system role and cannot create/edit custom roles themselves. This prevents privilege escalation while making the permission model truly dynamic.
+- All checks remain server-side enforced via RLS; UI changes alone don't grant access.
