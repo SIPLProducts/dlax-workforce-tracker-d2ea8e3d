@@ -206,26 +206,44 @@ export type Database = {
       daily_manpower_sheets: {
         Row: {
           created_at: string
+          current_level: number
           entry_date: string
           id: string
           project_id: string
+          rejection_remarks: string | null
           sheet_code: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          total_levels: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          current_level?: number
           entry_date: string
           id?: string
           project_id: string
+          rejection_remarks?: string | null
           sheet_code?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_levels?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          current_level?: number
           entry_date?: string
           id?: string
           project_id?: string
+          rejection_remarks?: string | null
           sheet_code?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_levels?: number
           updated_at?: string
         }
         Relationships: []
@@ -347,6 +365,44 @@ export type Database = {
         }
         Relationships: []
       }
+      project_approval_levels: {
+        Row: {
+          approver_user_id: string
+          created_at: string
+          id: string
+          label: string | null
+          level_no: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          approver_user_id: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          level_no: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          approver_user_id?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          level_no?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_approval_levels_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           code: string | null
@@ -417,6 +473,44 @@ export type Database = {
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sheet_approval_history: {
+        Row: {
+          action: string
+          action_at: string
+          approver_user_id: string
+          id: string
+          level_no: number
+          remarks: string | null
+          sheet_id: string
+        }
+        Insert: {
+          action: string
+          action_at?: string
+          approver_user_id: string
+          id?: string
+          level_no: number
+          remarks?: string | null
+          sheet_id: string
+        }
+        Update: {
+          action?: string
+          action_at?: string
+          approver_user_id?: string
+          id?: string
+          level_no?: number
+          remarks?: string | null
+          sheet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sheet_approval_history_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "daily_manpower_sheets"
             referencedColumns: ["id"]
           },
         ]
@@ -606,6 +700,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_sheet: {
+        Args: { _remarks?: string; _sheet_id: string }
+        Returns: {
+          created_at: string
+          current_level: number
+          entry_date: string
+          id: string
+          project_id: string
+          rejection_remarks: string | null
+          sheet_code: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          total_levels: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_manpower_sheets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_email_for_login_id: { Args: { _login_id: string }; Returns: string }
       get_screen_permission: {
         Args: { _screen_key: string; _user_id: string }
@@ -626,12 +743,20 @@ export type Database = {
         Args: { _screen_key: string; _user_id: string }
         Returns: boolean
       }
+      is_current_sheet_approver: {
+        Args: { _sheet_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_project_l1: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
       is_project_l2: {
         Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_project_level_approver: {
+        Args: { _level: number; _project_id: string; _user_id: string }
         Returns: boolean
       }
       list_assignable_projects: {
@@ -641,6 +766,52 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      reject_sheet: {
+        Args: { _remarks: string; _sheet_id: string }
+        Returns: {
+          created_at: string
+          current_level: number
+          entry_date: string
+          id: string
+          project_id: string
+          rejection_remarks: string | null
+          sheet_code: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          total_levels: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_manpower_sheets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      submit_sheet: {
+        Args: { _sheet_id: string }
+        Returns: {
+          created_at: string
+          current_level: number
+          entry_date: string
+          id: string
+          project_id: string
+          rejection_remarks: string | null
+          sheet_code: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          total_levels: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_manpower_sheets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
