@@ -412,11 +412,26 @@ function DailyEntryPage() {
               <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save"}
             </Button>
           )}
-          {!isEmpty && approvalEnabled && levels.length > 0 && (sheetStatus === "draft" || sheetStatus === "rejected") && (
-            <Button variant="default" onClick={handleSendToApproval} disabled={sending}>
-              <Send className="w-4 h-4 mr-2" /> {sending ? "Sending..." : "Send to Approval"}
-            </Button>
-          )}
+          {(() => {
+            const canSend = !isEmpty && approvalEnabled && levels.length > 0 && (sheetStatus === "draft" || sheetStatus === "rejected");
+            const reason = isEmpty ? "Save the sheet first"
+              : !approvalEnabled ? "Approval not enabled for this project"
+              : levels.length === 0 ? "No approval levels configured for this project"
+              : sheetStatus === "pending" ? "Already pending approval"
+              : sheetStatus === "approved" ? "Already approved"
+              : "";
+            const btn = (
+              <Button variant="default" onClick={handleSendToApproval} disabled={!canSend || sending}>
+                <Send className="w-4 h-4 mr-2" /> {sending ? "Sending..." : "Send to Approval"}
+              </Button>
+            );
+            return canSend ? btn : (
+              <Tooltip>
+                <TooltipTrigger asChild><span>{btn}</span></TooltipTrigger>
+                <TooltipContent>{reason}</TooltipContent>
+              </Tooltip>
+            );
+          })()}
         </div>
       </div>
 
@@ -588,7 +603,7 @@ function DailyEntryPage() {
                           )}
                           {(s.status === "draft" || s.status === "rejected") && (
                             <Button size="sm" variant="default" onClick={() => sendFromList(s)}>
-                              <Send className="w-4 h-4 mr-1" /> Send
+                              <Send className="w-4 h-4 mr-1" /> Send to Approval
                             </Button>
                           )}
                         </div>
