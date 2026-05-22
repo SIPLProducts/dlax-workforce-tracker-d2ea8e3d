@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Save } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { CalendarIcon, Save, Eye, Pencil, Send, Plus } from "lucide-react";
 import { format, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -18,16 +21,11 @@ export const Route = createFileRoute("/daily-entry")({
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
 });
 
-// Fixed column schema as per the register
 type ColDef = { key: string; label: string };
 type GroupDef = { key: "CIVIL" | "MEP" | "NMR"; label: string; cols: ColDef[]; headerClass: string; cellClass: string };
 
 const GROUPS: GroupDef[] = [
-  {
-    key: "CIVIL",
-    label: "CIVIL - Item rate / Subcontract",
-    headerClass: "bg-blue-100 text-blue-900",
-    cellClass: "bg-blue-50/40",
+  { key: "CIVIL", label: "CIVIL - Item rate / Subcontract", headerClass: "bg-blue-100 text-blue-900", cellClass: "bg-blue-50/40",
     cols: [
       { key: "civil_rod_bending", label: "Rod Bending" },
       { key: "civil_shuttering", label: "Shuttering" },
@@ -35,13 +33,8 @@ const GROUPS: GroupDef[] = [
       { key: "civil_scaffolders", label: "Scaffolders" },
       { key: "civil_painters", label: "Painters" },
       { key: "civil_helpers", label: "Helpers" },
-    ],
-  },
-  {
-    key: "MEP",
-    label: "MEP - Item rate / Subcontract",
-    headerClass: "bg-emerald-100 text-emerald-900",
-    cellClass: "bg-emerald-50/40",
+    ] },
+  { key: "MEP", label: "MEP - Item rate / Subcontract", headerClass: "bg-emerald-100 text-emerald-900", cellClass: "bg-emerald-50/40",
     cols: [
       { key: "mep_plumbers", label: "Plumbers" },
       { key: "mep_carpenters", label: "Carpenters" },
@@ -49,19 +42,13 @@ const GROUPS: GroupDef[] = [
       { key: "mep_welders", label: "Welders" },
       { key: "mep_electricians", label: "Electricians" },
       { key: "mep_helpers", label: "Helpers" },
-    ],
-  },
-  {
-    key: "NMR",
-    label: "NMR Man powers",
-    headerClass: "bg-orange-100 text-orange-900",
-    cellClass: "bg-orange-50/40",
+    ] },
+  { key: "NMR", label: "NMR Man powers", headerClass: "bg-orange-100 text-orange-900", cellClass: "bg-orange-50/40",
     cols: [
       { key: "nmr_mason", label: "Mason" },
       { key: "nmr_mc", label: "M/C" },
       { key: "nmr_fc", label: "F/C" },
-    ],
-  },
+    ] },
 ];
 
 const ALL_COLS: ColDef[] = GROUPS.flatMap((g) => g.cols);
@@ -73,16 +60,38 @@ const emptyRow = (): RowData => {
   return r as RowData;
 };
 
-const WEATHER_OPTIONS = [
-  "Sunny",
-  "Cloudy",
-  "Rainy",
-  "Heavy Rain",
-  "Stormy",
-  "Foggy",
-  "Hot",
-  "Windy",
-];
+const WEATHER_OPTIONS = ["Sunny", "Cloudy", "Rainy", "Heavy Rain", "Stormy", "Foggy", "Hot", "Windy"];
+
+type SheetRow = {
+  id: string;
+  sheet_code: string;
+  project_id: string;
+  entry_date: string;
+  status: string; // aggregated
+  total: number;
+};
+
+function statusMeta(s: string) {
+  const map: Record<string, { cls: string; label: string }> = {
+    draft: { cls: "bg-slate-100 text-slate-900 border-slate-300", label: "Draft" },
+    pending_l1: { cls: "bg-amber-100 text-amber-900 border-amber-300", label: "Pending L1" },
+    pending_l2: { cls: "bg-blue-100 text-blue-900 border-blue-300", label: "Pending L2" },
+    approved: { cls: "bg-emerald-100 text-emerald-900 border-emerald-300", label: "Approved" },
+    rejected: { cls: "bg-red-100 text-red-900 border-red-300", label: "Rejected" },
+    empty: { cls: "bg-slate-50 text-slate-600 border-slate-200", label: "No entries yet" },
+  };
+  return map[s] || { cls: "", label: s };
+}
+
+// Aggregate per-row statuses → sheet status
+function aggregateStatus(rowStatuses: string[]): string {
+  if (rowStatuses.length === 0) return "empty";
+  if (rowStatuses.some((s) => s === "rejected")) return "rejected";
+  if (rowStatuses.some((s) => s === "pending_l1")) return "pending_l1";
+  if (rowStatuses.some((s) => s === "pending_l2")) return "pending_l2";
+  if (rowStatuses.every((s) => s === "approved")) return "approved";
+  return "draft";
+}
 
 function DailyEntryPage() {
   const { user } = useAuth();
@@ -94,9 +103,23 @@ function DailyEntryPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
-  const [statuses, setStatuses] = useState<Record<string, { status: string; rejection?: string | null }>>({});
+  const [rowStatuses, setRowStatuses] = useState<string[]>([]);
+  const [sheetCode, setSheetCode] = useState<string | null>(null);
+  const [approvalEnabled, setApprovalEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"view" | "edit">("view"); // default view; flips to edit when nothing exists yet
+  const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
+
+  const sheetStatus = useMemo(() => aggregateStatus(rowStatuses), [rowStatuses]);
+  const isEmpty = sheetStatus === "empty";
+  const canEdit = isEmpty || sheetStatus === "draft" || sheetStatus === "rejected";
+  const editLockReason =
+    sheetStatus === "approved" ? "Approved — cannot modify" :
+    sheetStatus === "pending_l1" || sheetStatus === "pending_l2" ? "Awaiting approval — cannot modify" :
+    "";
+  const readOnly = mode === "view" || !canEdit;
 
   const tryParseDate = (s: string): Date | null => {
     for (const f of ["dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "d/M/yyyy", "d-M-yyyy"]) {
@@ -109,15 +132,9 @@ function DailyEntryPage() {
   const handleDateTextChange = (raw: string) => {
     setDateText(raw);
     const parsed = tryParseDate(raw);
-    if (parsed) {
-      setDate(parsed);
-      setDateError(false);
-    } else {
-      setDateError(raw.length > 0);
-    }
+    if (parsed) { setDate(parsed); setDateError(false); } else { setDateError(raw.length > 0); }
   };
 
-  // Load projects
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("projects").select("id,name,code").order("name");
@@ -126,32 +143,18 @@ function DailyEntryPage() {
     })();
   }, []);
 
-  // Load contractors + subscribe to realtime updates
   useEffect(() => {
     const fetchContractors = async () => {
-      const { data } = await supabase
-        .from("contractors")
-        .select("id,company_name,contact_number,work_place")
-        .order("company_name");
+      const { data } = await supabase.from("contractors").select("id,company_name,contact_number,work_place").order("company_name");
       setContractors(data || []);
     };
     fetchContractors();
-
-    const channel = supabase
-      .channel("contractors-daily-entry")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "contractors" },
-        () => fetchContractors()
-      )
+    const channel = supabase.channel("contractors-daily-entry")
+      .on("postgres_changes", { event: "*", schema: "public", table: "contractors" }, () => fetchContractors())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Initialize rows when contractors change
   useEffect(() => {
     setRows((prev) => {
       const next: Record<string, RowData> = {};
@@ -160,21 +163,28 @@ function DailyEntryPage() {
     });
   }, [contractors]);
 
-  // Load existing daily_manpower for this date+project; map remarks JSON into typed columns
+  // Load existing sheet for project+date
   const loadEntries = async () => {
     if (!projectId) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("daily_manpower")
-      .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status,rejection_remarks")
-      .eq("project_id", projectId)
-      .eq("entry_date", format(date, "yyyy-MM-dd"));
+    const [{ data: dm }, { data: sheet }, { data: cfg }] = await Promise.all([
+      supabase.from("daily_manpower")
+        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
+        .eq("project_id", projectId)
+        .eq("entry_date", format(date, "yyyy-MM-dd")),
+      supabase.from("daily_manpower_sheets" as any)
+        .select("sheet_code")
+        .eq("project_id", projectId)
+        .eq("entry_date", format(date, "yyyy-MM-dd"))
+        .maybeSingle(),
+      supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
+    ]);
     setLoading(false);
-    if (error) return;
+
     const next: Record<string, RowData> = {};
-    const stat: Record<string, { status: string; rejection?: string | null }> = {};
     contractors.forEach((c) => (next[c.id] = emptyRow()));
-    (data || []).forEach((rec: any) => {
+    const statuses: string[] = [];
+    (dm || []).forEach((rec: any) => {
       const r = next[rec.contractor_id] || emptyRow();
       r.security = rec.security_count || 0;
       r.deficiency = rec.deficiency_manpower || 0;
@@ -182,34 +192,60 @@ function DailyEntryPage() {
         const parsed = rec.remarks ? JSON.parse(rec.remarks) : null;
         if (parsed && typeof parsed === "object") {
           r.remarks = parsed._remarks || "";
-          ALL_COLS.forEach((c) => {
-            if (typeof parsed[c.key] === "number") (r as any)[c.key] = parsed[c.key];
-          });
+          ALL_COLS.forEach((c) => { if (typeof parsed[c.key] === "number") (r as any)[c.key] = parsed[c.key]; });
         } else if (typeof rec.remarks === "string") {
           r.remarks = rec.remarks;
         }
-      } catch {
-        r.remarks = rec.remarks || "";
-      }
+      } catch { r.remarks = rec.remarks || ""; }
       r.weather = rec.weather_condition || "";
       next[rec.contractor_id] = r;
-      stat[rec.contractor_id] = { status: rec.status, rejection: rec.rejection_remarks };
+      statuses.push(rec.status);
     });
     setRows(next);
-    setStatuses(stat);
+    setRowStatuses(statuses);
+    setSheetCode((sheet as any)?.sheet_code || null);
+    setApprovalEnabled(!!(cfg as any)?.approval_enabled);
+    // Default mode: if sheet exists & not editable, go view; if no sheet, go edit (new entry)
+    if (statuses.length === 0) setMode("edit");
+    else setMode("view");
   };
 
-  useEffect(() => {
-    loadEntries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, date, contractors]);
+  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors]);
 
-  const updateCell = (cid: string, key: string, val: number) => {
-    setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
+  // Load all sheets for the saved-entries table below
+  const loadAllSheets = async () => {
+    const { data: sheets } = await supabase
+      .from("daily_manpower_sheets" as any)
+      .select("id, sheet_code, project_id, entry_date")
+      .order("entry_date", { ascending: false })
+      .limit(500);
+    const sheetIds = (sheets || []).map((s: any) => s.id);
+    if (sheetIds.length === 0) { setAllSheets([]); return; }
+    const { data: dm } = await supabase
+      .from("daily_manpower")
+      .select("sheet_id, status, headcount")
+      .in("sheet_id", sheetIds);
+    const byId: Record<string, { statuses: string[]; total: number }> = {};
+    (dm || []).forEach((r: any) => {
+      if (!byId[r.sheet_id]) byId[r.sheet_id] = { statuses: [], total: 0 };
+      byId[r.sheet_id].statuses.push(r.status);
+      byId[r.sheet_id].total += r.headcount || 0;
+    });
+    setAllSheets((sheets || []).map((s: any) => ({
+      id: s.id,
+      sheet_code: s.sheet_code,
+      project_id: s.project_id,
+      entry_date: s.entry_date,
+      status: aggregateStatus(byId[s.id]?.statuses || []),
+      total: byId[s.id]?.total || 0,
+    })));
   };
-  const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) => {
+  useEffect(() => { loadAllSheets(); }, []);
+
+  const updateCell = (cid: string, key: string, val: number) =>
     setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
-  };
+  const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) =>
+    setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
 
   const rowTotal = (r: RowData) => ALL_COLS.reduce((s, c) => s + (Number((r as any)[c.key]) || 0), 0);
 
@@ -217,8 +253,7 @@ function DailyEntryPage() {
     const t: Record<string, number> = { security: 0, deficiency: 0, total: 0 };
     ALL_COLS.forEach((c) => (t[c.key] = 0));
     contractors.forEach((c) => {
-      const r = rows[c.id];
-      if (!r) return;
+      const r = rows[c.id]; if (!r) return;
       ALL_COLS.forEach((col) => (t[col.key] += Number((r as any)[col.key]) || 0));
       t.security += Number(r.security) || 0;
       t.deficiency += Number(r.deficiency) || 0;
@@ -230,11 +265,10 @@ function DailyEntryPage() {
   const handleSave = async () => {
     if (!projectId) return toast.error("Select a project");
     if (!user) return toast.error("Not signed in");
+    if (!canEdit) return toast.error(editLockReason || "Cannot edit");
     setSaving(true);
     const entry_date = format(date, "yyyy-MM-dd");
 
-    // Strategy: one daily_manpower row per contractor; store all per-trade counts inside remarks as JSON.
-    // headcount = sum of all categories. Use a sentinel category/department: pick the first available.
     const { data: cats } = await supabase.from("worker_categories").select("id").limit(1);
     const { data: deps } = await supabase.from("departments").select("id").limit(1);
     const fallbackCat = cats?.[0]?.id;
@@ -244,72 +278,141 @@ function DailyEntryPage() {
       return toast.error("Add at least one Department and Category in Masters first");
     }
 
-    // Wipe existing rows for date+project, then insert fresh
     await supabase.from("daily_manpower").delete().eq("project_id", projectId).eq("entry_date", entry_date);
 
-    const inserts = contractors
-      .map((c) => {
-        const r = rows[c.id];
-        if (!r) return null;
-        const total = rowTotal(r);
-        const hasAny = total > 0 || r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim());
-        if (!hasAny) return null;
-        const payload: any = { _remarks: r.remarks || "" };
-        ALL_COLS.forEach((col) => (payload[col.key] = Number((r as any)[col.key]) || 0));
-        return {
-          project_id: projectId,
-          entry_date,
-          contractor_id: c.id,
-          department_id: fallbackDep,
-          category_id: fallbackCat,
-          headcount: total,
-          security_count: Number(r.security) || 0,
-          deficiency_manpower: Number(r.deficiency) || 0,
-          remarks: JSON.stringify(payload),
-          created_by: user.id,
-          submitted_by: user.id,
-          submitted_at: new Date().toISOString(),
-        };
-      })
-      .filter(Boolean);
+    const inserts = contractors.map((c) => {
+      const r = rows[c.id]; if (!r) return null;
+      const total = rowTotal(r);
+      const hasAny = total > 0 || r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim());
+      if (!hasAny) return null;
+      const payload: any = { _remarks: r.remarks || "" };
+      ALL_COLS.forEach((col) => (payload[col.key] = Number((r as any)[col.key]) || 0));
+      return {
+        project_id: projectId,
+        entry_date,
+        contractor_id: c.id,
+        department_id: fallbackDep,
+        category_id: fallbackCat,
+        headcount: total,
+        security_count: Number(r.security) || 0,
+        deficiency_manpower: Number(r.deficiency) || 0,
+        remarks: JSON.stringify(payload),
+        created_by: user.id,
+        submitted_by: user.id,
+      };
+    }).filter(Boolean);
 
     if (inserts.length === 0) {
       setSaving(false);
       toast.success("Saved (no entries)");
-      await loadEntries();
+      await loadEntries(); await loadAllSheets();
       return;
     }
 
     const { error } = await supabase.from("daily_manpower").insert(inserts as any);
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Daily entry saved");
-    await loadEntries();
+    await loadEntries(); await loadAllSheets();
+    toast.success(`Saved as Draft`);
+    setMode("view");
+  };
+
+  const handleSendToApproval = async () => {
+    if (!approvalEnabled) return toast.error("Approval is not configured for this project");
+    if (rowStatuses.length === 0) return toast.error("Save the sheet first");
+    if (sheetStatus !== "draft" && sheetStatus !== "rejected") return toast.error("Sheet is already submitted");
+    setSending(true);
+    const entry_date = format(date, "yyyy-MM-dd");
+    const patch: any = { status: "pending_l1", submitted_at: new Date().toISOString(), submitted_by: user?.id };
+    const { error } = await supabase.from("daily_manpower")
+      .update(patch)
+      .eq("project_id", projectId)
+      .eq("entry_date", entry_date)
+      .in("status", ["draft", "rejected"]);
+    setSending(false);
+    if (error) return toast.error(error.message);
+    toast.success("Sent for approval");
+    await loadEntries(); await loadAllSheets();
+  };
+
+  const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
+    setProjectId(s.project_id);
+    const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
+    if (isValid(d)) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
+    setMode(asMode);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const sendFromList = async (s: SheetRow) => {
+    if (s.status !== "draft" && s.status !== "rejected") return toast.error("Sheet already submitted");
+    const { data: cfg } = await supabase.from("project_approval_config").select("approval_enabled").eq("project_id", s.project_id).maybeSingle();
+    if (!(cfg as any)?.approval_enabled) return toast.error("Approval not configured for this project");
+    const { error } = await supabase.from("daily_manpower")
+      .update({ status: "pending_l1", submitted_at: new Date().toISOString(), submitted_by: user?.id })
+      .eq("project_id", s.project_id)
+      .eq("entry_date", s.entry_date)
+      .in("status", ["draft", "rejected"]);
+    if (error) return toast.error(error.message);
+    toast.success(`${s.sheet_code} sent for approval`);
+    await loadAllSheets();
+    if (s.project_id === projectId && s.entry_date === format(date, "yyyy-MM-dd")) await loadEntries();
+  };
+
+  const projectName = (id: string) => {
+    const p = projects.find((x) => x.id === id);
+    return p ? `${p.code ? p.code + " — " : ""}${p.name}` : id.slice(0, 8);
   };
 
   const numCell = (val: number, onChange: (n: number) => void, extraClass = "") => (
     <input
-      type="number"
-      min={0}
-      value={val || ""}
+      type="number" min={0} value={val || ""} disabled={readOnly}
       onChange={(e) => onChange(Number(e.target.value) || 0)}
       className={cn(
-        "w-full h-9 px-1 text-center text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40",
+        "w-full h-9 px-1 text-center text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-70 disabled:cursor-not-allowed",
         extraClass
       )}
     />
   );
 
+  const sMeta = statusMeta(sheetStatus);
+
   return (
+    <TooltipProvider>
     <div className="p-4 space-y-4 max-w-[100vw]">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold">Daily Manpower Entry</h1>
           <p className="text-sm text-muted-foreground">Daily Labour Attendance Register</p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save"}
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          {!isEmpty && (
+            <Button variant="outline" onClick={() => setMode("view")} disabled={mode === "view"}>
+              <Eye className="w-4 h-4 mr-2" /> View
+            </Button>
+          )}
+          {canEdit ? (
+            <Button variant="outline" onClick={() => setMode("edit")} disabled={mode === "edit"}>
+              <Pencil className="w-4 h-4 mr-2" /> Edit
+            </Button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span><Button variant="outline" disabled><Pencil className="w-4 h-4 mr-2" /> Edit</Button></span>
+              </TooltipTrigger>
+              <TooltipContent>{editLockReason}</TooltipContent>
+            </Tooltip>
+          )}
+          {mode === "edit" && (
+            <Button onClick={handleSave} disabled={saving || !canEdit}>
+              <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save"}
+            </Button>
+          )}
+          {!isEmpty && approvalEnabled && (sheetStatus === "draft" || sheetStatus === "rejected") && (
+            <Button variant="default" onClick={handleSendToApproval} disabled={sending}>
+              <Send className="w-4 h-4 mr-2" /> {sending ? "Sending..." : "Send to Approval"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -317,18 +420,13 @@ function DailyEntryPage() {
           <div className="space-y-1">
             <label className="text-xs font-medium">Date</label>
             <div className="flex gap-1">
-              <Input
-                value={dateText}
-                onChange={(e) => handleDateTextChange(e.target.value)}
-                placeholder="dd/MM/yyyy"
-                className={cn("w-36", dateError && "border-destructive")}
-              />
+              <Input value={dateText} onChange={(e) => handleDateTextChange(e.target.value)} placeholder="dd/MM/yyyy"
+                className={cn("w-36", dateError && "border-destructive")} />
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button>
-                </PopoverTrigger>
+                <PopoverTrigger asChild><Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }} initialFocus />
+                  <Calendar mode="single" selected={date}
+                    onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
@@ -342,6 +440,11 @@ function DailyEntryPage() {
               </SelectContent>
             </Select>
           </div>
+          <div className="ml-auto flex items-center gap-2">
+            {sheetCode && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheetCode}</span></div>}
+            <Badge variant="outline" className={sMeta.cls}>{sMeta.label}</Badge>
+            {mode === "edit" && <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300">Editing</Badge>}
+          </div>
         </CardContent>
       </Card>
 
@@ -349,124 +452,149 @@ function DailyEntryPage() {
         <CardContent className="p-0">
           <TableWithTopScroll>
             <table className="border-collapse text-xs w-full min-w-[1600px]">
-            <thead>
-              {/* Group super-header */}
-              <tr>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-20 w-12">Sl.no</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-20 min-w-[200px] text-left">Name of the Contractor</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[110px]">Contact No</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[140px]">Work Place</th>
-                {GROUPS.map((g) => (
-                  <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>
-                    {g.label}
-                  </th>
-                ))}
-                <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[70px]">Security</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[90px]">Deficieny<br/>Manpower</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px]">Remarks</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
-                <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[120px]">Status</th>
-              </tr>
-              <tr>
-                {GROUPS.flatMap((g) =>
-                  g.cols.map((c) => (
-                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>
-                      {c.label}
-                    </th>
-                  ))
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr><td colSpan={4 + ALL_COLS.length + 6} className="text-center py-6 text-muted-foreground">Loading…</td></tr>
-              )}
-              {!loading && contractors.length === 0 && (
-                <tr><td colSpan={4 + ALL_COLS.length + 6} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>
-              )}
-              {contractors.map((c, idx) => {
-                const r = rows[c.id] || emptyRow();
-                return (
-                  <tr key={c.id} className="hover:bg-muted/30">
-                    <td className="border text-center sticky left-0 bg-background z-10">{idx + 1}</td>
-                    <td className="border px-2 sticky left-12 bg-background z-10 font-medium">{c.company_name}</td>
-                    <td className="border px-2 text-center">{c.contact_number || ""}</td>
-                    <td className="border px-2">{c.work_place || ""}</td>
-                    {GROUPS.map((g) =>
-                      g.cols.map((col) => (
+              <thead>
+                <tr>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-20 w-12">Sl.no</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-20 min-w-[200px] text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[110px]">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[140px]">Work Place</th>
+                  {GROUPS.map((g) => (
+                    <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.label}</th>
+                  ))}
+                  <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[70px]">Security</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[90px]">Deficieny<br/>Manpower</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px]">Remarks</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
+                </tr>
+                <tr>
+                  {GROUPS.flatMap((g) => g.cols.map((c) => (
+                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.label}</th>
+                  )))}
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>)}
+                {contractors.map((c, idx) => {
+                  const r = rows[c.id] || emptyRow();
+                  return (
+                    <tr key={c.id} className="hover:bg-muted/30">
+                      <td className="border text-center sticky left-0 bg-background z-10">{idx + 1}</td>
+                      <td className="border px-2 sticky left-12 bg-background z-10 font-medium">{c.company_name}</td>
+                      <td className="border px-2 text-center">{c.contact_number || ""}</td>
+                      <td className="border px-2">{c.work_place || ""}</td>
+                      {GROUPS.map((g) => g.cols.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
                           {numCell((r as any)[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
                         </td>
-                      ))
-                    )}
-                    <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
-                    <td className="border">{numCell(r.security, (n) => updateField(c.id, "security", n))}</td>
-                    <td className="border">{numCell(r.deficiency, (n) => updateField(c.id, "deficiency", n))}</td>
-                    <td className="border">
-                      <input
-                        value={r.remarks}
-                        onChange={(e) => updateField(c.id, "remarks", e.target.value)}
-                        className="w-full h-9 px-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                      />
-                    </td>
-                    <td className="border">
-                      <Select value={r.weather || undefined} onValueChange={(v) => updateField(c.id, "weather", v)}>
-                        <SelectTrigger className="h-9 border-0 bg-transparent rounded-none focus:ring-2 focus:ring-primary/40 min-w-[120px]">
-                          <SelectValue placeholder="—" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {WEATHER_OPTIONS.map((w) => (
-                            <SelectItem key={w} value={w}>{w}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="border px-2 text-xs text-center" title={statuses[c.id]?.rejection || ""}>
-                      {(() => {
-                        const s = statuses[c.id]?.status;
-                        if (!s) return <span className="text-muted-foreground">—</span>;
-                        const m: Record<string, string> = {
-                          pending_l1: "bg-amber-100 text-amber-900",
-                          pending_l2: "bg-blue-100 text-blue-900",
-                          approved: "bg-emerald-100 text-emerald-900",
-                          rejected: "bg-red-100 text-red-900",
-                        };
-                        const lbl: Record<string, string> = {
-                          pending_l1: "Pending L1",
-                          pending_l2: "Pending L2",
-                          approved: "Approved",
-                          rejected: "Rejected",
-                        };
-                        return <span className={cn("px-2 py-0.5 rounded text-[11px] font-medium", m[s])}>{lbl[s] || s}</span>;
-                      })()}
-                    </td>
+                      )))}
+                      <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
+                      <td className="border">{numCell(r.security, (n) => updateField(c.id, "security", n))}</td>
+                      <td className="border">{numCell(r.deficiency, (n) => updateField(c.id, "deficiency", n))}</td>
+                      <td className="border">
+                        <input value={r.remarks} disabled={readOnly}
+                          onChange={(e) => updateField(c.id, "remarks", e.target.value)}
+                          className="w-full h-9 px-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-70" />
+                      </td>
+                      <td className="border">
+                        <Select value={r.weather || undefined} disabled={readOnly} onValueChange={(v) => updateField(c.id, "weather", v)}>
+                          <SelectTrigger className="h-9 border-0 bg-transparent rounded-none focus:ring-2 focus:ring-primary/40 min-w-[120px]">
+                            <SelectValue placeholder="—" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WEATHER_OPTIONS.map((w) => (<SelectItem key={w} value={w}>{w}</SelectItem>))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {contractors.length > 0 && (
+                <tfoot>
+                  <tr className="bg-yellow-100 font-bold">
+                    <td className="border text-center sticky left-0 bg-yellow-100 z-10" colSpan={2}>TOTAL</td>
+                    <td className="border" colSpan={2}></td>
+                    {ALL_COLS.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
+                    <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
+                    <td className="border text-center">{colTotals.security || ""}</td>
+                    <td className="border text-center">{colTotals.deficiency || ""}</td>
+                    <td className="border"></td>
+                    <td className="border"></td>
                   </tr>
-                );
-              })}
-            </tbody>
-            {contractors.length > 0 && (
-              <tfoot>
-                <tr className="bg-yellow-100 font-bold">
-                  <td className="border text-center sticky left-0 bg-yellow-100 z-10" colSpan={2}>TOTAL</td>
-                  <td className="border" colSpan={2}></td>
-                  {ALL_COLS.map((c) => (
-                    <td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>
-                  ))}
-                  <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
-                  <td className="border text-center">{colTotals.security || ""}</td>
-                  <td className="border text-center">{colTotals.deficiency || ""}</td>
-                  <td className="border"></td>
-                  <td className="border"></td>
-                  <td className="border"></td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
+                </tfoot>
+              )}
+            </table>
           </TableWithTopScroll>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-lg font-semibold">Saved Entries</h2>
+              <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load above.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => { setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+              <Plus className="w-4 h-4 mr-2" /> New Entry
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sheet ID</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead className="text-right">Total Headcount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allSheets.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No saved sheets yet</TableCell></TableRow>
+                )}
+                {allSheets.map((s) => {
+                  const m = statusMeta(s.status);
+                  const editable = s.status === "draft" || s.status === "rejected" || s.status === "empty";
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-mono font-semibold">{s.sheet_code}</TableCell>
+                      <TableCell>{format(parseDate(s.entry_date, "yyyy-MM-dd", new Date()), "dd/MM/yyyy")}</TableCell>
+                      <TableCell>{projectName(s.project_id)}</TableCell>
+                      <TableCell className="text-right">{s.total}</TableCell>
+                      <TableCell><Badge variant="outline" className={m.cls}>{m.label}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "view")}><Eye className="w-4 h-4" /></Button>
+                          {editable ? (
+                            <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "edit")}><Pencil className="w-4 h-4" /></Button>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild><span><Button size="sm" variant="ghost" disabled><Pencil className="w-4 h-4" /></Button></span></TooltipTrigger>
+                              <TooltipContent>{s.status === "approved" ? "Approved — cannot modify" : "Awaiting approval"}</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {(s.status === "draft" || s.status === "rejected") && (
+                            <Button size="sm" variant="default" onClick={() => sendFromList(s)}>
+                              <Send className="w-4 h-4 mr-1" /> Send
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -485,12 +613,8 @@ function TableWithTopScroll({ children }: { children: React.ReactNode }) {
     return () => ro.disconnect();
   }, [children]);
 
-  const syncFromTop = () => {
-    if (topRef.current && bottomRef.current) bottomRef.current.scrollLeft = topRef.current.scrollLeft;
-  };
-  const syncFromBottom = () => {
-    if (topRef.current && bottomRef.current) topRef.current.scrollLeft = bottomRef.current.scrollLeft;
-  };
+  const syncFromTop = () => { if (topRef.current && bottomRef.current) bottomRef.current.scrollLeft = topRef.current.scrollLeft; };
+  const syncFromBottom = () => { if (topRef.current && bottomRef.current) topRef.current.scrollLeft = bottomRef.current.scrollLeft; };
 
   return (
     <>

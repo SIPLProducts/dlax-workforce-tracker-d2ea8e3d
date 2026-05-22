@@ -102,6 +102,7 @@ export type Database = {
           rejection_remarks: string | null
           remarks: string | null
           security_count: number
+          sheet_id: string | null
           status: Database["public"]["Enums"]["approval_status"]
           submitted_at: string | null
           submitted_by: string | null
@@ -129,6 +130,7 @@ export type Database = {
           rejection_remarks?: string | null
           remarks?: string | null
           security_count?: number
+          sheet_id?: string | null
           status?: Database["public"]["Enums"]["approval_status"]
           submitted_at?: string | null
           submitted_by?: string | null
@@ -156,6 +158,7 @@ export type Database = {
           rejection_remarks?: string | null
           remarks?: string | null
           security_count?: number
+          sheet_id?: string | null
           status?: Database["public"]["Enums"]["approval_status"]
           submitted_at?: string | null
           submitted_by?: string | null
@@ -191,7 +194,41 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "daily_manpower_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "daily_manpower_sheets"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      daily_manpower_sheets: {
+        Row: {
+          created_at: string
+          entry_date: string
+          id: string
+          project_id: string
+          sheet_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entry_date: string
+          id?: string
+          project_id: string
+          sheet_code?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entry_date?: string
+          id?: string
+          project_id?: string
+          sheet_code?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       department_categories: {
         Row: {
