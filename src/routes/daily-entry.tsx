@@ -412,7 +412,7 @@ function DailyEntryPage() {
               <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save"}
             </Button>
           )}
-          {!isEmpty && approvalEnabled && (sheetStatus === "draft" || sheetStatus === "rejected") && (
+          {!isEmpty && approvalEnabled && levels.length > 0 && (sheetStatus === "draft" || sheetStatus === "rejected") && (
             <Button variant="default" onClick={handleSendToApproval} disabled={sending}>
               <Send className="w-4 h-4 mr-2" /> {sending ? "Sending..." : "Send to Approval"}
             </Button>
