@@ -445,9 +445,12 @@ function DailyEntryPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            {sheetCode && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheetCode}</span></div>}
-            <Badge variant="outline" className={sMeta.cls}>{sMeta.label}</Badge>
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {sheet?.sheet_code && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheet.sheet_code}</span></div>}
+            <Badge variant="outline" className={sMeta.cls}>
+              {sMeta.label}
+              {sheet?.status === "pending" && ` — Level ${sheet.current_level}/${sheet.total_levels}${currentApproverName ? ` (${currentApproverName})` : ""}`}
+            </Badge>
             {mode === "edit" && <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300">Editing</Badge>}
           </div>
         </CardContent>
