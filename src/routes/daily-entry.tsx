@@ -329,20 +329,19 @@ function DailyEntryPage() {
   };
 
   const handleSendToApproval = async () => {
-    if (!approvalEnabled) return toast.error("Approval is not configured for this project");
-    if (rowStatuses.length === 0) return toast.error("Save the sheet first");
-    if (sheetStatus !== "draft" && sheetStatus !== "rejected") return toast.error("Sheet is already submitted");
+    if (!sheet) return toast.error("Save the sheet first");
+    if (sheet.status !== "draft" && sheet.status !== "rejected") return toast.error("Sheet is already submitted");
     setSending(true);
-    const entry_date = format(date, "yyyy-MM-dd");
-    const patch: any = { status: "pending_l1", submitted_at: new Date().toISOString(), submitted_by: user?.id };
-    const { error } = await supabase.from("daily_manpower")
-      .update(patch)
-      .eq("project_id", projectId)
-      .eq("entry_date", entry_date)
-      .in("status", ["draft", "rejected"]);
+    const { data, error } = await supabase.rpc("submit_sheet", { _sheet_id: sheet.id });
     setSending(false);
     if (error) return toast.error(error.message);
-    toast.success("Sent for approval");
+    const updated: any = data;
+    if (updated?.status === "approved") {
+      toast.success("Approval not configured — sheet auto-approved");
+    } else {
+      const firstApprover = approverNames[levels.find((l) => l.level_no === 1)?.approver_user_id || ""] || "Level 1 approver";
+      toast.success(`Sent for approval to ${firstApprover}`);
+    }
     await loadEntries(); await loadAllSheets();
   };
 
@@ -356,18 +355,13 @@ function DailyEntryPage() {
 
   const sendFromList = async (s: SheetRow) => {
     if (s.status !== "draft" && s.status !== "rejected") return toast.error("Sheet already submitted");
-    const { data: cfg } = await supabase.from("project_approval_config").select("approval_enabled").eq("project_id", s.project_id).maybeSingle();
-    if (!(cfg as any)?.approval_enabled) return toast.error("Approval not configured for this project");
-    const { error } = await supabase.from("daily_manpower")
-      .update({ status: "pending_l1", submitted_at: new Date().toISOString(), submitted_by: user?.id })
-      .eq("project_id", s.project_id)
-      .eq("entry_date", s.entry_date)
-      .in("status", ["draft", "rejected"]);
+    const { error } = await supabase.rpc("submit_sheet", { _sheet_id: s.id });
     if (error) return toast.error(error.message);
     toast.success(`${s.sheet_code} sent for approval`);
     await loadAllSheets();
     if (s.project_id === projectId && s.entry_date === format(date, "yyyy-MM-dd")) await loadEntries();
   };
+
 
   const projectName = (id: string) => {
     const p = projects.find((x) => x.id === id);
