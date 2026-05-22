@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -81,6 +82,8 @@ const emptyForm: ProjectForm = { name: "", code: "", location: "", division: "",
 function Page() {
   const { hasRole } = useAuth();
   const isAdmin = hasRole("admin");
+  const { canEdit } = usePermissions();
+  const canManageApprovals = isAdmin || canEdit("masters_approval_config");
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [pcs, setPcs] = useState<UserLite[]>([]);
@@ -179,7 +182,7 @@ function Page() {
     setLoading(false);
   };
 
-  useEffect(() => { if (isAdmin) loadAll(); }, [isAdmin]);
+  useEffect(() => { if (canManageApprovals) loadAll(); }, [canManageApprovals]);
 
   // ---- Helpers ----
   const cfgFor = (pid: string): Config =>
@@ -367,8 +370,8 @@ function Page() {
     toast.success(`Applied to ${selected.size} project${selected.size > 1 ? "s" : ""} — click "Save All" to persist`);
   };
 
-  if (!isAdmin) {
-    return <div className="p-8 text-muted-foreground">Admin access required.</div>;
+  if (!canManageApprovals) {
+    return <div className="p-8 text-muted-foreground">You don't have permission to access this page.</div>;
   }
 
   const labelFor = (u: UserLite) => {
