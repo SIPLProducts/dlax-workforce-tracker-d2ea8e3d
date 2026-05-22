@@ -28,13 +28,13 @@ export const adminCreateUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // Verify caller is admin
-    const { data: isAdmin, error: roleErr } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    if (roleErr) throw new Error("Failed to verify admin role");
-    if (!isAdmin) throw new Error("Forbidden: admin only");
+    // Allow system admin OR custom role with edit on user_management
+    const [{ data: isAdmin, error: roleErr }, { data: canEdit, error: permErr }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_screen_edit", { _user_id: userId, _screen_key: "user_management" }),
+    ]);
+    if (roleErr || permErr) throw new Error("Failed to verify permissions");
+    if (!isAdmin && !canEdit) throw new Error("Forbidden: requires User Management edit permission");
 
     const SUPABASE_URL = process.env.SUPABASE_URL!;
     const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
