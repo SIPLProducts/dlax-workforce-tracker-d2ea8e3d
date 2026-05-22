@@ -19,6 +19,7 @@ import { APP_SCREENS } from "@/lib/screens";
 import { useServerFn } from "@tanstack/react-start";
 import { adminCreateUser } from "@/utils/admin-users.functions";
 import { ScreenGuard } from "@/components/ScreenGuard";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/users")({
   component: () => <ScreenGuard screen="user_management"><UsersPage /></ScreenGuard>,
@@ -74,6 +75,8 @@ function UsersPage() {
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
 
   const isAdmin = hasRole("admin");
+  const { canEdit } = usePermissions();
+  const canManageUsers = isAdmin || canEdit("user_management");
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -117,8 +120,8 @@ function UsersPage() {
   }, []);
 
   useEffect(() => {
-    if (isAdmin) fetchAll();
-  }, [isAdmin, fetchAll]);
+    if (canManageUsers) fetchAll();
+  }, [canManageUsers, fetchAll]);
 
   const createUserFn = useServerFn(adminCreateUser);
 
@@ -315,7 +318,7 @@ function UsersPage() {
     }
   };
 
-  if (!isAdmin) {
+  if (!canManageUsers) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <p className="text-muted-foreground">You don't have permission to access this page.</p>
