@@ -12,9 +12,10 @@ import { CalendarIcon, Save } from "lucide-react";
 import { format, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { ScreenGuard } from "@/components/ScreenGuard";
 
 export const Route = createFileRoute("/daily-entry")({
-  component: DailyEntryPage,
+  component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
 });
 
 // Fixed column schema as per the register

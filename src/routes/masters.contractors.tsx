@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/contractors")({
-  component: ContractorsPage,
+  component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
 });
 
 function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) {

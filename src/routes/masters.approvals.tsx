@@ -28,7 +28,7 @@ import { format } from "date-fns";
 import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/masters/approvals")({
-  component: Page,
+  component: () => <ScreenGuard screen="masters_approval_config"><Page /></ScreenGuard>,
 });
 
 type Project = {

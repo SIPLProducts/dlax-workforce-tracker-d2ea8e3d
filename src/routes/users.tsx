@@ -18,9 +18,10 @@ import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
 import { APP_SCREENS } from "@/lib/screens";
 import { useServerFn } from "@tanstack/react-start";
 import { adminCreateUser } from "@/utils/admin-users.functions";
+import { ScreenGuard } from "@/components/ScreenGuard";
 
 export const Route = createFileRoute("/users")({
-  component: UsersPage,
+  component: () => <ScreenGuard screen="user_management"><UsersPage /></ScreenGuard>,
 });
 
 type UserWithRoles = {

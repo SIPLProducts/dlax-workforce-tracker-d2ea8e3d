@@ -11,7 +11,7 @@ import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/departments")({
-  component: DepartmentsPage,
+  component: () => <ScreenGuard screen="masters_departments"><DepartmentsPage /></ScreenGuard>,
 });
 
 function DepartmentsPage() {

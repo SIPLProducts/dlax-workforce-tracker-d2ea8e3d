@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/approvals")({
-  component: Page,
+  component: () => <ScreenGuard screen="approvals"><Page /></ScreenGuard>,
 });
 
 type Entry = {

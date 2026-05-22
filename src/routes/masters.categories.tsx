@@ -12,7 +12,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/masters/categories")({
-  component: CategoriesPage,
+  component: () => <ScreenGuard screen="masters_categories"><CategoriesPage /></ScreenGuard>,
 });
 
 const GROUPS = ["CIVIL", "MEP", "NMR"] as const;
