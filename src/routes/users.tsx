@@ -167,6 +167,11 @@ function UsersPage() {
 
   const handleAddRole = async () => {
     if (!selectedUser || !selectedRole) return;
+    if (selectedRole !== "admin" && selectedUser.custom_role_ids?.length > 0) {
+      if (!confirm("This user has a custom role assigned. Adding a system role will override the custom role's restrictions. Continue?")) {
+        return;
+      }
+    }
     setSavingRole(true);
     try {
       const { error } = await supabase.from("user_roles").insert({ user_id: selectedUser.user_id, role: selectedRole as any });
@@ -195,6 +200,13 @@ function UsersPage() {
       const { error } = await supabase.from("user_custom_roles").insert({ user_id: selectedUser.user_id, role_id: selectedCustomRole });
       if (error) throw error;
 
+      // Strip non-admin system roles so the custom role becomes the source of truth.
+      await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", selectedUser.user_id)
+        .neq("role", "admin" as any);
+
       toast.success("Custom role assigned");
       setCustomAssignOpen(false); setSelectedCustomRole("");
       fetchAll();
@@ -202,6 +214,7 @@ function UsersPage() {
       toast.error(err.message || "Failed to assign");
     } finally { setSavingRole(false); }
   };
+
 
   const handleRemoveCustomRole = async (userId: string, roleId: string) => {
     try {
