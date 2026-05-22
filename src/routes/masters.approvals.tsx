@@ -1,3 +1,4 @@
+import { ScreenGuard } from "@/components/ScreenGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
