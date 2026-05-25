@@ -26,6 +26,7 @@ import {
   format, subDays, eachDayOfInterval, differenceInCalendarDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/")({
   component: IndexPage,
