@@ -647,15 +647,17 @@ function DailyEntryPage() {
           </TableWithTopScroll>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="saved" className="mt-0">
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-lg font-semibold">Saved Entries</h2>
-              <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load above.</p>
+              <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load in the Entry Sheet tab.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); setActiveTab("entry"); }}>
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
@@ -687,9 +689,9 @@ function DailyEntryPage() {
                       <TableCell><Badge variant="outline" className={m.cls}>{m.label}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "view")}><Eye className="w-4 h-4" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => { loadSheetIntoEditor(s, "view"); setActiveTab("entry"); }}><Eye className="w-4 h-4" /></Button>
                           {editable ? (
-                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); }}><Pencil className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); setActiveTab("entry"); }}><Pencil className="w-4 h-4" /></Button>
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild><span><Button size="sm" variant="ghost" disabled><Pencil className="w-4 h-4" /></Button></span></TooltipTrigger>
@@ -711,6 +713,8 @@ function DailyEntryPage() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
     </TooltipProvider>
   );
