@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/masters/approvals")({
   component: () => <ScreenGuard screen="masters_approval_config"><Page /></ScreenGuard>,
