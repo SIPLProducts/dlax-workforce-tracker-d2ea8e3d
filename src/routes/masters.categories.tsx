@@ -65,11 +65,12 @@ function CategoriesPage() {
   };
 
   const handleEdit = (d: any) => {
+    if (!requireEdit()) return;
     setEditing(d);
     setForm({ name: d.name, category_group: d.category_group || "", display_order: d.display_order || 0 });
     setOpen(true);
   };
-  const handleDelete = async (id: string) => { if (!confirm("Delete?")) return; await supabase.from("worker_categories").delete().eq("id", id); toast.success("Deleted"); load(); };
+  const handleDelete = async (id: string) => { if (!requireEdit()) return; if (!confirm("Delete?")) return; await supabase.from("worker_categories").delete().eq("id", id); toast.success("Deleted"); load(); };
   const filtered = items.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
