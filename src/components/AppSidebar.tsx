@@ -12,7 +12,6 @@ import {
   Tag,
   BarChart3,
   LogOut,
-  HardHat,
   UserCog,
   CheckCircle2,
   ShieldCheck,
@@ -30,6 +29,7 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { KpcLogo } from "@/components/KpcLogo";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, screen: "dashboard" },
@@ -88,12 +88,12 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <HardHat className="h-7 w-7 text-sidebar-primary" />
-          <div>
-            <h1 className="text-lg font-bold text-sidebar-foreground tracking-tight">DLAX</h1>
-            <p className="text-xs text-sidebar-foreground/60">Labour Tracking</p>
+      <SidebarHeader className="p-4 bg-brand-gradient">
+        <div className="flex flex-col gap-3">
+          <KpcLogo variant="on-dark" className="h-7 w-auto" />
+          <div className="border-t border-sidebar-border pt-3">
+            <h1 className="text-xl font-bold text-sidebar-foreground tracking-tight leading-none">DLAX</h1>
+            <p className="text-[11px] text-sidebar-foreground/60 mt-1 uppercase tracking-wider">Daily Labour Attendance</p>
           </div>
         </div>
       </SidebarHeader>
@@ -175,11 +175,18 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 border-t border-sidebar-border">
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email}</p>
-          <p className="text-xs text-sidebar-primary font-medium capitalize">{roleLabel}</p>
-          <Button variant="ghost" size="sm" className="justify-start text-sidebar-foreground/60 hover:text-sidebar-foreground" onClick={signOut}>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
+              {(user?.email?.[0] || "U").toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-sidebar-foreground truncate font-medium">{user?.email}</p>
+              <p className="text-[10px] text-sidebar-primary font-semibold uppercase tracking-wider capitalize">{roleLabel}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" className="justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </Button>

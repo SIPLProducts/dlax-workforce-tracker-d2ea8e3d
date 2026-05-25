@@ -1,60 +1,123 @@
+## DLAX Enterprise Theme & Branding Uplift
 
-# DLAX UAT Test Scenarios — Excel Workbook
+A full visual refresh giving DLAX a polished, enterprise SaaS look — anchored by the KPC logo and a "Navy Trust" base palette, with quick theme switching in the header.
 
-Generate a downloadable `.xlsx` file at `/mnt/documents/DLAX_UAT_Scenarios.xlsx` containing detailed user acceptance test cases covering every module of the DLAX application.
+---
 
-## Workbook structure
+### Logo handling (important)
 
-**Sheet 1 — Cover / Instructions**
-- App: DLAX (Daily Labour Attendance & Tracking System)
-- Client: KPC Infrastructure
-- Version, tester name, environment, date columns
-- Legend (Pass / Fail / Blocked / N/A), severity scale
-- Role abbreviations (ADM, SUP, MGR, PC, PM)
+The uploaded `kpc-logo_1.png` is a **white wordmark with an amber triangle accent** on a transparent background — i.e. it only reads correctly on **dark** surfaces.
 
-**Sheet 2 — Test Summary Dashboard**
-- Count of test cases per module
-- Pass / Fail / Blocked counts using COUNTIF formulas against the Test Cases sheet
-- Overall pass rate %
+Strategy:
+1. Save the uploaded white logo as `src/assets/kpc-logo-white.png` — used on the navy sidebar, navy login panel, and dark-mode top bar.
+2. Auto-generate a **dark variant** for light surfaces: invert the wordmark to deep navy (`#0f1b3d`) while keeping the amber accent. Saved as `src/assets/kpc-logo-dark.png`. Used on the light-mode top bar, light backgrounds, and favicon.
+3. A small `<KpcLogo />` component picks the right variant based on the current `surface` prop (or theme mode).
+4. PWA icons (`icon-192`, `icon-512`, `apple-touch-icon`) are regenerated as the amber accent on a navy rounded-square background so the app icon is recognizable on a home screen.
 
-**Sheet 3 — Test Cases (main sheet)**
-Columns: TC ID · Module · Sub-Module · Scenario · Priority · Role · Preconditions · Test Data · Steps · Expected Result · Actual Result · Status · Severity · Tester · Date · Remarks
+If you have an SVG version of the logo or a separate "KPC" + tagline lockup, drop it in later and I'll swap — the component centralizes the switch.
 
-**Sheet 4 — Defect Log**
-Columns: Defect ID · Linked TC ID · Summary · Steps to reproduce · Severity · Priority · Status · Assigned to · Reported date · Closed date
+---
 
-**Sheet 5 — Sign-off**
-Tester, Project Coordinator, Project Manager, Admin sign-off rows with date & signature columns.
+### 1. Design tokens (src/styles.css)
 
-## Modules covered (≈80–100 detailed test cases)
+Replace the current generic blue palette with a structured enterprise token system:
 
-1. **Authentication & Session** — Login with User ID (not email), invalid credentials, password masking, case-insensitive User ID, auto-strip @domain, session persistence, logout, role-based route guards, unauthorized redirect.
-2. **Dashboard** — KPI tiles render per role, project filter respects user_projects scoping, admin sees all projects.
-3. **Masters – Projects** — Create / edit / deactivate, duplicate name validation, only admin/edit permission can mutate.
-4. **Masters – Contractors** — CRUD, KPC is principal (not selectable as contractor), uniqueness.
-5. **Masters – Departments** — CRUD, ordering, active flag.
-6. **Masters – Categories** — CRUD (skilled / semi-skilled / unskilled etc.).
-7. **Masters – Approval Config** — Toggle PC→PM 2-level approval per project, single-level fallback, save & reload.
-8. **Daily Manpower Entry (Supervisor)** — Date picker, project/contractor/department/category selection, headcount + hours + overtime, edit before approval, lock after approval, validation (no negatives, hours ≤ 24), draft save.
-9. **Individual Worker Attendance** — Name, check-in, check-out capture, totals match headcount, edit/delete.
-10. **Approvals Workflow** — PC approves → status moves to PM; PM approves → final; reject with mandatory remarks bounces back; supervisor sees rejection reason; audit trail.
-11. **Reports** — Project / contractor / department summaries, date range filter, Excel (.xlsx) export opens cleanly, totals reconcile with daily entries, non-admin scoping to assigned projects.
-12. **User Management** — Create user (login_id, password, display name), uniqueness on login_id, assign system role(s), assign projects (user_projects), edit display name, deactivate.
-13. **Custom Roles & Screen Permissions** — Create custom role, set per-screen permission (none/view/edit), edit existing role updates (no duplicate insertion), delete role, assign one custom role per user (replaces previous), permission immediately reflected in sidebar/routes.
-14. **Per-user Project Access (RLS)** — Non-admin sees only assigned projects in dropdowns, reports, approvals; admin bypass; revoking project hides data instantly.
-15. **Security / RLS** — Direct API attempt for non-permitted project returns no rows; non-admin cannot mutate masters; service-role operations only via server functions.
-16. **Mobile / PWA** — Install via QR, mobile tab bar navigation, daily entry works on small viewport, offline behavior (graceful error).
-17. **Cross-cutting** — Toast notifications on success/failure, loading states, empty states, form validation messages, browser back/forward preserves filters.
+- **Base palette (default — Navy Trust)**
+  - Deep navy `#0f1b3d` → sidebar / primary surfaces
+  - Mid navy `#1e3a5f` → primary brand
+  - Steel blue `#3b6fa0` → interactive accents
+  - Cool white `#e8edf3` → background tint, dividers
+  - Amber `#e8a83a` → preserved as a secondary accent so the logo's amber arrow ties into the UI (used for highlights, badges, focus glows)
+- Add semantic tokens: `--surface`, `--surface-elevated`, `--brand`, `--brand-foreground`, `--accent`, `--success`, `--warning`, `--danger`, `--info`, `--ring`, plus `--shadow-elevation-{1,2,3}` and `--gradient-brand`.
+- Both light and dark variants for every token (dark mode = navy-tinted graphite, not pure black).
 
-## Format & quality
+### 2. Multi-theme system
 
-- Arial 10pt, header row bold with light grey fill, frozen header row, auto-filter enabled on Test Cases sheet.
-- Status column uses data validation dropdown: Pass / Fail / Blocked / Not Run / N/A.
-- Priority dropdown: P1 / P2 / P3.
-- Conditional formatting on Status: green=Pass, red=Fail, amber=Blocked.
-- Column widths tuned for readability; wrap text on Steps and Expected Result.
-- Summary sheet uses COUNTIF formulas (no hardcoded counts) — recalculated via LibreOffice before delivery.
+Add 4 switchable themes, each with light + dark variants, scoped via `data-theme` attribute on `<html>`:
 
-## Deliverable
+| Theme | Use |
+|---|---|
+| `navy-trust` (default) | Enterprise / finance feel |
+| `emerald-prestige` | Premium green + gold |
+| `industrial-amber` | Slate + amber (closest tie to logo arrow) |
+| `ocean-deep` | Modern infra/SaaS |
 
-A single file: `DLAX_UAT_Scenarios.xlsx`, presented via `<presentation-artifact>` tag. Workbook will be QA'd by opening with openpyxl after recalculation to confirm zero formula errors and that all sheets render.
+Implementation:
+- New `src/hooks/use-theme.tsx` — `ThemeProvider` storing `{theme, mode}` in `localStorage` + applying `data-theme` and `class="dark"` on `<html>`.
+- New `src/components/ThemeSwitcher.tsx` — compact header control: theme dropdown (color swatches) + light/dark toggle.
+- Wrap app in `ThemeProvider` inside `src/routes/__root.tsx`.
+
+### 3. Header (quick-switch location)
+
+Promote the existing `<SidebarTrigger>` strip in `AppLayout.tsx` into a proper enterprise top bar:
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ ☰  [KPC] DLAX  ·  breadcrumb           🎨 ☀/🌙  👤 Name ▾  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- Sticky top bar, hairline border, surface-elevated.
+- Breadcrumb derived from current route.
+- Right cluster: ThemeSwitcher, Light/Dark toggle, user menu (name, role, sign out).
+- Logo variant on top bar follows light/dark mode.
+
+### 4. Sidebar polish (`AppSidebar.tsx`)
+
+- KPC white logo + "DLAX" wordmark + tagline at top on the navy sidebar (replace current icon).
+- Tighter section labels (uppercase, tracked, muted).
+- Active-item: amber left rail accent + subtle gradient background using `--brand` — visually ties to the logo's amber arrow.
+- User block at bottom with avatar initials, name, role badge.
+- Improved spacing & icon sizing for enterprise density.
+
+### 5. Login page refresh (`routes/login.tsx`)
+
+- Left panel: deep navy gradient + the white KPC logo prominent, DLAX wordmark beneath, three feature pills, QR install card restyled with new tokens.
+- Right panel: card with refined typography, theme-tokenized inputs, focus rings using `--ring` (amber glow on focus for brand continuity).
+- Remove hardcoded amber/slate Tailwind classes — switch to semantic tokens so the login auto-themes too.
+
+### 6. Dashboard cards & tables (full enterprise polish)
+
+- KPI cards: replace `stat-tint-*` utilities with a unified `<StatCard>` component — icon chip (brand-tinted), label, value, delta, sparkline slot. Subtle elevation, brand left-rail accent.
+- Tables: hairline borders, sticky header, condensed row height option, right-aligned numeric columns, status pills using semantic tokens (success/warning/danger).
+- Page headers: title + subtitle + actions cluster, consistent across all routes.
+
+### 7. Typography
+
+- Keep Inter (already loaded) but expand the scale: `text-display`, `text-h1..h4`, `text-body`, `text-caption`, `text-overline` as utility classes with proper tracking and weight pairings (enterprise = tighter tracking on display, regular on body).
+
+### 8. Asset integration
+
+- `src/assets/kpc-logo-white.png` (uploaded) — for dark surfaces
+- `src/assets/kpc-logo-dark.png` (generated) — for light surfaces
+- `src/components/KpcLogo.tsx` — picks the right variant
+- Regenerate `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png`, favicon from the logo on a navy background.
+- Update `manifest.webmanifest` `theme_color` to `#0f1b3d` and `__root.tsx` `theme-color` meta.
+
+---
+
+### Files touched / created
+
+**Created**
+- `src/hooks/use-theme.tsx`
+- `src/components/ThemeSwitcher.tsx`
+- `src/components/TopBar.tsx`
+- `src/components/StatCard.tsx`
+- `src/components/KpcLogo.tsx`
+- `src/assets/kpc-logo-white.png`, `src/assets/kpc-logo-dark.png`
+
+**Edited**
+- `src/styles.css` — new token system + 4 theme blocks + dark variants
+- `src/routes/__root.tsx` — ThemeProvider, updated theme-color meta
+- `src/components/AppLayout.tsx` — mount TopBar
+- `src/components/AppSidebar.tsx` — logo, polish, user block
+- `src/routes/login.tsx` — token-driven styling, white logo on navy panel
+- `src/routes/index.tsx` — dashboard StatCards
+- `src/routes/reports.tsx`, `daily-entry.tsx`, `approvals.tsx`, `users.tsx`, `masters.*.tsx` — adopt page header pattern + table styling tokens
+- `public/manifest.webmanifest` — theme color
+- `public/icon-*.png`, `apple-touch-icon.png` — regenerated from logo on navy
+
+### Out of scope
+
+- No backend, RLS, schema, or business-logic changes.
+- No new features — purely visual + theming infrastructure.

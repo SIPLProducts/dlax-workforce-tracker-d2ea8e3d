@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { HardHat, Eye, EyeOff, Users, Building2, ShieldCheck, BarChart3, Loader2, Smartphone, User } from "lucide-react";
+import { Eye, EyeOff, Users, Building2, ShieldCheck, BarChart3, Loader2, Smartphone, User } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
+import { KpcLogo } from "@/components/KpcLogo";
 
 const INSTALL_URL = "https://dlax.siplproducts.com";
 
@@ -50,23 +51,20 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left Branding Panel */}
-      <div className="hidden lg:flex lg:w-[480px] xl:w-[540px] flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 text-white relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[480px] xl:w-[540px] flex-col justify-between bg-gradient-to-br from-[#0a1228] via-[#0f1b3d] to-[#1e3a5f] p-10 text-white relative overflow-hidden">
         {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl translate-y-1/3 -translate-x-1/3" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/8 rounded-full blur-2xl translate-y-1/3 -translate-x-1/3" />
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500 shadow-lg shadow-amber-500/30">
-              <HardHat className="h-7 w-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">DLAX</h1>
-              <p className="text-sm text-slate-400 font-medium">by KPC Infrastructure</p>
-            </div>
+          <KpcLogo variant="on-dark" className="h-10 w-auto mb-6" />
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">DLAX</h1>
+            <span className="text-sm text-slate-400 font-medium">Enterprise Edition</span>
           </div>
-          <p className="mt-6 text-lg text-slate-300 leading-relaxed max-w-sm">
-            Daily Labour Attendance & Tracking System for enterprise workforce management.
+          <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">Daily Labour Attendance &amp; Tracking</p>
+          <p className="mt-6 text-base text-slate-300 leading-relaxed max-w-sm">
+            Enterprise workforce management for KPC and partner contractor operations across all project sites.
           </p>
         </div>
 
@@ -111,11 +109,11 @@ function LoginPage() {
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-10">
         {/* Mobile header */}
         <div className="mb-8 flex flex-col items-center lg:hidden">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-500 shadow-lg shadow-amber-500/20 mb-3">
-            <HardHat className="h-8 w-8 text-white" />
+          <div className="rounded-xl bg-[#0f1b3d] px-4 py-3 mb-3 shadow-lg">
+            <KpcLogo variant="on-dark" className="h-7 w-auto" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">DLAX</h1>
-          <p className="text-sm text-muted-foreground">Daily Labour Attendance & Tracking</p>
+          <p className="text-sm text-muted-foreground">Daily Labour Attendance &amp; Tracking</p>
         </div>
 
         <Card className="w-full max-w-[420px] border-0 shadow-xl shadow-black/5 bg-card">
