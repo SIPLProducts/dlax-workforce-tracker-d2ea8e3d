@@ -13,6 +13,7 @@ import { Plus, Pencil, Trash2, Download, Upload, FileDown, Briefcase, CheckCircl
 import { toast } from "sonner";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/masters/projects")({
   component: () => <ScreenGuard screen="masters_projects"><ProjectsPage /></ScreenGuard>,
