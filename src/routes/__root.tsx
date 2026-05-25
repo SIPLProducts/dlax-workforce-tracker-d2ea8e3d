@@ -25,7 +25,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#1E2761" },
+      { name: "theme-color", content: "#0f1b3d" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "DLAX" },
@@ -72,9 +72,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   return (
-    <AuthProvider>
-      <AppRootShell />
-      <Toaster position="top-right" richColors />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRootShell />
+        <Toaster position="top-right" richColors />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
