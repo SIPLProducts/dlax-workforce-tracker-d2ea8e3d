@@ -617,7 +617,7 @@ function DailyEntryPage() {
               <h2 className="text-lg font-semibold">Saved Entries</h2>
               <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load above.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
