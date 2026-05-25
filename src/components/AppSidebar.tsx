@@ -15,6 +15,7 @@ import {
   UserCog,
   CheckCircle2,
   ShieldCheck,
+  Link2,
 } from "lucide-react";
 import {
   Sidebar,
