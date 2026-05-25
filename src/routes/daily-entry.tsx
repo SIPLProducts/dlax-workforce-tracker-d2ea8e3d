@@ -554,6 +554,16 @@ function DailyEntryPage() {
         </CardContent>
       </Card>
 
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="entry">Entry Sheet</TabsTrigger>
+          <TabsTrigger value="saved" className="gap-2">
+            Saved Entries
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-semibold">{allSheets.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="entry" className="mt-0">
       <Card>
         <CardContent className="p-0">
           <TableWithTopScroll>
