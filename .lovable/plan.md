@@ -1,16 +1,25 @@
-## Delete two users
+## What is happening
 
-Permanently remove the user accounts `pmubhelstpp` and `pmuiipevskp` from the system.
+The User ID in the screenshot is **`pmbhelstpp`** — not the two IDs removed earlier (`pmubhelstpp`, `pmuiipevskp`).
 
-### What gets deleted
-Run a migration that deletes both rows from `auth.users` by id:
-- `6289196d-02b3-4214-a103-e4c2ce273d08` (pmubhelstpp)
-- `e2550e56-40f4-4ca3-aa2c-866f17b3a7b7` (pmuiipevskp)
+I checked the backend and found `pmbhelstpp` still exists as a real active account:
 
-Because related tables (`profiles`, `user_roles`, `user_projects`, `user_custom_roles`, etc.) reference `auth.users(id)` with `ON DELETE CASCADE`, their profile rows, role assignments, project access, and custom-role assignments will be removed automatically.
+- Login ID: `pmbhelstpp`
+- Email: `pmbhelstpp@dlax.local`
+- User ID: `31c5d284-683a-4415-91df-6f68e62746c9`
 
-Historical data they authored (e.g. `daily_manpower` entries they submitted, approval history) will be retained, since those tables don't cascade-delete on the user — only their ability to log in and their permission rows go away.
+So the app is correctly blocking creation because that User ID is already present.
 
-### Notes
-- This action is irreversible.
-- No application code changes; this is a one-time data migration.
+## Plan
+
+1. Remove the active `pmbhelstpp` account from authentication.
+2. Remove related rows for that user from:
+   - `profiles`
+   - `user_roles`
+   - `user_projects`
+   - `user_custom_roles`
+3. Verify the User ID `pmbhelstpp` no longer exists, so it can be recreated from the User Management screen.
+
+## Technical details
+
+This will be a one-time backend data cleanup for user ID `31c5d284-683a-4415-91df-6f68e62746c9`. The earlier cascade fix should prevent future leftover profile rows when auth users are deleted.
