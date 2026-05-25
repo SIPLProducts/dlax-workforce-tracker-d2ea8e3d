@@ -16,6 +16,7 @@ import { format, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ScreenGuard } from "@/components/ScreenGuard";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/daily-entry")({
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
