@@ -54,6 +54,14 @@ function ProjectsPage() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_projects")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
 
