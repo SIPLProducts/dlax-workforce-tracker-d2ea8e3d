@@ -94,15 +94,17 @@ function DailyEntryPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
-  const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number } | null>(null);
+  const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number; submitted_by: string | null } | null>(null);
   const [rowCount, setRowCount] = useState(0);
   const [approvalEnabled, setApprovalEnabled] = useState(false);
   const [levels, setLevels] = useState<{ level_no: number; approver_user_id: string; label: string | null }[]>([]);
   const [approverNames, setApproverNames] = useState<Record<string, string>>({});
+  const [submitterName, setSubmitterName] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
