@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/masters/categories")({
   component: () => <ScreenGuard screen="masters_categories"><CategoriesPage /></ScreenGuard>,
@@ -24,6 +25,14 @@ function CategoriesPage() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState<{ name: string; category_group: string; display_order: number }>({ name: "", category_group: "", display_order: 0 });
   const [search, setSearch] = useState("");
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_categories")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -35,6 +44,7 @@ function CategoriesPage() {
   const resetForm = () => setForm({ name: "", category_group: "", display_order: 0 });
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     const payload = {
       name: form.name.trim(),
@@ -55,18 +65,19 @@ function CategoriesPage() {
   };
 
   const handleEdit = (d: any) => {
+    if (!requireEdit()) return;
     setEditing(d);
     setForm({ name: d.name, category_group: d.category_group || "", display_order: d.display_order || 0 });
     setOpen(true);
   };
-  const handleDelete = async (id: string) => { if (!confirm("Delete?")) return; await supabase.from("worker_categories").delete().eq("id", id); toast.success("Deleted"); load(); };
+  const handleDelete = async (id: string) => { if (!requireEdit()) return; if (!confirm("Delete?")) return; await supabase.from("worker_categories").delete().eq("id", id); toast.success("Deleted"); load(); };
   const filtered = items.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold">Worker Categories</h1><p className="text-sm text-muted-foreground">Manage worker categories. Set group (CIVIL / MEP / NMR) and order to control how they appear in the Daily Entry spreadsheet.</p></div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); resetForm(); } }}>
+        <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); resetForm(); } }}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Category</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Category</DialogTitle></DialogHeader>

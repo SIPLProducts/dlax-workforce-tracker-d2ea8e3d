@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2, Download, Upload, FileDown, Briefcase, CheckCircle2, PauseCircle, Layers, X } from "lucide-react";
 import { toast } from "sonner";
 import { ScreenGuard } from "@/components/ScreenGuard";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/masters/projects")({
   component: () => <ScreenGuard screen="masters_projects"><ProjectsPage /></ScreenGuard>,
@@ -53,6 +54,14 @@ function ProjectsPage() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_projects")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -62,6 +71,7 @@ function ProjectsPage() {
   };
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     try {
       if (editing) {
@@ -81,12 +91,14 @@ function ProjectsPage() {
   };
 
   const handleEdit = (p: any) => {
+    if (!requireEdit()) return;
     setEditing(p);
     setForm({ name: p.name, code: p.code || "", division: p.division || "", project_group: p.project_group || "", location: p.location || "", start_date: p.start_date || "", status: p.status });
     setOpen(true);
   };
 
   const handleDelete = async (id: string) => {
+    if (!requireEdit()) return;
     if (!confirm("Delete this project?")) return;
     await supabase.from("projects").delete().eq("id", id);
     toast.success("Deleted");
@@ -127,6 +139,7 @@ function ProjectsPage() {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!requireEdit()) { if (fileInputRef.current) fileInputRef.current.value = ""; return; }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -212,7 +225,7 @@ function ProjectsPage() {
           <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload</Button>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
           <Button variant="outline" size="sm" onClick={downloadProjects}><Download className="mr-2 h-4 w-4" />Download</Button>
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" }); } }}>
+          <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" }); } }}>
             <DialogTrigger asChild><Button size="sm"><Plus className="mr-2 h-4 w-4" />Add Project</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Project</DialogTitle></DialogHeader>

@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/masters/departments")({
   component: () => <ScreenGuard screen="masters_departments"><DepartmentsPage /></ScreenGuard>,
@@ -25,6 +26,14 @@ function DepartmentsPage() {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_departments")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -46,6 +55,7 @@ function DepartmentsPage() {
   };
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!name.trim()) { toast.error("Name is required"); return; }
     setSaving(true);
     try {
@@ -74,6 +84,7 @@ function DepartmentsPage() {
   };
 
   const handleEdit = (d: any) => {
+    if (!requireEdit()) return;
     setShowInlineForm(false);
     setEditing(d);
     setName(d.name);
@@ -88,6 +99,7 @@ function DepartmentsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!requireEdit()) return;
     if (!confirm("Delete this category of labour?")) return;
     await supabase.from("departments").delete().eq("id", id);
     toast.success("Deleted");
@@ -101,6 +113,7 @@ function DepartmentsPage() {
   };
 
   const startAdd = () => {
+    if (!requireEdit()) return;
     setEditing(null);
     setName("");
     setSelectedCategoryIds([]);

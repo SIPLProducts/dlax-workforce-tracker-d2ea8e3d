@@ -16,6 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { format, subDays, eachDayOfInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/masters/contractors")({
   component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
@@ -52,6 +53,14 @@ function ContractorsPage() {
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [contractorId, setContractorId] = useState("all");
   const [rows, setRows] = useState<any[]>([]);
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_contractors")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
   useEffect(() => { loadManpower(); }, [dateFrom, dateTo, contractorId]);
@@ -125,6 +134,7 @@ function ContractorsPage() {
   };
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!form.company_name.trim()) { toast.error("Company name is required"); return; }
     try {
       if (editing) {
@@ -139,8 +149,8 @@ function ContractorsPage() {
     } catch (err: any) { toast.error(err.message); }
   };
 
-  const handleEdit = (c: any) => { setEditing(c); setForm({ contractor_code: c.contractor_code || "", company_name: c.company_name, contact_person: c.contact_person || "", phone: c.phone || "", license_number: c.license_number || "", contact_number: c.contact_number || "", work_place: c.work_place || "", nature_of_work: c.nature_of_work || "" }); setOpen(true); };
-  const handleDelete = async (id: string) => { if (!confirm("Delete?")) return; await supabase.from("contractors").delete().eq("id", id); toast.success("Deleted"); load(); };
+  const handleEdit = (c: any) => { if (!requireEdit()) return; setEditing(c); setForm({ contractor_code: c.contractor_code || "", company_name: c.company_name, contact_person: c.contact_person || "", phone: c.phone || "", license_number: c.license_number || "", contact_number: c.contact_number || "", work_place: c.work_place || "", nature_of_work: c.nature_of_work || "" }); setOpen(true); };
+  const handleDelete = async (id: string) => { if (!requireEdit()) return; if (!confirm("Delete?")) return; await supabase.from("contractors").delete().eq("id", id); toast.success("Deleted"); load(); };
   const filtered = items.filter((c) => c.company_name.toLowerCase().includes(search.toLowerCase()));
 
   const CSV_COLUMNS = ["contractor_code", "company_name", "contact_person", "phone", "contact_number", "work_place", "nature_of_work", "license_number"];
@@ -191,6 +201,7 @@ function ContractorsPage() {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!requireEdit()) { e.target.value = ""; return; }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -247,7 +258,7 @@ function ContractorsPage() {
             <Upload className="mr-2 h-4 w-4" />Upload
           </Button>
           <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
+          <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
