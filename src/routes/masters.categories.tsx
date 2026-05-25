@@ -76,35 +76,38 @@ function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Worker Categories</h1><p className="text-sm text-muted-foreground">Manage worker categories. Set group (CIVIL / MEP / NMR) and order to control how they appear in the Daily Entry spreadsheet.</p></div>
-        <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); resetForm(); } }}>
-          <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Category</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Category</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Mason, Helper, Plumber" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Group</Label>
-                  <Select value={form.category_group || "none"} onValueChange={(v) => setForm({ ...form, category_group: v === "none" ? "" : v })}>
-                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {GROUPS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+      <PageHeader
+        title="Worker Categories"
+        subtitle="Manage worker categories. Set group (CIVIL / MEP / NMR) and order to control how they appear in the Daily Entry spreadsheet."
+        actions={
+          <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); resetForm(); } }}>
+            <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Category</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Category</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Mason, Helper, Plumber" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Group</Label>
+                    <Select value={form.category_group || "none"} onValueChange={(v) => setForm({ ...form, category_group: v === "none" ? "" : v })}>
+                      <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {GROUPS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Display order</Label>
+                    <Input type="number" value={form.display_order} onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} />
+                  </div>
                 </div>
-                <div>
-                  <Label>Display order</Label>
-                  <Input type="number" value={form.display_order} onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} />
-                </div>
+                <Button className="w-full" onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
               </div>
-              <Button className="w-full" onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
       <Input placeholder="Search categories..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       <Card><CardContent className="p-0">
         <Table>
