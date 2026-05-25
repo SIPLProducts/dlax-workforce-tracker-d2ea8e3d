@@ -595,8 +595,10 @@ function DailyEntryPage() {
               {contractors.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
-                    <td className="border text-center sticky left-0 bg-yellow-100 z-10" colSpan={2}>TOTAL</td>
-                    <td className="border" colSpan={2}></td>
+                    <td className="border text-center sticky left-0 bg-yellow-100 z-10 w-12">TOTAL</td>
+                    <td className="border sticky left-12 bg-yellow-100 z-10 w-[220px]"></td>
+                    <td className="border sticky left-[232px] bg-yellow-100 z-10 w-[120px]"></td>
+                    <td className="border sticky left-[352px] bg-yellow-100 z-10 w-[160px] border-r-2 border-r-slate-300"></td>
                     {ALL_COLS.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border text-center">{colTotals.security || ""}</td>
