@@ -44,6 +44,7 @@ const masterItems = [
   { to: "/masters/departments", label: "Departments", icon: Layers, screen: "masters_departments" },
   { to: "/masters/categories", label: "Categories", icon: Tag, screen: "masters_categories" },
   { to: "/masters/approvals", label: "Approval Settings", icon: ShieldCheck, screen: "masters_approval_config" },
+  { to: "/masters/assignments", label: "Project Assignments", icon: Link2, screen: "masters_assignments" },
 ];
 
 const reportItems = [
