@@ -381,6 +381,7 @@ function DailyEntryPage() {
 
 
   const handleSendToApproval = async () => {
+    if (!requireEdit()) return;
     if (!sheet) return toast.error("Save the sheet first");
     if (sheet.status !== "draft" && sheet.status !== "rejected") return toast.error("Sheet is already submitted");
     setSending(true);
