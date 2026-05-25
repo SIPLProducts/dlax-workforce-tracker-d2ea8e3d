@@ -44,6 +44,7 @@ function CategoriesPage() {
   const resetForm = () => setForm({ name: "", category_group: "", display_order: 0 });
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     const payload = {
       name: form.name.trim(),
