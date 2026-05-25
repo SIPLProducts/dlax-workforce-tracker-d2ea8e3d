@@ -16,6 +16,7 @@ import { format, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ScreenGuard } from "@/components/ScreenGuard";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/daily-entry")({
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
@@ -118,6 +119,16 @@ function DailyEntryPage() {
     sheetStatus === "pending" ? `Awaiting approval at Level ${sheet?.current_level} (${currentApproverName})` :
     "";
   const readOnly = mode === "view" || !canEdit;
+
+  const { canEdit: canEditPerm } = usePermissions();
+  const canEditScreen = canEditPerm("daily_entry");
+  const requireEdit = () => {
+    if (!canEditScreen) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
 
   const tryParseDate = (s: string): Date | null => {
@@ -295,6 +306,7 @@ function DailyEntryPage() {
   }, [rows, contractors]);
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!projectId) return toast.error("Select a project");
     if (!user) return toast.error("Not signed in");
     if (!canEdit) return toast.error(editLockReason || "Cannot edit");
@@ -369,6 +381,7 @@ function DailyEntryPage() {
 
 
   const handleSendToApproval = async () => {
+    if (!requireEdit()) return;
     if (!sheet) return toast.error("Save the sheet first");
     if (sheet.status !== "draft" && sheet.status !== "rejected") return toast.error("Sheet is already submitted");
     setSending(true);
@@ -439,7 +452,7 @@ function DailyEntryPage() {
             </Button>
           )}
           {canEdit ? (
-            <Button variant="outline" onClick={() => setMode("edit")} disabled={mode === "edit"}>
+            <Button variant="outline" onClick={() => { if (!requireEdit()) return; setMode("edit"); }} disabled={mode === "edit"}>
               <Pencil className="w-4 h-4 mr-2" /> Edit
             </Button>
           ) : (
@@ -604,7 +617,7 @@ function DailyEntryPage() {
               <h2 className="text-lg font-semibold">Saved Entries</h2>
               <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load above.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
@@ -638,7 +651,7 @@ function DailyEntryPage() {
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "view")}><Eye className="w-4 h-4" /></Button>
                           {editable ? (
-                            <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "edit")}><Pencil className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); }}><Pencil className="w-4 h-4" /></Button>
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild><span><Button size="sm" variant="ghost" disabled><Pencil className="w-4 h-4" /></Button></span></TooltipTrigger>
