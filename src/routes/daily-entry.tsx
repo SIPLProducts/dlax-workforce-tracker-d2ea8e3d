@@ -94,15 +94,17 @@ function DailyEntryPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
-  const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number } | null>(null);
+  const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number; submitted_by: string | null } | null>(null);
   const [rowCount, setRowCount] = useState(0);
   const [approvalEnabled, setApprovalEnabled] = useState(false);
   const [levels, setLevels] = useState<{ level_no: number; approver_user_id: string; label: string | null }[]>([]);
   const [approverNames, setApproverNames] = useState<Record<string, string>>({});
+  const [submitterName, setSubmitterName] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
@@ -170,7 +172,7 @@ function DailyEntryPage() {
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
       supabase.from("daily_manpower_sheets")
-        .select("id, sheet_code, status, current_level, total_levels")
+        .select("id, sheet_code, status, current_level, total_levels, submitted_by")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"))
         .maybeSingle(),
@@ -201,24 +203,38 @@ function DailyEntryPage() {
     });
     setRows(next);
     setRowCount(nRows);
-    setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels } : null);
+    setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels, submitted_by: sh.submitted_by ?? null } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
     const levelList = (lvs || []) as any[];
     setLevels(levelList);
 
-    // Fetch approver display names
-    const ids = Array.from(new Set(levelList.map((l) => l.approver_user_id)));
+    // Fetch approver + submitter display names
+    const ids = Array.from(new Set([
+      ...levelList.map((l) => l.approver_user_id),
+      ...(sh?.submitted_by ? [sh.submitted_by] : []),
+    ]));
     if (ids.length > 0) {
       const { data: profs } = await supabase.from("profiles").select("user_id, display_name, login_id").in("user_id", ids);
       const map: Record<string, string> = {};
       (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name || p.login_id || p.user_id.slice(0, 8); });
       setApproverNames(map);
+      setSubmitterName(sh?.submitted_by ? (map[sh.submitted_by] || "") : "");
     } else {
       setApproverNames({});
+      setSubmitterName("");
     }
 
-    if (nRows === 0) setMode("edit");
-    else setMode("view");
+    // Determine final mode: explicit Edit click wins; otherwise default by editability.
+    const sheetEditable = !sh || sh.status === "draft" || sh.status === "rejected";
+    if (pendingModeRef.current) {
+      const requested = pendingModeRef.current;
+      pendingModeRef.current = null;
+      setMode(requested === "edit" && sheetEditable ? "edit" : "view");
+    } else if (nRows === 0) {
+      setMode("edit");
+    } else {
+      setMode("view");
+    }
   };
 
   useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors]);
@@ -342,10 +358,13 @@ function DailyEntryPage() {
       const firstApprover = approverNames[levels.find((l) => l.level_no === 1)?.approver_user_id || ""] || "Level 1 approver";
       toast.success(`Sent for approval to ${firstApprover}`);
     }
+    setMode("view");
+    pendingModeRef.current = "view";
     await loadEntries(); await loadAllSheets();
   };
 
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
+    pendingModeRef.current = asMode;
     setProjectId(s.project_id);
     const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
     if (isValid(d)) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
@@ -467,6 +486,7 @@ function DailyEntryPage() {
               {sheet?.status === "pending" && ` — Level ${sheet.current_level}/${sheet.total_levels}${currentApproverName ? ` (${currentApproverName})` : ""}`}
             </Badge>
             {mode === "edit" && <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300">Editing</Badge>}
+            <div className="text-sm w-full"><span className="text-muted-foreground">Submitted By:</span> <span className="font-medium">{submitterName || "—"}</span></div>
           </div>
         </CardContent>
       </Card>
