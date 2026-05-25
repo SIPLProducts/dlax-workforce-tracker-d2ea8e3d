@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar />
         <main className="flex-1 overflow-auto">
           <TopBar />
