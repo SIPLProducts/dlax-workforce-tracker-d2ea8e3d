@@ -91,12 +91,14 @@ function ProjectsPage() {
   };
 
   const handleEdit = (p: any) => {
+    if (!requireEdit()) return;
     setEditing(p);
     setForm({ name: p.name, code: p.code || "", division: p.division || "", project_group: p.project_group || "", location: p.location || "", start_date: p.start_date || "", status: p.status });
     setOpen(true);
   };
 
   const handleDelete = async (id: string) => {
+    if (!requireEdit()) return;
     if (!confirm("Delete this project?")) return;
     await supabase.from("projects").delete().eq("id", id);
     toast.success("Deleted");
