@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CalendarIcon, Save, Eye, Pencil, Send, Plus } from "lucide-react";
 import { format, parse as parseDate, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,7 @@ function DailyEntryPage() {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
+  const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
   const isEmpty = sheetStatus === "empty";
@@ -552,16 +554,26 @@ function DailyEntryPage() {
         </CardContent>
       </Card>
 
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="entry">Entry Sheet</TabsTrigger>
+          <TabsTrigger value="saved" className="gap-2">
+            Saved Entries
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-semibold">{allSheets.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="entry" className="mt-0">
       <Card>
         <CardContent className="p-0">
           <TableWithTopScroll>
             <table className="border-collapse text-xs w-full min-w-[1600px]">
               <thead>
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-20 w-12">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-20 w-[220px] text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[232px] z-20 w-[120px]">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[352px] z-20 w-[160px] border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 w-12">Sl.no</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-30 w-[220px] text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 w-[120px]">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 w-[160px] border-r-2 border-r-slate-300">Work Place</th>
                   {GROUPS.map((g) => (
                     <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.label}</th>
                   ))}
@@ -584,10 +596,10 @@ function DailyEntryPage() {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
-                      <td className="border text-center sticky left-0 bg-background z-10 w-12">{idx + 1}</td>
-                      <td className="border px-2 sticky left-12 bg-background z-10 w-[220px] font-medium">{c.company_name}</td>
-                      <td className="border px-2 text-center sticky left-[232px] bg-background z-10 w-[120px]">{c.contact_number || ""}</td>
-                      <td className="border px-2 sticky left-[352px] bg-background z-10 w-[160px] border-r-2 border-r-slate-300">{c.work_place || ""}</td>
+                      <td className="border text-center sticky left-0 bg-background z-20 w-12">{idx + 1}</td>
+                      <td className="border px-2 sticky left-12 bg-background z-20 w-[220px] font-medium">{c.company_name}</td>
+                      <td className="border px-2 text-center sticky left-[268px] bg-background z-20 w-[120px]">{c.contact_number || ""}</td>
+                      <td className="border px-2 sticky left-[388px] bg-background z-20 w-[160px] border-r-2 border-r-slate-300">{c.work_place || ""}</td>
                       {GROUPS.map((g) => g.cols.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
                           {numCell((r as any)[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
@@ -618,10 +630,10 @@ function DailyEntryPage() {
               {contractors.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
-                    <td className="border text-center sticky left-0 bg-yellow-100 z-10 w-12">TOTAL</td>
-                    <td className="border sticky left-12 bg-yellow-100 z-10 w-[220px]"></td>
-                    <td className="border sticky left-[232px] bg-yellow-100 z-10 w-[120px]"></td>
-                    <td className="border sticky left-[352px] bg-yellow-100 z-10 w-[160px] border-r-2 border-r-slate-300"></td>
+                    <td className="border text-center sticky left-0 bg-yellow-100 z-20 w-12">TOTAL</td>
+                    <td className="border sticky left-12 bg-yellow-100 z-20 w-[220px]"></td>
+                    <td className="border sticky left-[268px] bg-yellow-100 z-20 w-[120px]"></td>
+                    <td className="border sticky left-[388px] bg-yellow-100 z-20 w-[160px] border-r-2 border-r-slate-300"></td>
                     {ALL_COLS.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border text-center">{colTotals.security || ""}</td>
@@ -635,15 +647,17 @@ function DailyEntryPage() {
           </TableWithTopScroll>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="saved" className="mt-0">
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-lg font-semibold">Saved Entries</h2>
-              <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load above.</p>
+              <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load in the Entry Sheet tab.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); setActiveTab("entry"); }}>
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
@@ -675,9 +689,9 @@ function DailyEntryPage() {
                       <TableCell><Badge variant="outline" className={m.cls}>{m.label}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "view")}><Eye className="w-4 h-4" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => { loadSheetIntoEditor(s, "view"); setActiveTab("entry"); }}><Eye className="w-4 h-4" /></Button>
                           {editable ? (
-                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); }}><Pencil className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); setActiveTab("entry"); }}><Pencil className="w-4 h-4" /></Button>
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild><span><Button size="sm" variant="ghost" disabled><Pencil className="w-4 h-4" /></Button></span></TooltipTrigger>
@@ -699,6 +713,8 @@ function DailyEntryPage() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
     </TooltipProvider>
   );
