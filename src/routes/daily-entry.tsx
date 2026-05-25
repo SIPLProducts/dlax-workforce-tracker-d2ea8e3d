@@ -172,7 +172,7 @@ function DailyEntryPage() {
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
       supabase.from("daily_manpower_sheets")
-        .select("id, sheet_code, status, current_level, total_levels")
+        .select("id, sheet_code, status, current_level, total_levels, submitted_by")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"))
         .maybeSingle(),
@@ -203,24 +203,38 @@ function DailyEntryPage() {
     });
     setRows(next);
     setRowCount(nRows);
-    setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels } : null);
+    setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels, submitted_by: sh.submitted_by ?? null } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
     const levelList = (lvs || []) as any[];
     setLevels(levelList);
 
-    // Fetch approver display names
-    const ids = Array.from(new Set(levelList.map((l) => l.approver_user_id)));
+    // Fetch approver + submitter display names
+    const ids = Array.from(new Set([
+      ...levelList.map((l) => l.approver_user_id),
+      ...(sh?.submitted_by ? [sh.submitted_by] : []),
+    ]));
     if (ids.length > 0) {
       const { data: profs } = await supabase.from("profiles").select("user_id, display_name, login_id").in("user_id", ids);
       const map: Record<string, string> = {};
       (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name || p.login_id || p.user_id.slice(0, 8); });
       setApproverNames(map);
+      setSubmitterName(sh?.submitted_by ? (map[sh.submitted_by] || "") : "");
     } else {
       setApproverNames({});
+      setSubmitterName("");
     }
 
-    if (nRows === 0) setMode("edit");
-    else setMode("view");
+    // Determine final mode: explicit Edit click wins; otherwise default by editability.
+    const sheetEditable = !sh || sh.status === "draft" || sh.status === "rejected";
+    if (pendingModeRef.current) {
+      const requested = pendingModeRef.current;
+      pendingModeRef.current = null;
+      setMode(requested === "edit" && sheetEditable ? "edit" : "view");
+    } else if (nRows === 0) {
+      setMode("edit");
+    } else {
+      setMode("view");
+    }
   };
 
   useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors]);
