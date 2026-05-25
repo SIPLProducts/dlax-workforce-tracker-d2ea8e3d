@@ -109,7 +109,7 @@ function LoginPage() {
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-10">
         {/* Mobile header */}
         <div className="mb-8 flex flex-col items-center lg:hidden">
-          <div className="rounded-xl bg-[#0f1b3d] px-4 py-3 mb-3 shadow-lg">
+          <div className="rounded-xl bg-[#194170] px-4 py-3 mb-3 shadow-lg">
             <KpcLogo variant="on-dark" className="h-7 w-auto" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">DLAX</h1>
