@@ -25,6 +25,14 @@ function CategoriesPage() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState<{ name: string; category_group: string; display_order: number }>({ name: "", category_group: "", display_order: 0 });
   const [search, setSearch] = useState("");
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_categories")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
 
