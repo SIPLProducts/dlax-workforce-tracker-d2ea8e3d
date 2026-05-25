@@ -568,12 +568,18 @@ function DailyEntryPage() {
         <CardContent className="p-0">
           <TableWithTopScroll>
             <table className="border-collapse text-xs w-full min-w-[1600px]">
+              <colgroup>
+                <col style={{ width: 48 }} />
+                <col style={{ width: 220 }} />
+                <col style={{ width: 120 }} />
+                <col style={{ width: 160 }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 w-12">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-30 w-[220px] text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 w-[120px]">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 w-[160px] border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 box-border">Sl.no</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] z-30 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 box-border">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {GROUPS.map((g) => (
                     <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.label}</th>
                   ))}
