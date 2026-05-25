@@ -270,9 +270,9 @@ function DailyEntryPage() {
 
 
   const updateCell = (cid: string, key: string, val: number) =>
-    setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
+    setRows((prev) => ({ ...prev, [cid]: { ...emptyRow(), ...(prev[cid] || {}), [key]: val } as RowData }));
   const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) =>
-    setRows((prev) => ({ ...prev, [cid]: { ...prev[cid], [key]: val } as RowData }));
+    setRows((prev) => ({ ...prev, [cid]: { ...emptyRow(), ...(prev[cid] || {}), [key]: val } as RowData }));
 
   const rowTotal = (r: RowData) => ALL_COLS.reduce((s, c) => s + (Number((r as any)[c.key]) || 0), 0);
 
