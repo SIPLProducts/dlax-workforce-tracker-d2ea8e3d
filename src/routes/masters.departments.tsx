@@ -184,15 +184,15 @@ function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Category of Labour</h1>
-          <p className="text-sm text-muted-foreground">Manage categories of labour and their worker sub-categories</p>
-        </div>
-        <Button onClick={startAdd} disabled={!!isFormVisible}>
-          <Plus className="mr-2 h-4 w-4" />Add Category of Labour
-        </Button>
-      </div>
+      <PageHeader
+        title="Category of Labour"
+        subtitle="Manage categories of labour and their worker sub-categories"
+        actions={
+          <Button onClick={startAdd} disabled={!!isFormVisible}>
+            <Plus className="mr-2 h-4 w-4" />Add Category of Labour
+          </Button>
+        }
+      />
 
       <Input placeholder="Search categories of labour..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
 
