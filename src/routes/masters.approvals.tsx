@@ -471,26 +471,24 @@ function Page() {
   );
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-6 h-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold">Project Approval Settings</h1>
-            <p className="text-sm text-muted-foreground">Configure multi-level sequential approval per project</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {dirtyCount > 0 && (
-            <Badge variant="outline" className="border-amber-400 text-amber-700 self-center">
-              {dirtyCount} unsaved
-            </Badge>
-          )}
-          <Button onClick={openAddProject}>
-            <Plus className="w-4 h-4 mr-2" /> Add Project
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Project Approval Settings"
+        subtitle="Configure multi-level sequential approval per project"
+        icon={<ShieldCheck className="w-6 h-6 text-primary" />}
+        actions={
+          <>
+            {dirtyCount > 0 && (
+              <Badge variant="outline" className="border-amber-400 text-amber-700 self-center">
+                {dirtyCount} unsaved
+              </Badge>
+            )}
+            <Button onClick={openAddProject}>
+              <Plus className="w-4 h-4 mr-2" /> Add Project
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardContent className="p-3 flex flex-wrap gap-2 items-center">
