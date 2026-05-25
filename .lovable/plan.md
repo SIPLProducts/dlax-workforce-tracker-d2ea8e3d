@@ -1,38 +1,73 @@
+
 ## Goal
 
-On the Daily Manpower Entry sheet, freeze the left identification columns (Sl.no, Name of the Contractor, Contact No, Work Place) so they stay visible while the user scrolls horizontally through the CIVIL / MEP / NMR data columns. Today only Sl.no and Name of the Contractor are sticky — Contact No and Work Place scroll away.
+After creating a Project, allow assigning **Contractors**, **Departments**, and **Categories** to it from existing masters, or creating brand-new ones inline (saved to the global masters DB). Daily Entry will then only show items assigned to the selected project. Global masters remain available as a fallback when no assignment exists for a project.
 
-## Scope
+## Database changes (migration)
 
-Single file: `src/routes/daily-entry.tsx` — the manpower entry table only. No DB / logic changes, no other screens touched.
+Three new join tables, all with RLS:
 
-## Changes
+1. `project_contractors (id, project_id, contractor_id, created_at)` — unique on `(project_id, contractor_id)`
+2. `project_departments (id, project_id, department_id, created_at)` — unique on `(project_id, department_id)`
+3. `project_categories (id, project_id, category_id, created_at)` — unique on `(project_id, category_id)`
 
-1. Convert the 4 identification columns to sticky columns with explicit `left` offsets and fixed widths:
-   - Sl.no — `w-12`, `left-0`
-   - Name of the Contractor — `w-[220px]` (was `min-w-[200px]`), `left-12`
-   - Contact No — `w-[120px]` (was `min-w-[110px]`), `left-[232px]`
-   - Work Place — `w-[160px]` (was `min-w-[140px]`), `left-[352px]`
-   - Total frozen pane width ≈ 512px.
+**RLS policies** (per table):
+- SELECT: `has_project_access(auth.uid(), project_id) OR has_role(auth.uid(),'admin') OR has_screen_edit(auth.uid(),'masters_projects')`
+- INSERT/DELETE: admins, or users with edit on `masters_projects` (so a project editor can manage assignments)
 
-2. Apply sticky + matching `left` to:
-   - Header `<th>` cells in row 1 (with `z-20` so they stay above body)
-   - Body `<td>` cells for every contractor row (with `z-10` and solid `bg-background` so scrolling data underneath doesn't bleed through)
-   - Footer TOTAL row cells covering the same 4 columns (solid `bg-yellow-100`)
+**Helper function**:
+- `project_has_assignments(_project_id uuid, _kind text) returns boolean` — used by the UI/Daily Entry to know whether to filter or fall back to global pool.
 
-3. Keep the existing vertical sticky header (row 1 + row 2 of `<thead>`) intact. The page-level `PageHeader` and the synced top scrollbar above the table are already sticky and stay as-is.
+No changes to existing `contractors`, `departments`, `worker_categories` tables.
 
-4. Make sure right-side borders on the last frozen column (`Work Place`) render above scrolling cells so the freeze edge is visually clear (use `border-r-2 border-slate-300` on the 4th sticky column only).
+## UI changes
 
-## Technical notes
+### 1. Project edit dialog (`src/routes/masters.projects.tsx`)
+Convert the dialog into tabs:
+- **Details** (existing fields)
+- **Contractors** — multi-select picker over global `contractors`. "+ Add new" inline form (gated by `canEdit('masters_contractors')`) that inserts into `contractors` + auto-assigns.
+- **Departments** — same pattern (gated by `canEdit('masters_departments')`)
+- **Categories** — same pattern (gated by `canEdit('masters_categories')`)
 
-- Sticky offsets must be exact pixel values (Tailwind arbitrary classes like `left-[232px]`) because the columns are fixed widths; percentage-based widths won't align header vs body.
-- Body cells need an opaque background (`bg-background`) or the columns behind them will show through during horizontal scroll.
-- The footer TOTAL row currently uses `colSpan={2}` for the first two cells and an empty `colSpan={2}` for Contact No + Work Place. Split these into 4 individual cells so each can carry its own sticky offset.
-- No new dependencies, no schema changes, no route changes.
+Assignment tabs only become enabled after the project is saved (need a project id). For new project flow: save Details first, then tabs unlock.
+
+### 2. New dedicated screen `Masters → Project Assignments`
+- New route: `src/routes/masters.assignments.tsx`
+- New screen key: `masters_assignments` (added to `src/lib/screens.ts` + default permissions for admin in `use-permissions.tsx`)
+- UI: Project picker on top, then 3 sections (Contractors / Departments / Categories), each showing assigned items with add/remove + inline-create (same permission gating as above).
+- Sidebar entry added in `AppSidebar.tsx` under Masters.
+
+### 3. Daily Entry filtering (`src/routes/daily-entry.tsx`)
+When a project is selected, fetch its assignments:
+- If `project_contractors` has rows for project → show only those contractors; else fall back to all `contractors` (global fallback).
+- Same logic for departments and categories.
+This preserves backward compatibility with existing projects that have no assignments yet.
+
+## Permission gating summary
+
+| Action | Permission required |
+|---|---|
+| View assignments | Project access (or admin / project editor) |
+| Add/remove an assignment | `masters_projects` edit (or admin) |
+| Inline-create a new contractor | `masters_contractors` edit (or admin) |
+| Inline-create a new department | `masters_departments` edit (or admin) |
+| Inline-create a new category | `masters_categories` edit (or admin) |
+
+If a user lacks the inline-create permission, the "+ Add new" button is hidden — they can still assign from the existing pool.
 
 ## Out of scope
 
-- Other tables (Saved Entries, Reports, Approvals).
-- Vertical row freezing.
-- Resizable columns.
+- No bulk import for assignments (use existing master Upload, then assign).
+- No change to approval workflow, reports, or auth.
+- Existing daily_manpower rows referencing now-unassigned masters remain visible in reports (historical data is preserved).
+
+## Files touched
+
+- `supabase/migrations/<new>.sql` — 3 join tables + RLS + helper function
+- `src/lib/screens.ts` — add `masters_assignments`
+- `src/hooks/use-permissions.tsx` — admin baseline for new screen
+- `src/components/AppSidebar.tsx` — nav entry
+- `src/routes/masters.projects.tsx` — tabbed dialog with assignment tabs
+- `src/routes/masters.assignments.tsx` — NEW dedicated screen
+- `src/routes/daily-entry.tsx` — filter dropdowns by project assignments with global fallback
+- `mem://features/project-master-assignments` — new memory doc + index update

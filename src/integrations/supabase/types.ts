@@ -403,6 +403,69 @@ export type Database = {
           },
         ]
       }
+      project_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: []
+      }
+      project_contractors: {
+        Row: {
+          contractor_id: string
+          created_at: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          contractor_id: string
+          created_at?: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          contractor_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: []
+      }
+      project_departments: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           code: string | null

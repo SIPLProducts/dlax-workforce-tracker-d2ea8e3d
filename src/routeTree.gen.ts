@@ -19,6 +19,7 @@ import { Route as MastersProjectsRouteImport } from './routes/masters.projects'
 import { Route as MastersDepartmentsRouteImport } from './routes/masters.departments'
 import { Route as MastersContractorsRouteImport } from './routes/masters.contractors'
 import { Route as MastersCategoriesRouteImport } from './routes/masters.categories'
+import { Route as MastersAssignmentsRouteImport } from './routes/masters.assignments'
 import { Route as MastersApprovalsRouteImport } from './routes/masters.approvals'
 
 const UsersRoute = UsersRouteImport.update({
@@ -71,6 +72,11 @@ const MastersCategoriesRoute = MastersCategoriesRouteImport.update({
   path: '/masters/categories',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MastersAssignmentsRoute = MastersAssignmentsRouteImport.update({
+  id: '/masters/assignments',
+  path: '/masters/assignments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MastersApprovalsRoute = MastersApprovalsRouteImport.update({
   id: '/masters/approvals',
   path: '/masters/approvals',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
+  '/masters/assignments': typeof MastersAssignmentsRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
+  '/masters/assignments': typeof MastersAssignmentsRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
+  '/masters/assignments': typeof MastersAssignmentsRoute
   '/masters/categories': typeof MastersCategoriesRoute
   '/masters/contractors': typeof MastersContractorsRoute
   '/masters/departments': typeof MastersDepartmentsRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/users'
     | '/masters/approvals'
+    | '/masters/assignments'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/users'
     | '/masters/approvals'
+    | '/masters/assignments'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/users'
     | '/masters/approvals'
+    | '/masters/assignments'
     | '/masters/categories'
     | '/masters/contractors'
     | '/masters/departments'
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   UsersRoute: typeof UsersRoute
   MastersApprovalsRoute: typeof MastersApprovalsRoute
+  MastersAssignmentsRoute: typeof MastersAssignmentsRoute
   MastersCategoriesRoute: typeof MastersCategoriesRoute
   MastersContractorsRoute: typeof MastersContractorsRoute
   MastersDepartmentsRoute: typeof MastersDepartmentsRoute
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MastersCategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/masters/assignments': {
+      id: '/masters/assignments'
+      path: '/masters/assignments'
+      fullPath: '/masters/assignments'
+      preLoaderRoute: typeof MastersAssignmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/masters/approvals': {
       id: '/masters/approvals'
       path: '/masters/approvals'
@@ -263,6 +283,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   UsersRoute: UsersRoute,
   MastersApprovalsRoute: MastersApprovalsRoute,
+  MastersAssignmentsRoute: MastersAssignmentsRoute,
   MastersCategoriesRoute: MastersCategoriesRoute,
   MastersContractorsRoute: MastersContractorsRoute,
   MastersDepartmentsRoute: MastersDepartmentsRoute,

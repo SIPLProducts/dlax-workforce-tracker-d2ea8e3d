@@ -10,6 +10,7 @@ const SYSTEM_BASELINE: Record<string, Partial<Record<ScreenKey, PermissionLevel>
     masters_projects: "edit", masters_contractors: "edit",
     masters_departments: "edit", masters_categories: "edit",
     masters_approval_config: "edit",
+    masters_assignments: "edit",
     user_management: "edit",
   },
   supervisor: {
