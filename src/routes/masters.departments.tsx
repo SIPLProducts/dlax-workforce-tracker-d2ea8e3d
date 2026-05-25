@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/masters/departments")({
   component: () => <ScreenGuard screen="masters_departments"><DepartmentsPage /></ScreenGuard>,
