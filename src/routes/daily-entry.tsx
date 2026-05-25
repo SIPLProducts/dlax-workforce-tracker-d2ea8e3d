@@ -585,10 +585,10 @@ function DailyEntryPage() {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
-                      <td className="border text-center sticky left-0 bg-background z-10 w-12">{idx + 1}</td>
-                      <td className="border px-2 sticky left-12 bg-background z-10 w-[220px] font-medium">{c.company_name}</td>
-                      <td className="border px-2 text-center sticky left-[232px] bg-background z-10 w-[120px]">{c.contact_number || ""}</td>
-                      <td className="border px-2 sticky left-[352px] bg-background z-10 w-[160px] border-r-2 border-r-slate-300">{c.work_place || ""}</td>
+                      <td className="border text-center sticky left-0 bg-background z-20 w-12">{idx + 1}</td>
+                      <td className="border px-2 sticky left-12 bg-background z-20 w-[220px] font-medium">{c.company_name}</td>
+                      <td className="border px-2 text-center sticky left-[268px] bg-background z-20 w-[120px]">{c.contact_number || ""}</td>
+                      <td className="border px-2 sticky left-[388px] bg-background z-20 w-[160px] border-r-2 border-r-slate-300">{c.work_place || ""}</td>
                       {GROUPS.map((g) => g.cols.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
                           {numCell((r as any)[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
