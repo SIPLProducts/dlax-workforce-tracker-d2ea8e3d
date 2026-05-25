@@ -310,16 +310,17 @@ function DailyEntryPage() {
       return toast.error("Add at least one Department and Category in Masters first");
     }
 
-    await supabase.from("daily_manpower").delete().eq("project_id", projectId).eq("entry_date", entry_date);
-
-    const inserts = contractors.map((c) => {
-      const r = rows[c.id]; if (!r) return null;
+    const inserts: any[] = [];
+    const keptContractorIds = new Set<string>();
+    contractors.forEach((c) => {
+      const r = rows[c.id]; if (!r) return;
       const total = rowTotal(r);
       const hasAny = total > 0 || r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim());
-      if (!hasAny) return null;
+      if (!hasAny) return;
       const payload: any = { _remarks: r.remarks || "" };
       ALL_COLS.forEach((col) => (payload[col.key] = Number((r as any)[col.key]) || 0));
-      return {
+      keptContractorIds.add(c.id);
+      inserts.push({
         project_id: projectId,
         entry_date,
         contractor_id: c.id,
@@ -331,8 +332,23 @@ function DailyEntryPage() {
         remarks: JSON.stringify(payload),
         created_by: user.id,
         submitted_by: user.id,
-      };
-    }).filter(Boolean);
+      });
+    });
+
+    // Delete rows the user cleared from the sheet (only editable statuses are allowed by RLS)
+    let delQuery = supabase
+      .from("daily_manpower")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("entry_date", entry_date);
+    if (keptContractorIds.size > 0) {
+      delQuery = delQuery.not("contractor_id", "in", `(${Array.from(keptContractorIds).join(",")})`);
+    }
+    const { error: delErr } = await delQuery;
+    if (delErr) {
+      setSaving(false);
+      return toast.error(delErr.message);
+    }
 
     if (inserts.length === 0) {
       setSaving(false);
@@ -341,13 +357,16 @@ function DailyEntryPage() {
       return;
     }
 
-    const { error } = await supabase.from("daily_manpower").insert(inserts as any);
+    const { error } = await supabase
+      .from("daily_manpower")
+      .upsert(inserts as any, { onConflict: "entry_date,project_id,contractor_id,department_id,category_id" });
     setSaving(false);
     if (error) return toast.error(error.message);
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
   };
+
 
   const handleSendToApproval = async () => {
     if (!sheet) return toast.error("Save the sheet first");
