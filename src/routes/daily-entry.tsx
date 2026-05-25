@@ -156,15 +156,27 @@ function DailyEntryPage() {
 
   useEffect(() => {
     const fetchContractors = async () => {
-      const { data } = await supabase.from("contractors").select("id,company_name,contact_number,work_place").order("company_name");
+      // Project-scoped with global fallback: if the project has assignments, use those; else use the full pool.
+      let assignedIds: string[] = [];
+      if (projectId) {
+        const { data: joins } = await supabase
+          .from("project_contractors")
+          .select("contractor_id")
+          .eq("project_id", projectId);
+        assignedIds = (joins || []).map((j: any) => j.contractor_id);
+      }
+      let query = supabase.from("contractors").select("id,company_name,contact_number,work_place").order("company_name");
+      if (assignedIds.length > 0) query = query.in("id", assignedIds);
+      const { data } = await query;
       setContractors(data || []);
     };
     fetchContractors();
     const channel = supabase.channel("contractors-daily-entry")
       .on("postgres_changes", { event: "*", schema: "public", table: "contractors" }, () => fetchContractors())
+      .on("postgres_changes", { event: "*", schema: "public", table: "project_contractors" }, () => fetchContractors())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     setRows((prev) => {
