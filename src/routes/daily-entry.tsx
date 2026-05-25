@@ -358,6 +358,8 @@ function DailyEntryPage() {
       const firstApprover = approverNames[levels.find((l) => l.level_no === 1)?.approver_user_id || ""] || "Level 1 approver";
       toast.success(`Sent for approval to ${firstApprover}`);
     }
+    setMode("view");
+    pendingModeRef.current = "view";
     await loadEntries(); await loadAllSheets();
   };
 
