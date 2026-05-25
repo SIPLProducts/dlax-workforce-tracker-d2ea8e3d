@@ -120,6 +120,16 @@ function DailyEntryPage() {
     "";
   const readOnly = mode === "view" || !canEdit;
 
+  const { canEdit: canEditPerm } = usePermissions();
+  const canEditScreen = canEditPerm("daily_entry");
+  const requireEdit = () => {
+    if (!canEditScreen) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
+
 
   const tryParseDate = (s: string): Date | null => {
     for (const f of ["dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "d/M/yyyy", "d-M-yyyy"]) {
