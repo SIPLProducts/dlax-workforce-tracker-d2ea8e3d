@@ -200,6 +200,13 @@ function UsersPage() {
     if (!selectedUser || !selectedCustomRole) return;
     setSavingRole(true);
     try {
+      // Replace any existing custom-role assignments so the user ends up with exactly one.
+      const { error: delErr } = await supabase
+        .from("user_custom_roles")
+        .delete()
+        .eq("user_id", selectedUser.user_id);
+      if (delErr) throw delErr;
+
       const { error } = await supabase.from("user_custom_roles").insert({ user_id: selectedUser.user_id, role_id: selectedCustomRole });
       if (error) throw error;
 
