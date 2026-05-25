@@ -51,10 +51,10 @@ function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left Branding Panel */}
-      <div className="hidden lg:flex lg:w-[480px] xl:w-[540px] flex-col justify-between bg-gradient-to-br from-[#0a1228] via-[#0f1b3d] to-[#1e3a5f] p-10 text-white relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[480px] xl:w-[540px] flex-col justify-between bg-gradient-to-br from-[#143866] via-[#194170] to-[#1f4d80] p-10 text-white relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/8 rounded-full blur-2xl translate-y-1/3 -translate-x-1/3" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/10 rounded-full blur-2xl translate-y-1/3 -translate-x-1/3" />
 
         <div className="relative z-10">
           <KpcLogo variant="on-dark" className="h-10 w-auto mb-6" />
