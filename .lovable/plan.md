@@ -1,17 +1,28 @@
 ## Plan
 
-1. **Fix the stale bottom total while editing**
-   - Update the Daily Entry input handling so numeric changes always create a complete row object before recalculating totals.
-   - Ensure footer totals (`TOTAL`, column totals, security, deficiency) are derived from the latest in-memory row values immediately after edits.
+### 1. Past-date entries open in disabled (view) mode
+In `src/routes/daily-entry.tsx` `loadEntries()`, the mode is currently auto-set to `"edit"` whenever the loaded sheet has zero rows. This makes a previous date with no entries instantly editable.
 
-2. **Fix saved sheet total after save**
-   - After saving an edited sheet, reload the saved entries list so **Total Headcount** reflects the newly saved database values.
-   - Make sure the editor stays consistent with the reloaded sheet data.
+Change the default-mode logic so that:
+- If `pendingModeRef.current` is set (user clicked Edit / Send-to-Approval), honor it as today.
+- Else if the selected date is **before today**, always default to `"view"` (disabled), even when there are no rows. The user must click **Edit** to unlock editing (and Edit is only enabled when the sheet status allows it: empty / draft / rejected).
+- Else (today or future) keep current behavior: empty → edit, otherwise → view.
 
-3. **Preserve edit-lock rules**
-   - Keep editing enabled only for draft/rejected sheets.
-   - Keep editing disabled after “Send to Approval”.
+Keep the existing rule that once status is `pending` or `approved`, `canEdit` is false and clicking Edit has no effect — so "after Send to Approval the entry is no longer editable" continues to work unchanged.
 
-## Likely cause
+### 2. Honor first accessible screen as landing page
+Today, `/` always renders the Dashboard regardless of permission. A user whose first accessible screen is Daily Entry still lands on the Dashboard.
 
-The displayed footer total is calculated from local `rows` state. The current edit handlers only patch the changed key onto the existing row; if a row is missing or stale during reload/edit transitions, the derived footer can continue showing old values until a full reload. I’ll make the row update path safer and ensure post-save reload refreshes both the sheet and saved list totals.
+Fix in `src/routes/index.tsx`:
+- Use `usePermissions()` inside the index component.
+- While permissions are loading, show a spinner.
+- After load: if the user has `view` on `dashboard`, render the Dashboard as today.
+- If the user does **not** have `view` on `dashboard`, redirect via `<Navigate>` to the first screen from `APP_SCREENS` (in `src/lib/screens.ts`) for which `canView(screen)` is true (e.g. `daily_entry`, then `approvals`, `reports`, masters, etc.). Fall back to `/login` if nothing is accessible.
+
+This uses the existing screen ordering in `APP_SCREENS` as the natural "first screen" priority and requires no schema change.
+
+### Technical notes
+- File touched: `src/routes/daily-entry.tsx` (mode-selection branch inside `loadEntries`).
+- File touched: `src/routes/index.tsx` (wrap `DashboardContent` with a permission-aware gate using `usePermissions` + `Navigate` + `APP_SCREENS`).
+- No DB / RLS / auth changes.
+- No change to `ScreenGuard` (still guards direct URL access to `/daily-entry`, `/approvals`, etc.).
