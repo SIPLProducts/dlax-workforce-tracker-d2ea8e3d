@@ -84,6 +84,7 @@ function DepartmentsPage() {
   };
 
   const handleEdit = (d: any) => {
+    if (!requireEdit()) return;
     setShowInlineForm(false);
     setEditing(d);
     setName(d.name);
@@ -98,6 +99,7 @@ function DepartmentsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!requireEdit()) return;
     if (!confirm("Delete this category of labour?")) return;
     await supabase.from("departments").delete().eq("id", id);
     toast.success("Deleted");
@@ -111,6 +113,7 @@ function DepartmentsPage() {
   };
 
   const startAdd = () => {
+    if (!requireEdit()) return;
     setEditing(null);
     setName("");
     setSelectedCategoryIds([]);
