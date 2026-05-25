@@ -326,10 +326,21 @@ function DailyEntryPage() {
     setSaving(true);
     const entry_date = format(date, "yyyy-MM-dd");
 
-    const { data: cats } = await supabase.from("worker_categories").select("id").limit(1);
-    const { data: deps } = await supabase.from("departments").select("id").limit(1);
-    const fallbackCat = cats?.[0]?.id;
-    const fallbackDep = deps?.[0]?.id;
+    // Prefer a department/category assigned to this project; fall back to global pool.
+    const [{ data: assignedCats }, { data: assignedDeps }] = await Promise.all([
+      supabase.from("project_categories").select("category_id").eq("project_id", projectId).limit(1),
+      supabase.from("project_departments").select("department_id").eq("project_id", projectId).limit(1),
+    ]);
+    let fallbackCat = (assignedCats?.[0] as any)?.category_id as string | undefined;
+    let fallbackDep = (assignedDeps?.[0] as any)?.department_id as string | undefined;
+    if (!fallbackCat) {
+      const { data: cats } = await supabase.from("worker_categories").select("id").limit(1);
+      fallbackCat = cats?.[0]?.id;
+    }
+    if (!fallbackDep) {
+      const { data: deps } = await supabase.from("departments").select("id").limit(1);
+      fallbackDep = deps?.[0]?.id;
+    }
     if (!fallbackCat || !fallbackDep) {
       setSaving(false);
       return toast.error("Add at least one Department and Category in Masters first");
