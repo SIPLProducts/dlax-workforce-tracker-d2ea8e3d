@@ -139,6 +139,7 @@ function ProjectsPage() {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!requireEdit()) { if (fileInputRef.current) fileInputRef.current.value = ""; return; }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
