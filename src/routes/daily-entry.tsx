@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/daily-entry")({
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
@@ -439,57 +440,57 @@ function DailyEntryPage() {
 
   return (
     <TooltipProvider>
-    <div className="p-4 space-y-4 max-w-[100vw]">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold">Daily Manpower Entry</h1>
-          <p className="text-sm text-muted-foreground">Daily Labour Attendance Register</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {!isEmpty && (
-            <Button variant="outline" onClick={() => setMode("view")} disabled={mode === "view"}>
-              <Eye className="w-4 h-4 mr-2" /> View
-            </Button>
-          )}
-          {canEdit ? (
-            <Button variant="outline" onClick={() => { if (!requireEdit()) return; setMode("edit"); }} disabled={mode === "edit"}>
-              <Pencil className="w-4 h-4 mr-2" /> Edit
-            </Button>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span><Button variant="outline" disabled><Pencil className="w-4 h-4 mr-2" /> Edit</Button></span>
-              </TooltipTrigger>
-              <TooltipContent>{editLockReason}</TooltipContent>
-            </Tooltip>
-          )}
-          {mode === "edit" && (
-            <Button onClick={handleSave} disabled={saving || !canEdit}>
-              <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save"}
-            </Button>
-          )}
-          {(() => {
-            const canSend = !isEmpty && approvalEnabled && levels.length > 0 && (sheetStatus === "draft" || sheetStatus === "rejected");
-            const reason = isEmpty ? "Save the sheet first"
-              : !approvalEnabled ? "Approval not enabled for this project"
-              : levels.length === 0 ? "No approval levels configured for this project"
-              : sheetStatus === "pending" ? "Already pending approval"
-              : sheetStatus === "approved" ? "Already approved"
-              : "";
-            const btn = (
-              <Button variant="default" onClick={handleSendToApproval} disabled={!canSend || sending}>
-                <Send className="w-4 h-4 mr-2" /> {sending ? "Sending..." : "Send to Approval"}
+    <div className="space-y-4 max-w-[100vw]">
+      <PageHeader
+        title="Daily Manpower Entry"
+        subtitle="Daily Labour Attendance Register"
+        actions={
+          <>
+            {!isEmpty && (
+              <Button variant="outline" onClick={() => setMode("view")} disabled={mode === "view"}>
+                <Eye className="w-4 h-4 mr-2" /> View
               </Button>
-            );
-            return canSend ? btn : (
+            )}
+            {canEdit ? (
+              <Button variant="outline" onClick={() => { if (!requireEdit()) return; setMode("edit"); }} disabled={mode === "edit"}>
+                <Pencil className="w-4 h-4 mr-2" /> Edit
+              </Button>
+            ) : (
               <Tooltip>
-                <TooltipTrigger asChild><span>{btn}</span></TooltipTrigger>
-                <TooltipContent>{reason}</TooltipContent>
+                <TooltipTrigger asChild>
+                  <span><Button variant="outline" disabled><Pencil className="w-4 h-4 mr-2" /> Edit</Button></span>
+                </TooltipTrigger>
+                <TooltipContent>{editLockReason}</TooltipContent>
               </Tooltip>
-            );
-          })()}
-        </div>
-      </div>
+            )}
+            {mode === "edit" && (
+              <Button onClick={handleSave} disabled={saving || !canEdit}>
+                <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save"}
+              </Button>
+            )}
+            {(() => {
+              const canSend = !isEmpty && approvalEnabled && levels.length > 0 && (sheetStatus === "draft" || sheetStatus === "rejected");
+              const reason = isEmpty ? "Save the sheet first"
+                : !approvalEnabled ? "Approval not enabled for this project"
+                : levels.length === 0 ? "No approval levels configured for this project"
+                : sheetStatus === "pending" ? "Already pending approval"
+                : sheetStatus === "approved" ? "Already approved"
+                : "";
+              const btn = (
+                <Button variant="default" onClick={handleSendToApproval} disabled={!canSend || sending}>
+                  <Send className="w-4 h-4 mr-2" /> {sending ? "Sending..." : "Send to Approval"}
+                </Button>
+              );
+              return canSend ? btn : (
+                <Tooltip>
+                  <TooltipTrigger asChild><span>{btn}</span></TooltipTrigger>
+                  <TooltipContent>{reason}</TooltipContent>
+                </Tooltip>
+              );
+            })()}
+          </>
+        }
+      />
 
       <Card>
         <CardContent className="p-4 flex flex-wrap items-end gap-3">

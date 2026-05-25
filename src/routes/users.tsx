@@ -20,6 +20,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { adminCreateUser } from "@/utils/admin-users.functions";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/users")({
   component: () => <ScreenGuard screen="user_management"><UsersPage /></ScreenGuard>,
@@ -335,15 +336,15 @@ function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">User Management</h1>
-          <p className="text-sm text-muted-foreground">Manage users, roles and screen permissions</p>
-        </div>
-        <Button onClick={() => setCreateOpen(!createOpen)}>
-          {createOpen ? <><X className="h-4 w-4 mr-2" />Close</> : <><UserPlus className="h-4 w-4 mr-2" />Add User</>}
-        </Button>
-      </div>
+      <PageHeader
+        title="User Management"
+        subtitle="Manage users, roles and screen permissions"
+        actions={
+          <Button onClick={() => setCreateOpen(!createOpen)}>
+            {createOpen ? <><X className="h-4 w-4 mr-2" />Close</> : <><UserPlus className="h-4 w-4 mr-2" />Add User</>}
+          </Button>
+        }
+      />
 
       {createOpen && (
         <Card>

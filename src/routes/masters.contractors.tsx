@@ -17,6 +17,7 @@ import { format, subDays, eachDayOfInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/masters/contractors")({
   component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
@@ -243,40 +244,43 @@ function ContractorsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold">Contractors</h1><p className="text-sm text-muted-foreground">Manage contractors and view workforce overview</p></div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleDownloadTemplate}><FileDown className="mr-2 h-4 w-4" />Template</Button>
-          <input
-            id="contractors-csv-upload"
-            type="file"
-            accept=".csv,text/csv,application/vnd.ms-excel"
-            className="hidden"
-            onChange={handleUpload}
-          />
-          <Button variant="outline" onClick={() => document.getElementById("contractors-csv-upload")?.click()}>
-            <Upload className="mr-2 h-4 w-4" />Upload
-          </Button>
-          <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
-          <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
-          <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div><Label>Contractor Code</Label><Input value={form.contractor_code} onChange={(e) => setForm({ ...form, contractor_code: e.target.value })} placeholder="e.g. C-001" /></div>
-              <div><Label>Company Name *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
-              <div><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
-              <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div><Label>Contact Number</Label><Input value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value })} placeholder="Mobile number" /></div>
-              <div><Label>Work Place / Location</Label><Input value={form.work_place} onChange={(e) => setForm({ ...form, work_place: e.target.value })} placeholder="e.g. Block E1, F1" /></div>
-              <div><Label>Nature of Work</Label><Input value={form.nature_of_work} onChange={(e) => setForm({ ...form, nature_of_work: e.target.value })} placeholder="e.g. Civil, Electrical, Plumbing" /></div>
-              <div><Label>License Number</Label><Input value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} /></div>
-              <Button className="w-full" onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        </div>
-      </div>
+      <PageHeader
+        title="Contractors"
+        subtitle="Manage contractors and view workforce overview"
+        actions={
+          <>
+            <Button variant="outline" onClick={handleDownloadTemplate}><FileDown className="mr-2 h-4 w-4" />Template</Button>
+            <input
+              id="contractors-csv-upload"
+              type="file"
+              accept=".csv,text/csv,application/vnd.ms-excel"
+              className="hidden"
+              onChange={handleUpload}
+            />
+            <Button variant="outline" onClick={() => document.getElementById("contractors-csv-upload")?.click()}>
+              <Upload className="mr-2 h-4 w-4" />Upload
+            </Button>
+            <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
+              <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <div><Label>Contractor Code</Label><Input value={form.contractor_code} onChange={(e) => setForm({ ...form, contractor_code: e.target.value })} placeholder="e.g. C-001" /></div>
+                  <div><Label>Company Name *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
+                  <div><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+                  <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+                  <div><Label>Contact Number</Label><Input value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value })} placeholder="Mobile number" /></div>
+                  <div><Label>Work Place / Location</Label><Input value={form.work_place} onChange={(e) => setForm({ ...form, work_place: e.target.value })} placeholder="e.g. Block E1, F1" /></div>
+                  <div><Label>Nature of Work</Label><Input value={form.nature_of_work} onChange={(e) => setForm({ ...form, nature_of_work: e.target.value })} placeholder="e.g. Civil, Electrical, Plumbing" /></div>
+                  <div><Label>License Number</Label><Input value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} /></div>
+                  <Button className="w-full" onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
 
       {/* Dashboard Filters */}
       <Card>

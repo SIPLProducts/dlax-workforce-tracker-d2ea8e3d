@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, XCircle, Loader2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/approvals")({
   component: () => <ScreenGuard screen="approvals"><Page /></ScreenGuard>,
@@ -164,11 +165,12 @@ function Page() {
   );
 
   return (
-    <div className="p-4 space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Approvals</h1>
-        <p className="text-sm text-muted-foreground">Multi-level sequential approval — you only see sheets at your assigned level.</p>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Approvals"
+        subtitle="Multi-level sequential approval — you only see sheets at your assigned level."
+      />
+
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
