@@ -1,0 +1,1 @@
+CREATE POLICY "Authed view profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
