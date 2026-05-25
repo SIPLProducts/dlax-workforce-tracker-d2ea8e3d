@@ -23,22 +23,25 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
   const [perms, setPerms] = useState<Record<string, PermissionLevel>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [currentRoleId, setCurrentRoleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    const lockedId = roleId ?? null;
+    setCurrentRoleId(lockedId);
     setName("");
     setDescription("");
     const initial: Record<string, PermissionLevel> = {};
     APP_SCREENS.forEach((s) => (initial[s.key] = "none"));
     setPerms(initial);
 
-    if (roleId) {
+    if (lockedId) {
       setLoading(true);
       (async () => {
         try {
           const [{ data: role }, { data: rolePerms }] = await Promise.all([
-            supabase.from("custom_roles").select("*").eq("id", roleId).maybeSingle(),
-            supabase.from("role_screen_permissions").select("*").eq("role_id", roleId),
+            supabase.from("custom_roles").select("*").eq("id", lockedId).maybeSingle(),
+            supabase.from("role_screen_permissions").select("*").eq("role_id", lockedId),
           ]);
           if (role) {
             setName(role.name);
@@ -59,6 +62,7 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
   }, [open, roleId]);
 
   const handleSave = async () => {
+    if (saving) return;
     const trimmed = name.trim();
     if (!trimmed) {
       toast.error("Role name is required");
@@ -66,20 +70,21 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
     }
     setSaving(true);
     try {
+      const lockedId = currentRoleId;
       // Pre-check for duplicate name (case-insensitive)
       const { data: dup } = await supabase
         .from("custom_roles")
         .select("id")
         .ilike("name", trimmed)
         .limit(1);
-      const duplicate = (dup || []).find((r: any) => r.id !== roleId);
+      const duplicate = (dup || []).find((r: any) => r.id !== lockedId);
       if (duplicate) {
         toast.error(`A role named "${trimmed}" already exists`);
         setSaving(false);
         return;
       }
 
-      let id = roleId;
+      let id = lockedId;
       if (id) {
         const { error } = await supabase
           .from("custom_roles")
@@ -106,7 +111,7 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
       const { error: insErr } = await supabase.from("role_screen_permissions").insert(rows);
       if (insErr) throw insErr;
 
-      toast.success(roleId ? "Role updated" : "Role created");
+      toast.success(lockedId ? "Role updated" : "Role created");
       onSaved();
       onOpenChange(false);
     } catch (err: any) {
@@ -125,7 +130,7 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{roleId ? "Edit Role" : "Create New Role"}</DialogTitle>
+          <DialogTitle>{currentRoleId ? "Edit Role" : "Create New Role"}</DialogTitle>
         </DialogHeader>
 
         {loading ? (

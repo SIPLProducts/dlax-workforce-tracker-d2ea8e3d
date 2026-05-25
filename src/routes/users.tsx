@@ -670,7 +670,7 @@ function UsersPage() {
 
       <RolePermissionsDialog
         open={roleDialogOpen}
-        onOpenChange={setRoleDialogOpen}
+        onOpenChange={(o) => { setRoleDialogOpen(o); if (!o) setEditingRoleId(null); }}
         roleId={editingRoleId}
         onSaved={fetchAll}
       />
