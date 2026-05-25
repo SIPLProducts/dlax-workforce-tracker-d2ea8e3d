@@ -486,6 +486,7 @@ function DailyEntryPage() {
               {sheet?.status === "pending" && ` — Level ${sheet.current_level}/${sheet.total_levels}${currentApproverName ? ` (${currentApproverName})` : ""}`}
             </Badge>
             {mode === "edit" && <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300">Editing</Badge>}
+            <div className="text-sm w-full"><span className="text-muted-foreground">Submitted By:</span> <span className="font-medium">{submitterName || "—"}</span></div>
           </div>
         </CardContent>
       </Card>
