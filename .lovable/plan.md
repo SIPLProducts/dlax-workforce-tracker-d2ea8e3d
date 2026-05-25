@@ -1,28 +1,16 @@
-## Plan
+## Delete two users
 
-### 1. Past-date entries open in disabled (view) mode
-In `src/routes/daily-entry.tsx` `loadEntries()`, the mode is currently auto-set to `"edit"` whenever the loaded sheet has zero rows. This makes a previous date with no entries instantly editable.
+Permanently remove the user accounts `pmubhelstpp` and `pmuiipevskp` from the system.
 
-Change the default-mode logic so that:
-- If `pendingModeRef.current` is set (user clicked Edit / Send-to-Approval), honor it as today.
-- Else if the selected date is **before today**, always default to `"view"` (disabled), even when there are no rows. The user must click **Edit** to unlock editing (and Edit is only enabled when the sheet status allows it: empty / draft / rejected).
-- Else (today or future) keep current behavior: empty → edit, otherwise → view.
+### What gets deleted
+Run a migration that deletes both rows from `auth.users` by id:
+- `6289196d-02b3-4214-a103-e4c2ce273d08` (pmubhelstpp)
+- `e2550e56-40f4-4ca3-aa2c-866f17b3a7b7` (pmuiipevskp)
 
-Keep the existing rule that once status is `pending` or `approved`, `canEdit` is false and clicking Edit has no effect — so "after Send to Approval the entry is no longer editable" continues to work unchanged.
+Because related tables (`profiles`, `user_roles`, `user_projects`, `user_custom_roles`, etc.) reference `auth.users(id)` with `ON DELETE CASCADE`, their profile rows, role assignments, project access, and custom-role assignments will be removed automatically.
 
-### 2. Honor first accessible screen as landing page
-Today, `/` always renders the Dashboard regardless of permission. A user whose first accessible screen is Daily Entry still lands on the Dashboard.
+Historical data they authored (e.g. `daily_manpower` entries they submitted, approval history) will be retained, since those tables don't cascade-delete on the user — only their ability to log in and their permission rows go away.
 
-Fix in `src/routes/index.tsx`:
-- Use `usePermissions()` inside the index component.
-- While permissions are loading, show a spinner.
-- After load: if the user has `view` on `dashboard`, render the Dashboard as today.
-- If the user does **not** have `view` on `dashboard`, redirect via `<Navigate>` to the first screen from `APP_SCREENS` (in `src/lib/screens.ts`) for which `canView(screen)` is true (e.g. `daily_entry`, then `approvals`, `reports`, masters, etc.). Fall back to `/login` if nothing is accessible.
-
-This uses the existing screen ordering in `APP_SCREENS` as the natural "first screen" priority and requires no schema change.
-
-### Technical notes
-- File touched: `src/routes/daily-entry.tsx` (mode-selection branch inside `loadEntries`).
-- File touched: `src/routes/index.tsx` (wrap `DashboardContent` with a permission-aware gate using `usePermissions` + `Navigate` + `APP_SCREENS`).
-- No DB / RLS / auth changes.
-- No change to `ScreenGuard` (still guards direct URL access to `/daily-entry`, `/approvals`, etc.).
+### Notes
+- This action is irreversible.
+- No application code changes; this is a one-time data migration.
