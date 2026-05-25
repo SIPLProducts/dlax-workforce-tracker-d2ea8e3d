@@ -71,6 +71,7 @@ function ProjectsPage() {
   };
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     try {
       if (editing) {
