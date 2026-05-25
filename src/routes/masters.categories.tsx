@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/masters/categories")({
   component: () => <ScreenGuard screen="masters_categories"><CategoriesPage /></ScreenGuard>,
