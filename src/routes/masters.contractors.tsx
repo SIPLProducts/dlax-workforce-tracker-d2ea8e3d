@@ -53,6 +53,14 @@ function ContractorsPage() {
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [contractorId, setContractorId] = useState("all");
   const [rows, setRows] = useState<any[]>([]);
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_contractors")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
   useEffect(() => { loadManpower(); }, [dateFrom, dateTo, contractorId]);
