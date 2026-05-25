@@ -109,6 +109,7 @@ function DailyEntryPage() {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
+  const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
   const isEmpty = sheetStatus === "empty";
