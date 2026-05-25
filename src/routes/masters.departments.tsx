@@ -55,6 +55,7 @@ function DepartmentsPage() {
   };
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!name.trim()) { toast.error("Name is required"); return; }
     setSaving(true);
     try {
