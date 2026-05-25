@@ -568,12 +568,18 @@ function DailyEntryPage() {
         <CardContent className="p-0">
           <TableWithTopScroll>
             <table className="border-collapse text-xs w-full min-w-[1600px]">
+              <colgroup>
+                <col style={{ width: 48 }} />
+                <col style={{ width: 220 }} />
+                <col style={{ width: 120 }} />
+                <col style={{ width: 160 }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 w-12">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-30 w-[220px] text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 w-[120px]">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 w-[160px] border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 box-border">Sl.no</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] z-30 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 box-border">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {GROUPS.map((g) => (
                     <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.label}</th>
                   ))}
@@ -596,10 +602,10 @@ function DailyEntryPage() {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
-                      <td className="border text-center sticky left-0 bg-background z-20 w-12">{idx + 1}</td>
-                      <td className="border px-2 sticky left-12 bg-background z-20 w-[220px] font-medium">{c.company_name}</td>
-                      <td className="border px-2 text-center sticky left-[268px] bg-background z-20 w-[120px]">{c.contact_number || ""}</td>
-                      <td className="border px-2 sticky left-[388px] bg-background z-20 w-[160px] border-r-2 border-r-slate-300">{c.work_place || ""}</td>
+                      <td className="border text-center sticky left-0 bg-background z-20 box-border">{idx + 1}</td>
+                      <td className="border px-2 sticky left-[48px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
+                      <td className="border px-2 text-center sticky left-[268px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
+                      <td className="border px-2 sticky left-[388px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
                       {GROUPS.map((g) => g.cols.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
                           {numCell((r as any)[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
@@ -630,10 +636,10 @@ function DailyEntryPage() {
               {contractors.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
-                    <td className="border text-center sticky left-0 bg-yellow-100 z-20 w-12">TOTAL</td>
-                    <td className="border sticky left-12 bg-yellow-100 z-20 w-[220px]"></td>
-                    <td className="border sticky left-[268px] bg-yellow-100 z-20 w-[120px]"></td>
-                    <td className="border sticky left-[388px] bg-yellow-100 z-20 w-[160px] border-r-2 border-r-slate-300"></td>
+                    <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
+                    <td className="border sticky left-[48px] bg-yellow-100 z-20 box-border"></td>
+                    <td className="border sticky left-[268px] bg-yellow-100 z-20 box-border"></td>
+                    <td className="border sticky left-[388px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
                     {ALL_COLS.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border text-center">{colTotals.security || ""}</td>
