@@ -229,28 +229,41 @@ function ProjectsPage() {
             <Button variant="outline" size="sm" onClick={downloadProjects}><Download className="mr-2 h-4 w-4" />Download</Button>
             <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" }); } }}>
               <DialogTrigger asChild><Button size="sm"><Plus className="mr-2 h-4 w-4" />Add Project</Button></DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Project</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-                  <div><Label>Code</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. GENMNGR" /></div>
-                  <div><Label>Project Group</Label><Input value={form.project_group} onChange={(e) => setForm({ ...form, project_group: e.target.value })} placeholder="e.g. Township, Refinery" /></div>
-                  <div><Label>Division</Label><Input value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} placeholder="e.g. MD(KAK)" /></div>
-                  <div><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
-                  <div><Label>Start Date</Label><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></div>
-                  <div>
-                    <Label>Status</Label>
-                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Completed">Completed</SelectItem>
-                        <SelectItem value="On Hold">On Hold</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button className="w-full" onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
-                </div>
+                <Tabs defaultValue="details">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="assignments" disabled={!editing}>
+                      Assignments {!editing && <span className="ml-1 text-xs">(save first)</span>}
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="details" className="mt-4">
+                    <div className="space-y-4">
+                      <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                      <div><Label>Code</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. GENMNGR" /></div>
+                      <div><Label>Project Group</Label><Input value={form.project_group} onChange={(e) => setForm({ ...form, project_group: e.target.value })} placeholder="e.g. Township, Refinery" /></div>
+                      <div><Label>Division</Label><Input value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} placeholder="e.g. MD(KAK)" /></div>
+                      <div><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
+                      <div><Label>Start Date</Label><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></div>
+                      <div>
+                        <Label>Status</Label>
+                        <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="On Hold">On Hold</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button className="w-full" onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="assignments" className="mt-4">
+                    <ProjectAssignments projectId={editing?.id || ""} />
+                  </TabsContent>
+                </Tabs>
               </DialogContent>
             </Dialog>
           </>
