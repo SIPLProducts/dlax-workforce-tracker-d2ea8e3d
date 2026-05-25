@@ -16,6 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { format, subDays, eachDayOfInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const Route = createFileRoute("/masters/contractors")({
   component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
