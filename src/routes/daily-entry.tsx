@@ -362,6 +362,7 @@ function DailyEntryPage() {
   };
 
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
+    pendingModeRef.current = asMode;
     setProjectId(s.project_id);
     const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
     if (isValid(d)) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
