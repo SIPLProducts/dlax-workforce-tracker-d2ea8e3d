@@ -12,13 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2, Download, Upload, FileDown, Briefcase, CheckCircle2, PauseCircle, Layers, X } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Download, Upload, FileDown, Briefcase, CheckCircle2, PauseCircle, Layers, X } from "lucide-react";
-import { toast } from "sonner";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectAssignments } from "@/components/ProjectAssignments";
-import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/masters/projects")({
   component: () => <ScreenGuard screen="masters_projects"><ProjectsPage /></ScreenGuard>,
