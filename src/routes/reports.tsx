@@ -253,15 +253,15 @@ function ReportsPage() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold">Reports</h1>
-          <p className="text-xs md:text-sm text-muted-foreground">View and export workforce reports</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
-          <Download className="mr-2 h-4 w-4" />Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        title="Reports"
+        subtitle="View and export workforce reports"
+        actions={
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+            <Download className="mr-2 h-4 w-4" />Export CSV
+          </Button>
+        }
+      />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
         <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
