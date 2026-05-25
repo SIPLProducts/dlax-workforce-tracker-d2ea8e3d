@@ -1,23 +1,17 @@
 ## Plan
 
-1. **Make Edit open reliably before submission**
-   - Update the Daily Entry sheet loading flow so selecting **Edit** for a saved draft/rejected sheet keeps the page in edit mode after the project/date data reload finishes.
-   - Keep the existing rule: sheets in `draft` or `rejected` can be edited; sheets in `pending` or `approved` cannot.
+1. **Fix the stale bottom total while editing**
+   - Update the Daily Entry input handling so numeric changes always create a complete row object before recalculating totals.
+   - Ensure footer totals (`TOTAL`, column totals, security, deficiency) are derived from the latest in-memory row values immediately after edits.
 
-2. **Disable editing immediately after Send to Approval**
-   - After **Send to Approval**, force the page back to view/read-only mode and reload the sheet status.
-   - The Edit button will remain visible but disabled with the existing approval-lock reason while status is pending.
+2. **Fix saved sheet total after save**
+   - After saving an edited sheet, reload the saved entries list so **Total Headcount** reflects the newly saved database values.
+   - Make sure the editor stays consistent with the reloaded sheet data.
 
-3. **Show submitter name in the sheet view**
-   - Load `submitted_by` from `daily_manpower_sheets` on Daily Entry.
-   - Fetch the submitter profile name/login ID and display it below the status area as **Submitted By: <name>**.
-   - If the sheet has not been submitted yet, show a dash or no submitted name.
+3. **Preserve edit-lock rules**
+   - Keep editing enabled only for draft/rejected sheets.
+   - Keep editing disabled after “Send to Approval”.
 
-4. **Apply the same submitter data to saved sheets if needed**
-   - Include `submitted_by` in the Saved Entries query so the list data stays consistent with the main sheet details.
+## Likely cause
 
-## Technical details
-
-- Primary file: `src/routes/daily-entry.tsx`.
-- No database schema change is required for this request because `submitted_by` already exists on the sheet records and the approval RPC already sets it on submission.
-- The fix will likely use a small “pending load mode” ref/state so `loadEntries()` does not overwrite an explicit Edit click back to View.
+The displayed footer total is calculated from local `rows` state. The current edit handlers only patch the changed key onto the existing row; if a row is missing or stale during reload/edit transitions, the derived footer can continue showing old values until a full reload. I’ll make the row update path safer and ensure post-save reload refreshes both the sheet and saved list totals.
