@@ -559,10 +559,10 @@ function DailyEntryPage() {
             <table className="border-collapse text-xs w-full min-w-[1600px]">
               <thead>
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-20 w-12">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-20 w-[220px] text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[232px] z-20 w-[120px]">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[352px] z-20 w-[160px] border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 w-12">Sl.no</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-12 z-30 w-[220px] text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 w-[120px]">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 w-[160px] border-r-2 border-r-slate-300">Work Place</th>
                   {GROUPS.map((g) => (
                     <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.label}</th>
                   ))}
