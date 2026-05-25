@@ -10,6 +10,7 @@ export const APP_SCREENS = [
   { key: "masters_departments", label: "Category of Labour (Master)", path: "/masters/departments" },
   { key: "masters_categories", label: "Categories (Master)", path: "/masters/categories" },
   { key: "masters_approval_config", label: "Approval Settings (Master)", path: "/masters/approvals" },
+  { key: "masters_assignments", label: "Project Assignments (Master)", path: "/masters/assignments" },
   { key: "user_management", label: "User Management", path: "/users" },
 ] as const;
 
