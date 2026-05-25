@@ -134,6 +134,7 @@ function ContractorsPage() {
   };
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!form.company_name.trim()) { toast.error("Company name is required"); return; }
     try {
       if (editing) {
