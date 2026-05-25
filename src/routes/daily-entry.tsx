@@ -452,7 +452,7 @@ function DailyEntryPage() {
             </Button>
           )}
           {canEdit ? (
-            <Button variant="outline" onClick={() => setMode("edit")} disabled={mode === "edit"}>
+            <Button variant="outline" onClick={() => { if (!requireEdit()) return; setMode("edit"); }} disabled={mode === "edit"}>
               <Pencil className="w-4 h-4 mr-2" /> Edit
             </Button>
           ) : (
