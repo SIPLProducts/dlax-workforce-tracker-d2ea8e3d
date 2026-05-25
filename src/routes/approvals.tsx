@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, XCircle, Loader2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/approvals")({
   component: () => <ScreenGuard screen="approvals"><Page /></ScreenGuard>,
