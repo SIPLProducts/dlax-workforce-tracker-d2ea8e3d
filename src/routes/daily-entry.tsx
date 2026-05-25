@@ -651,7 +651,7 @@ function DailyEntryPage() {
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "view")}><Eye className="w-4 h-4" /></Button>
                           {editable ? (
-                            <Button size="sm" variant="ghost" onClick={() => loadSheetIntoEditor(s, "edit")}><Pencil className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); }}><Pencil className="w-4 h-4" /></Button>
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild><span><Button size="sm" variant="ghost" disabled><Pencil className="w-4 h-4" /></Button></span></TooltipTrigger>
