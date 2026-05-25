@@ -26,6 +26,14 @@ function DepartmentsPage() {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const { canEdit } = usePermissions();
+  const requireEdit = () => {
+    if (!canEdit("masters_departments")) {
+      toast.error("You are in View mode, not in Edit mode.");
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => { load(); }, []);
 
