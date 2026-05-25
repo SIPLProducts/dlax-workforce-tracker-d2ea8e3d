@@ -1,4 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { usePermissions } from "@/hooks/use-permissions";
+import { APP_SCREENS } from "@/lib/screens";
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -30,7 +32,17 @@ export const Route = createFileRoute("/")({
 });
 
 function IndexPage() {
-  return <DashboardContent />;
+  const { canView, loading } = usePermissions();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+  if (canView("dashboard")) return <DashboardContent />;
+  const first = APP_SCREENS.find((s) => s.key !== "dashboard" && canView(s.key));
+  return <Navigate to={(first?.path as any) || "/login"} />;
 }
 
 const PALETTE = [

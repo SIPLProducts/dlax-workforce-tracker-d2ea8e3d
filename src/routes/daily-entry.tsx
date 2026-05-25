@@ -224,12 +224,17 @@ function DailyEntryPage() {
       setSubmitterName("");
     }
 
-    // Determine final mode: explicit Edit click wins; otherwise default by editability.
+    // Determine final mode: explicit Edit click wins; otherwise default by date + editability.
     const sheetEditable = !sh || sh.status === "draft" || sh.status === "rejected";
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const selectedDateStr = format(date, "yyyy-MM-dd");
+    const isPastDate = selectedDateStr < todayStr;
     if (pendingModeRef.current) {
       const requested = pendingModeRef.current;
       pendingModeRef.current = null;
       setMode(requested === "edit" && sheetEditable ? "edit" : "view");
+    } else if (isPastDate) {
+      setMode("view");
     } else if (nRows === 0) {
       setMode("edit");
     } else {
