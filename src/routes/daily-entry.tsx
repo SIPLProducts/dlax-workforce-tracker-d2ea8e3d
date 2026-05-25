@@ -306,6 +306,7 @@ function DailyEntryPage() {
   }, [rows, contractors]);
 
   const handleSave = async () => {
+    if (!requireEdit()) return;
     if (!projectId) return toast.error("Select a project");
     if (!user) return toast.error("Not signed in");
     if (!canEdit) return toast.error(editLockReason || "Cannot edit");
