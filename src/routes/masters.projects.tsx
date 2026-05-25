@@ -225,7 +225,7 @@ function ProjectsPage() {
           <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload</Button>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
           <Button variant="outline" size="sm" onClick={downloadProjects}><Download className="mr-2 h-4 w-4" />Download</Button>
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEditing(null); setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" }); } }}>
+          <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" }); } }}>
             <DialogTrigger asChild><Button size="sm"><Plus className="mr-2 h-4 w-4" />Add Project</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Project</DialogTitle></DialogHeader>
