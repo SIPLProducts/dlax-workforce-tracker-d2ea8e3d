@@ -201,6 +201,7 @@ function ContractorsPage() {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!requireEdit()) { e.target.value = ""; return; }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
