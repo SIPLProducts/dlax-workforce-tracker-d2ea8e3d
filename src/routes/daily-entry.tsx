@@ -594,16 +594,25 @@ function DailyEntryPage() {
       merged.forEach((row) => inserts.push(row));
     });
 
-    // Delete all editable rows for (project, date) then insert fresh. RLS allows delete only for draft/rejected.
-    const { error: delErr } = await supabase
+    // Delete editable rows for (project, date) then insert fresh. Preserve any
+    // orphan rows (saved earlier with a dept/cat that is no longer assigned to
+    // this project) so we don't silently destroy data the grid can't represent.
+    // RLS allows delete only for draft/rejected.
+    let delQ = supabase
       .from("daily_manpower")
       .delete()
       .eq("project_id", projectId)
       .eq("entry_date", entry_date);
+    if (orphanRowIdsRef.current.length > 0) {
+      // Postgres `not.in` requires a parenthesised list
+      delQ = delQ.not("id", "in", `(${orphanRowIdsRef.current.join(",")})`);
+    }
+    const { error: delErr } = await delQ;
     if (delErr) {
       setSaving(false);
       return toast.error(delErr.message);
     }
+
 
     if (inserts.length === 0) {
       setSaving(false);
