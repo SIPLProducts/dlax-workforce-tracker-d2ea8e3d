@@ -690,8 +690,8 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] z-30 box-border text-left">Name of the Contractor</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 box-border">Contact No</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
-                  {GROUPS.map((g) => (
-                    <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.label}</th>
+                  {groups.map((g) => (
+                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.deptName}</th>
                   ))}
                   <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[70px]">Security</th>
@@ -700,15 +700,16 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
                 </tr>
                 <tr>
-                  {GROUPS.flatMap((g) => g.cols.map((c) => (
-                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.label}</th>
+                  {groups.flatMap((g) => g.cells.map((c) => (
+                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.catName}</th>
                   )))}
                 </tr>
               </thead>
               <tbody>
-                {loading && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {contractors.map((c, idx) => {
+                {loading && (<tr><td colSpan={4 + allCells.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + allCells.length + 5} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={4 + 5} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {allCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
@@ -716,9 +717,9 @@ function DailyEntryPage() {
                       <td className="border px-2 sticky left-[48px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
                       <td className="border px-2 text-center sticky left-[268px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
                       <td className="border px-2 sticky left-[388px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
-                      {GROUPS.map((g) => g.cols.map((col) => (
+                      {groups.map((g) => g.cells.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
-                          {numCell((r as any)[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
+                          {numCell(r.cells[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
                         </td>
                       )))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
@@ -743,14 +744,14 @@ function DailyEntryPage() {
                   );
                 })}
               </tbody>
-              {contractors.length > 0 && (
+              {contractors.length > 0 && allCells.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
                     <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
                     <td className="border sticky left-[48px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[268px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[388px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
-                    {ALL_COLS.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
+                    {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border text-center">{colTotals.security || ""}</td>
                     <td className="border text-center">{colTotals.deficiency || ""}</td>
@@ -758,6 +759,7 @@ function DailyEntryPage() {
                     <td className="border"></td>
                   </tr>
                 </tfoot>
+
               )}
             </table>
           </TableWithTopScroll>
