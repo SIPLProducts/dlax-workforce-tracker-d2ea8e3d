@@ -194,10 +194,9 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
             </Button>
           )}
         </div>
-
-        </div>
       </div>
     </div>
+
   );
 }
 
