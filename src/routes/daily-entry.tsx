@@ -406,7 +406,7 @@ function DailyEntryPage() {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, cells: { ...curr.cells, [key]: val } } };
     });
-  const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) =>
+  const updateField = (cid: string, key: "remarks" | "weather", val: any) =>
     setRows((prev) => {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, [key]: val } };
