@@ -1,34 +1,27 @@
-# Fix: Show submitter's User ID under "Submitted By" in Approvals
+## Goal
 
-## Root cause
-`approvals.tsx` fetches submitter info via `supabase.from("profiles").select(...)`, but the `profiles` RLS policy is `auth.uid() = user_id` — each user can only read their own row. So the approver receives only their own profile, and `profiles[s.submitted_by]` resolves to "—".
+Replace the small text-only View dialog in Approvals with the same full sheet view used on the Daily Entry page (project header, date, contractors × dept/category grid, remarks, weather, totals), in read-only mode.
 
-## Change
+## Approach
 
-### 1. Migration — SECURITY DEFINER RPC for safe public profile lookup
-```sql
-CREATE OR REPLACE FUNCTION public.get_user_display_info(_user_ids uuid[])
-RETURNS TABLE(user_id uuid, login_id text, display_name text)
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT user_id, login_id, display_name
-  FROM public.profiles
-  WHERE user_id = ANY(_user_ids);
-$$;
+Reuse the existing rendering in `src/routes/daily-entry.tsx` by navigating to it with query params, rather than duplicating the grid logic in Approvals. Daily Entry already supports view mode and shows everything we need; we just need it to deep-link to a specific sheet.
 
-REVOKE EXECUTE ON FUNCTION public.get_user_display_info(uuid[]) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_user_display_info(uuid[]) TO authenticated;
-```
-Exposes only `login_id` + `display_name` (no email). Safe for any signed-in user.
+## Changes
 
-### 2. `src/routes/approvals.tsx`
-- Replace the `profiles` table query in `load()` with an RPC call: `supabase.rpc("get_user_display_info", { _user_ids })`.
-- Collect `_user_ids` as the union of:
-  - all `submitted_by` from fetched sheets, and
-  - all `approver_user_id` from `project_approval_levels`.
-- Build the `profiles` map keyed by `user_id`, with value preferring `login_id` (the User ID) → `display_name` → short id, so the **Submitted By** column shows the User ID.
+1. **`src/routes/daily-entry.tsx`**
+   - Add `validateSearch` to the route to accept optional `project` (uuid) and `date` (yyyy-MM-dd) params.
+   - On mount, if both params are present: preselect that project, set the date, and force `mode = "view"` (do not auto-enter edit even if the sheet is a draft).
+   - No changes to existing entry/edit/save/send logic for users who land on `/daily-entry` without params.
+
+2. **`src/routes/approvals.tsx`**
+   - Replace the current `Eye` button handler: instead of `setViewing(s)`, use `useNavigate()` to push `/daily-entry?project=<project_id>&date=<entry_date>`.
+   - Remove the now-unused `viewing` state and the small View `<Dialog>` block. Keep the Reject dialog and approval levels info as-is.
+   - The approval-levels / submitter / rejection-remarks info that the old dialog showed will be available on the Daily Entry page (it already renders sheet status, submitter, approver chain, and rejection remarks for the active sheet — verified in `DailyEntryPage`).
+
+3. **No backend / RLS / schema changes.** Approvers already have read access to sheets they can act on; project-scoped RLS continues to apply.
 
 ## Out of scope
-- `profiles` table RLS is unchanged.
-- No changes to Daily Entry, Reports, masters, or approval workflow logic.
+
+- No change to Approve/Reject buttons or workflow.
+- No change to the Daily Entry edit/save behavior.
+- No new component extraction — we reuse the page directly.
