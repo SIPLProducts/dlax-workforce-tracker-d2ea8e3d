@@ -31,14 +31,7 @@ function AssignmentsPage() {
       <Card>
         <CardContent className="p-4">
           <Label className="text-xs text-muted-foreground">Project</Label>
-          <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger className="max-w-md"><SelectValue placeholder="Select a project" /></SelectTrigger>
-            <SelectContent>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.code ? `${p.code} — ` : ""}{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ProjectCombobox value={projectId} onChange={setProjectId} projects={projects} placeholder="Select a project" className="max-w-md" />
         </CardContent>
       </Card>
 
