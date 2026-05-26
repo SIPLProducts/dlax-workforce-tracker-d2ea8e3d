@@ -715,8 +715,6 @@ function DailyEntryPage() {
                         </td>
                       )))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
-                      <td className="border">{numCell(r.security, (n) => updateField(c.id, "security", n))}</td>
-                      <td className="border">{numCell(r.deficiency, (n) => updateField(c.id, "deficiency", n))}</td>
                       <td className="border">
                         <input value={r.remarks} disabled={readOnly}
                           onChange={(e) => updateField(c.id, "remarks", e.target.value)}
