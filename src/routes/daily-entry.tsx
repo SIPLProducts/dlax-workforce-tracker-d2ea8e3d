@@ -21,6 +21,10 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/daily-entry")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    project: typeof search.project === "string" ? search.project : undefined,
+    date: typeof search.date === "string" ? search.date : undefined,
+  }),
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
 });
 
@@ -151,6 +155,8 @@ function DailyEntryPage() {
     if (parsed) { setDate(parsed); setDateError(false); } else { setDateError(raw.length > 0); }
   };
 
+  const search = Route.useSearch();
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("projects").select("id,name,code").order("name");
@@ -158,6 +164,20 @@ function DailyEntryPage() {
       if (data && data.length && !projectId) setProjectId(data[0].id);
     })();
   }, []);
+
+  // Deep-link support: when arriving with ?project=&date=, preselect them and force View mode.
+  useEffect(() => {
+    if (search.project) setProjectId(search.project);
+    if (search.date) {
+      const d = parseDate(search.date, "yyyy-MM-dd", new Date());
+      if (isValid(d)) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
+    }
+    if (search.project || search.date) {
+      pendingModeRef.current = "view";
+      setActiveTab("entry");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.project, search.date]);
 
   useEffect(() => {
     const fetchContractors = async () => {
