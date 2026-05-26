@@ -158,18 +158,19 @@ function DailyEntryPage() {
 
   useEffect(() => {
     const fetchContractors = async () => {
-      // Project-scoped with global fallback: if the project has assignments, use those; else use the full pool.
-      let assignedIds: string[] = [];
-      if (projectId) {
-        const { data: joins } = await supabase
-          .from("project_contractors")
-          .select("contractor_id")
-          .eq("project_id", projectId);
-        assignedIds = (joins || []).map((j: any) => j.contractor_id);
-      }
-      let query = supabase.from("contractors").select("id,company_name,contact_number,work_place").order("company_name");
-      if (assignedIds.length > 0) query = query.in("id", assignedIds);
-      const { data } = await query;
+      // Strict project scope: only show contractors assigned to this project via Masters → Project Assignments.
+      if (!projectId) { setContractors([]); return; }
+      const { data: joins } = await supabase
+        .from("project_contractors")
+        .select("contractor_id")
+        .eq("project_id", projectId);
+      const ids = (joins || []).map((j: any) => j.contractor_id);
+      if (ids.length === 0) { setContractors([]); return; }
+      const { data } = await supabase
+        .from("contractors")
+        .select("id,company_name,contact_number,work_place")
+        .in("id", ids)
+        .order("company_name");
       setContractors(data || []);
     };
     fetchContractors();
@@ -328,24 +329,16 @@ function DailyEntryPage() {
     setSaving(true);
     const entry_date = format(date, "yyyy-MM-dd");
 
-    // Prefer a department/category assigned to this project; fall back to global pool.
+    // Strict project scope: only use department/category assigned to this project.
     const [{ data: assignedCats }, { data: assignedDeps }] = await Promise.all([
       supabase.from("project_categories").select("category_id").eq("project_id", projectId).limit(1),
       supabase.from("project_departments").select("department_id").eq("project_id", projectId).limit(1),
     ]);
-    let fallbackCat = (assignedCats?.[0] as any)?.category_id as string | undefined;
-    let fallbackDep = (assignedDeps?.[0] as any)?.department_id as string | undefined;
-    if (!fallbackCat) {
-      const { data: cats } = await supabase.from("worker_categories").select("id").limit(1);
-      fallbackCat = cats?.[0]?.id;
-    }
-    if (!fallbackDep) {
-      const { data: deps } = await supabase.from("departments").select("id").limit(1);
-      fallbackDep = deps?.[0]?.id;
-    }
+    const fallbackCat = (assignedCats?.[0] as any)?.category_id as string | undefined;
+    const fallbackDep = (assignedDeps?.[0] as any)?.department_id as string | undefined;
     if (!fallbackCat || !fallbackDep) {
       setSaving(false);
-      return toast.error("Add at least one Department and Category in Masters first");
+      return toast.error("Assign at least one Department and one Category to this project in Masters → Project Assignments.");
     }
 
     const inserts: any[] = [];
@@ -599,7 +592,7 @@ function DailyEntryPage() {
               </thead>
               <tbody>
                 {loading && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
                 {contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
