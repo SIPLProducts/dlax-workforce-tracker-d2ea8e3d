@@ -297,9 +297,7 @@ function DailyEntryPage() {
     const touchedContractors = new Set<string>();
     (dm || []).forEach((rec: any) => {
       const r = next[rec.contractor_id] || emptyRow();
-      // Header-level fields (kept on every row server-side; max wins on load)
-      r.security = Math.max(r.security, rec.security_count || 0);
-      r.deficiency = Math.max(r.deficiency, rec.deficiency_manpower || 0);
+      // Header-level fields (kept on every row server-side; first non-empty wins)
       r.weather = r.weather || rec.weather_condition || "";
 
       // Try legacy JSON-blob remarks first
