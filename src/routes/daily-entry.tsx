@@ -470,8 +470,6 @@ function DailyEntryPage() {
           department_id: did,
           category_id: x.cell.catId,
           headcount: x.n,
-          security_count: idx === 0 ? (Number(r.security) || 0) : 0,
-          deficiency_manpower: idx === 0 ? (Number(r.deficiency) || 0) : 0,
           remarks: idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null,
           weather_condition: idx === 0 ? (r.weather || null) : null,
           created_by: user.id,
