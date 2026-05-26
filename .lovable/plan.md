@@ -1,45 +1,61 @@
-# Login — Microsoft Sign-in Style
+# Login Page — Premium Redesign
 
-Replace the current rich Midnight Indigo design with a clean, flat Microsoft-style sign-in. No gradients, no glassmorphism, no animated mesh — just white surface, sharp typography, and a single Microsoft-blue accent.
+Make the login feel rich, modern, and enterprise-premium. Replace the current flat ice-blue right panel and static left panel with a cohesive dark Midnight Indigo composition, glassmorphism card, animated gradient mesh background, and subtle motion accents.
 
-## Visual direction
+## Direction
 
-- **Background:** pure white `#FFFFFF` (full viewport). No split, no panel art on desktop — Microsoft uses a single centered card.
-- **Card:** rectangular (NOT rounded), thin 1px border `#E5E5E5`, soft subtle shadow `0 2px 6px rgba(0,0,0,0.10)`, fixed width 440px, generous padding (44px), left-aligned content.
-- **Top of card:** small KPC logo (24px), then "DLAX" wordmark in Segoe-style sans-serif (use system `Segoe UI` font stack — falls back cleanly).
-- **Heading:** "Sign in" — 24px, weight 600, near-black `#1B1B1B`, left-aligned.
-- **Subhead:** "to continue to DLAX" — 15px, `#605E5C`.
-- **Inputs:** flat, NOT rounded. White background, no border on sides/top, only a 1px bottom border `#605E5C` (Microsoft underline-style). On focus, bottom border becomes 2px Microsoft blue `#0067B8`. No icons inside inputs. Label sits above as plain text.
-- **Primary button:** square corners, solid `#0067B8`, hover `#106EBE`, white text "Sign in", weight 600, 32px height-ish (use 40), positioned bottom-right of the card (Microsoft's signature "Next →" alignment). No gradient, no shadow on the button.
-- **Secondary link:** "Can't access your account?" / "Contact your administrator" in `#0067B8` text-link styling under the form, left-aligned.
-- **Footer (outside card, bottom-right of viewport):** small links row "Terms of use · Privacy & cookies · …" muted gray `#605E5C`, 12px.
-- **Top-left of viewport (outside card):** KPC mark only, small, like Microsoft's logo placement.
+- **Palette (Midnight Indigo):** `#0A0A1A` base, `#141432` mid, `#1E1E5A` deep accent, `#4F46E5` primary glow, with `#FBBF24` amber spark for brand highlights.
+- **Typography:** Inter (already loaded) — keep, tighten tracking on display headings.
+- **Layout:** Full-bleed split (≈55/45 on `lg`). Left = brand canvas. Right = glass login card centered on a richly textured midnight background — not flat slate.
 
-## Mobile
+## Visual changes (right panel — the main complaint)
 
-- Same card, full width minus 24px gutters, same flat treatment. QR install row appears below card in the same flat style (thin border, no shadow).
+Replace the flat `#E8F1F8` slate background with a layered midnight composition:
 
-## Tokens / scope
+1. **Background:** dark midnight base + animated conic/radial gradient mesh (blurred indigo + violet + amber blobs, very large, slow drift via CSS `@keyframes`).
+2. **Login card:** glassmorphism — `bg-white/[0.04]`, `backdrop-blur-2xl`, 1px white/10 border, `rounded-3xl`, dual-layer ambient shadow + inner highlight. Floats above the mesh.
+3. **Inside the card:**
+   - Small KPC mark + "DLAX" wordmark above heading on mobile (replaces current band).
+   - Heading "Welcome back" in white, semibold, tracking-tight; subhead in slate-400.
+   - Inputs: dark glass — `bg-white/[0.06]`, 1px white/10 border, `rounded-xl`, `h-12`, icon in indigo-300, focus ring `ring-2 ring-indigo-400/70` + subtle outer glow.
+   - Show/hide password eye in slate-400.
+   - Primary CTA: gradient button `from-indigo-500 to-violet-500`, white text, soft `shadow-indigo-500/40` glow, micro lift on hover.
+   - Footer line: muted slate-400.
+4. **Decorative:** thin amber spark line under the heading, animated pulse dot on the brand logo.
 
-- Everything stays inside `src/routes/login.tsx`. No theme token changes.
-- Use inline `style` for the exact Microsoft colors (`#0067B8`, `#1B1B1B`, `#605E5C`, `#E5E5E5`) — they're brand-specific, not theme tokens.
-- Use `font-family: 'Segoe UI', system-ui, -apple-system, sans-serif` on the card root so Windows users get the real Segoe rendering.
-- Keep `useAuth`, form submit, password show/hide, loading spinner, QR URL — unchanged.
+## Visual changes (left panel)
 
-## Removed from current design
+Keep the brand panel but lift it:
 
-- Animated mesh background, gradient orbs, grid overlay.
-- Left brand panel with constellation SVG.
-- Glassmorphism, backdrop-blur, glow shadows.
-- Gradient wordmark, amber spark line, gradient CTA button.
+- Replace the current line-art with a denser, more refined SVG constellation (more nodes, varied opacities, 2–3 amber pulse dots with `animate-ping`).
+- Add a soft animated indigo glow orb behind the wordmark.
+- Bigger DLAX wordmark with subtle gradient text (`from-white to-indigo-200`).
+- Brand band at bottom with the QR install card already there — restyle to match new glass aesthetic.
+
+## Mobile (< lg)
+
+- Hide left panel; entire viewport gets the same animated midnight mesh background.
+- Logo + DLAX wordmark stack above the glass card (no separate band).
+- QR card below the login card uses the same glass treatment.
+
+## Tokens / implementation
+
+- All new visuals are scoped to `src/routes/login.tsx`. No global theme changes.
+- Use Tailwind utility classes; add a small `<style>` block (or inline keyframes via Tailwind arbitrary values) for the slow gradient drift (`@keyframes meshDrift`).
+- No new dependencies. No changes to auth, form submit, routing, or QR URL.
+
+## Out of scope
+
+- `useAuth`, `signInWithUserId`, navigation, validation logic, QR URL.
+- Global design tokens in `src/styles.css`.
+- Other routes / layouts.
 
 ## Files
 
-- `src/routes/login.tsx` — full visual rewrite; logic preserved.
+- `src/routes/login.tsx` — full visual rewrite (JSX + inline keyframes only).
 
 ## Verification
 
-- `/login` desktop: white viewport, single centered rectangular card with thin border, "Sign in" heading, underline-only inputs, square blue button bottom-right of card.
-- Focused input shows 2px blue underline.
-- Mobile: card fills width with comfortable margins, QR row below, footer links readable.
-- Sign-in submit still works.
+- `/login` desktop ≥1112px: split layout, animated midnight mesh on the right, glass login card with focus glow on inputs.
+- Resize to mobile: single column, mesh background fills viewport, glass card centered with QR card below.
+- Submit still works; loading spinner unchanged.
