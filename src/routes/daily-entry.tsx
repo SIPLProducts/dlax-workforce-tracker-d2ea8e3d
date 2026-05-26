@@ -743,8 +743,6 @@ function DailyEntryPage() {
                     <td className="border sticky left-[388px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
                     {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
-                    <td className="border text-center">{colTotals.security || ""}</td>
-                    <td className="border text-center">{colTotals.deficiency || ""}</td>
                     <td className="border"></td>
                     <td className="border"></td>
                   </tr>
