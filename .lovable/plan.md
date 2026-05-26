@@ -1,27 +1,35 @@
-## Goal
-Remove the hardcoded **Security** and **Deficiency Manpower** columns from the Daily Entry Sheet. Keep **Weather** and **Remarks** as header-level fields. The category grid stays fully driven by Project Assignments.
+# Fix: Newly created projects not visible in Projects screen
 
-## Changes
+## Root cause
+The `projects` table SELECT policy uses `has_project_access(auth.uid(), id)`. That function only grants admin/user-manager users access to **all** projects when they have **zero** rows in `user_projects`. As soon as an admin gets assigned to any specific project, they can no longer see projects they aren't explicitly linked to — including ones they just created. New projects are never auto-inserted into `user_projects`, so they disappear from the list right after creation (toast shows "Created", but the row is filtered out by RLS).
 
-### `src/routes/daily-entry.tsx`
-1. Remove from the entry table:
-   - **Security** column (stop writing `security_count`)
-   - **Deficiency Manpower** column (stop writing `deficiency_manpower`)
-2. Keep:
-   - **Weather** — header-level field, written to `weather_condition` on the anchor row per contractor
-   - **Remarks** — header-level free-text, written to `remarks` on the anchor row per contractor
-   - Sl.no, Name of Contractor, Contact No, Work Place (contractor identity)
-   - One column per `(assigned department → assigned category via department_categories)`, grouped under the department header
-   - "Other" group only if a project-assigned category isn't linked to any project-assigned department
-   - Row Total + column Totals
-3. Remove state, inputs, and handlers for security/deficiency. Save payload no longer includes those two fields.
-4. Empty-state messaging stays.
+This matches what's happening in your screenshot: the DB has the new "DLAX Metro Phase 1" row, but the list only shows the 4 projects you're directly assigned to.
 
-### `src/routes/reports.tsx`
-- Drop Security and Deficiency Manpower from any report rendering / Excel export. Weather and Remarks stay.
+## Change
 
-### Database
-- **No migration.** `security_count` and `deficiency_manpower` columns stay on `daily_manpower` for historical rows; they just won't be written or displayed going forward.
+### 1. Migration — replace the SELECT policy on `public.projects`
+
+Drop the existing "Users view assigned projects" SELECT policy and create:
+
+```sql
+CREATE POLICY "View projects"
+ON public.projects FOR SELECT TO authenticated
+USING (
+  has_role(auth.uid(), 'admin'::app_role)
+  OR has_screen_edit(auth.uid(), 'masters_projects')
+  OR has_project_access(auth.uid(), id)
+);
+```
+
+Effect:
+- **Admins** always see every project, regardless of `user_projects` assignments.
+- **Users with edit access to the Projects master** see every project (needed to manage them).
+- **Everyone else** keeps current per-user scoping via `user_projects`.
+
+### 2. No code changes
+`src/routes/masters.projects.tsx` already does `select("*")`. Once the policy is fixed, your newly created projects appear immediately.
 
 ## Out of scope
-- Approval workflow, RLS, Project Assignments UI, `worker_attendance` — unchanged.
+- `has_project_access` itself is not changed — Daily Entry, Reports, Approvals, and other operational screens stay scoped per user as today.
+- No changes to insert/update/delete policies on `projects`.
+- No schema changes, no new columns.
