@@ -197,31 +197,6 @@ function Page() {
         )}
       </Tabs>
 
-      <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader><DialogTitle>Sheet {viewing?.sheet_code}</DialogTitle></DialogHeader>
-          {viewing && (
-            <div className="space-y-2 text-sm">
-              <div><span className="text-muted-foreground">Date:</span> {format(new Date(viewing.entry_date), "dd/MM/yyyy")}</div>
-              <div><span className="text-muted-foreground">Project:</span> {projectName(viewing.project_id)}</div>
-              <div><span className="text-muted-foreground">Status:</span> {statusBadge(viewing.status, viewing.current_level, viewing.total_levels)}</div>
-              <div><span className="text-muted-foreground">Total Headcount:</span> {viewing.total_headcount}</div>
-              <div><span className="text-muted-foreground">Submitted by:</span> {viewing.submitted_by ? profiles[viewing.submitted_by] : "—"}</div>
-              {viewing.rejection_remarks && <div className="text-red-700"><b>Rejection remarks:</b> {viewing.rejection_remarks}</div>}
-              <div className="pt-2 border-t">
-                <div className="text-xs font-medium mb-1">Approval levels</div>
-                {levels.filter((l) => l.project_id === viewing.project_id).sort((a,b)=>a.level_no-b.level_no).map((l) => (
-                  <div key={l.level_no} className="text-xs flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px]">L{l.level_no}</Badge>
-                    {l.label && <span className="text-muted-foreground">{l.label}:</span>}
-                    <span>{profiles[l.approver_user_id] || l.approver_user_id.slice(0, 8)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!rejectFor} onOpenChange={(o) => !o && setRejectFor(null)}>
         <DialogContent>
