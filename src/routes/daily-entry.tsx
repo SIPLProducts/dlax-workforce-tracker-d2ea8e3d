@@ -279,7 +279,7 @@ function DailyEntryPage() {
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
-        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
+        .select("contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
       supabase.from("daily_manpower_sheets")
@@ -294,26 +294,44 @@ function DailyEntryPage() {
 
     const next: Record<string, RowData> = {};
     contractors.forEach((c) => (next[c.id] = emptyRow()));
-    let nRows = 0;
+    const touchedContractors = new Set<string>();
     (dm || []).forEach((rec: any) => {
       const r = next[rec.contractor_id] || emptyRow();
-      r.security = rec.security_count || 0;
-      r.deficiency = rec.deficiency_manpower || 0;
-      try {
-        const parsed = rec.remarks ? JSON.parse(rec.remarks) : null;
-        if (parsed && typeof parsed === "object") {
-          r.remarks = parsed._remarks || "";
-          ALL_COLS.forEach((c) => { if (typeof parsed[c.key] === "number") (r as any)[c.key] = parsed[c.key]; });
-        } else if (typeof rec.remarks === "string") {
-          r.remarks = rec.remarks;
+      // Header-level fields (kept on every row server-side; max wins on load)
+      r.security = Math.max(r.security, rec.security_count || 0);
+      r.deficiency = Math.max(r.deficiency, rec.deficiency_manpower || 0);
+      r.weather = r.weather || rec.weather_condition || "";
+
+      // Try legacy JSON-blob remarks first
+      let isLegacyBlob = false;
+      if (rec.remarks && typeof rec.remarks === "string" && rec.remarks.trim().startsWith("{")) {
+        try {
+          const parsed = JSON.parse(rec.remarks);
+          if (parsed && typeof parsed === "object") {
+            isLegacyBlob = true;
+            r.remarks = r.remarks || parsed._remarks || "";
+            Object.entries(parsed).forEach(([k, v]) => {
+              if (k === "_remarks") return;
+              const ck = legacyKeyToCell[k];
+              if (ck && typeof v === "number") r.cells[ck] = (r.cells[ck] || 0) + v;
+            });
+          }
+        } catch { /* fall through */ }
+      }
+      if (!isLegacyBlob) {
+        if (rec.remarks && !r.remarks) r.remarks = rec.remarks;
+        if (rec.department_id && rec.category_id) {
+          const ck = cellKey(rec.department_id, rec.category_id);
+          r.cells[ck] = (r.cells[ck] || 0) + (rec.headcount || 0);
         }
-      } catch { r.remarks = rec.remarks || ""; }
-      r.weather = rec.weather_condition || "";
+      }
       next[rec.contractor_id] = r;
-      nRows += 1;
+      touchedContractors.add(rec.contractor_id);
     });
+    const nRows = touchedContractors.size;
     setRows(next);
     setRowCount(nRows);
+
     setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels, submitted_by: sh.submitted_by ?? null } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
     const levelList = (lvs || []) as any[];
