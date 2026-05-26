@@ -99,7 +99,7 @@ function DailyEntryPage() {
 
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [projectId, setProjectId] = useState<string>("");
-  const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
+  const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null; contractor_code: string | null }[]>([]);
   const [assignedDepts, setAssignedDepts] = useState<{ id: string; name: string }[]>([]);
   const [assignedCats, setAssignedCats] = useState<{ id: string; name: string; display_order: number }[]>([]);
   const [deptCatLinks, setDeptCatLinks] = useState<{ department_id: string; category_id: string }[]>([]);
@@ -191,7 +191,7 @@ function DailyEntryPage() {
       if (ids.length === 0) { setContractors([]); return; }
       const { data } = await supabase
         .from("contractors")
-        .select("id,company_name,contact_number,work_place")
+        .select("id,company_name,contact_number,work_place,contractor_code")
         .in("id", ids)
         .order("company_name");
       setContractors(data || []);
@@ -694,6 +694,7 @@ function DailyEntryPage() {
             <table className="border-collapse text-xs w-full min-w-[1600px]">
               <colgroup>
                 <col style={{ width: 48 }} />
+                <col style={{ width: 100 }} />
                 <col style={{ width: 220 }} />
                 <col style={{ width: 120 }} />
                 <col style={{ width: 160 }} />
@@ -701,9 +702,10 @@ function DailyEntryPage() {
               <thead>
                 <tr>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 box-border">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] z-30 box-border text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 box-border">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] z-30 box-border">SC Code</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] z-30 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] z-30 box-border">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {groups.map((g) => (
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.deptName}</th>
                   ))}
@@ -718,17 +720,18 @@ function DailyEntryPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading && (<tr><td colSpan={4 + allCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + allCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={4 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {loading && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
                 {allCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
                       <td className="border text-center sticky left-0 bg-background z-20 box-border">{idx + 1}</td>
-                      <td className="border px-2 sticky left-[48px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
-                      <td className="border px-2 text-center sticky left-[268px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
-                      <td className="border px-2 sticky left-[388px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
+                      <td className="border px-2 text-center sticky left-[48px] bg-background z-20 box-border truncate" title={c.contractor_code || ""}>{c.contractor_code || "—"}</td>
+                      <td className="border px-2 sticky left-[148px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
+                      <td className="border px-2 text-center sticky left-[368px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
+                      <td className="border px-2 sticky left-[488px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
                       {groups.map((g) => g.cells.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
                           {numCell(r.cells[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
@@ -759,8 +762,9 @@ function DailyEntryPage() {
                   <tr className="bg-yellow-100 font-bold">
                     <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
                     <td className="border sticky left-[48px] bg-yellow-100 z-20 box-border"></td>
-                    <td className="border sticky left-[268px] bg-yellow-100 z-20 box-border"></td>
-                    <td className="border sticky left-[388px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
+                    <td className="border sticky left-[148px] bg-yellow-100 z-20 box-border"></td>
+                    <td className="border sticky left-[368px] bg-yellow-100 z-20 box-border"></td>
+                    <td className="border sticky left-[488px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
                     {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
