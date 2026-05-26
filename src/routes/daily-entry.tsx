@@ -24,46 +24,46 @@ export const Route = createFileRoute("/daily-entry")({
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
 });
 
-type ColDef = { key: string; label: string };
-type GroupDef = { key: "CIVIL" | "MEP" | "NMR"; label: string; cols: ColDef[]; headerClass: string; cellClass: string };
+type Cell = { key: string; deptId: string; catId: string; deptName: string; catName: string };
+type GroupView = { deptId: string; deptName: string; headerClass: string; cellClass: string; cells: Cell[] };
 
-const GROUPS: GroupDef[] = [
-  { key: "CIVIL", label: "CIVIL - Item rate / Subcontract", headerClass: "bg-blue-100 text-blue-900", cellClass: "bg-blue-50/40",
-    cols: [
-      { key: "civil_rod_bending", label: "Rod Bending" },
-      { key: "civil_shuttering", label: "Shuttering" },
-      { key: "civil_mason", label: "Mason" },
-      { key: "civil_scaffolders", label: "Scaffolders" },
-      { key: "civil_painters", label: "Painters" },
-      { key: "civil_helpers", label: "Helpers" },
-    ] },
-  { key: "MEP", label: "MEP - Item rate / Subcontract", headerClass: "bg-emerald-100 text-emerald-900", cellClass: "bg-emerald-50/40",
-    cols: [
-      { key: "mep_plumbers", label: "Plumbers" },
-      { key: "mep_carpenters", label: "Carpenters" },
-      { key: "mep_fitters", label: "Fitters" },
-      { key: "mep_welders", label: "Welders" },
-      { key: "mep_electricians", label: "Electricians" },
-      { key: "mep_helpers", label: "Helpers" },
-    ] },
-  { key: "NMR", label: "NMR Man powers", headerClass: "bg-orange-100 text-orange-900", cellClass: "bg-orange-50/40",
-    cols: [
-      { key: "nmr_mason", label: "Mason" },
-      { key: "nmr_mc", label: "M/C" },
-      { key: "nmr_fc", label: "F/C" },
-    ] },
+const GROUP_PALETTE = [
+  { headerClass: "bg-blue-100 text-blue-900", cellClass: "bg-blue-50/40" },
+  { headerClass: "bg-emerald-100 text-emerald-900", cellClass: "bg-emerald-50/40" },
+  { headerClass: "bg-orange-100 text-orange-900", cellClass: "bg-orange-50/40" },
+  { headerClass: "bg-purple-100 text-purple-900", cellClass: "bg-purple-50/40" },
+  { headerClass: "bg-pink-100 text-pink-900", cellClass: "bg-pink-50/40" },
+  { headerClass: "bg-teal-100 text-teal-900", cellClass: "bg-teal-50/40" },
+  { headerClass: "bg-amber-100 text-amber-900", cellClass: "bg-amber-50/40" },
+  { headerClass: "bg-rose-100 text-rose-900", cellClass: "bg-rose-50/40" },
 ];
+const OTHER_STYLE = { headerClass: "bg-slate-100 text-slate-900", cellClass: "bg-slate-50/40" };
+const cellKey = (d: string, c: string) => `${d}__${c}`;
 
-const ALL_COLS: ColDef[] = GROUPS.flatMap((g) => g.cols);
+type RowData = { cells: Record<string, number>; security: number; deficiency: number; remarks: string; weather: string };
+const emptyRow = (): RowData => ({ cells: {}, security: 0, deficiency: 0, remarks: "", weather: "" });
 
-type RowData = Record<string, number> & { security: number; deficiency: number; remarks: string; weather: string };
-const emptyRow = (): RowData => {
-  const r: any = { security: 0, deficiency: 0, remarks: "", weather: "" };
-  ALL_COLS.forEach((c) => (r[c.key] = 0));
-  return r as RowData;
+// Legacy JSON-blob keys → [department name, category name] for backward-compatible display
+const LEGACY_KEY_MAP: Record<string, [string, string]> = {
+  civil_rod_bending: ["CIVIL", "Rod Bending"],
+  civil_shuttering: ["CIVIL", "Shuttering"],
+  civil_mason: ["CIVIL", "Mason"],
+  civil_scaffolders: ["CIVIL", "Scaffolders"],
+  civil_painters: ["CIVIL", "Painters"],
+  civil_helpers: ["CIVIL", "Helpers"],
+  mep_plumbers: ["MEP", "Plumbers"],
+  mep_carpenters: ["MEP", "Carpenters"],
+  mep_fitters: ["MEP", "Fitters"],
+  mep_welders: ["MEP", "Welders"],
+  mep_electricians: ["MEP", "Electricians"],
+  mep_helpers: ["MEP", "Helpers"],
+  nmr_mason: ["NMR Man powers", "Mason"],
+  nmr_mc: ["NMR Man powers", "M/C"],
+  nmr_fc: ["NMR Man powers", "F /C"],
 };
 
 const WEATHER_OPTIONS = ["Sunny", "Cloudy", "Rainy", "Heavy Rain", "Stormy", "Foggy", "Hot", "Windy"];
+
 
 type SheetRow = {
   id: string;
