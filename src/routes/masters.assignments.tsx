@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectAssignments } from "@/components/ProjectAssignments";
+import { ProjectCombobox } from "@/components/ProjectCombobox";
 
 export const Route = createFileRoute("/masters/assignments")({
   component: () => <ScreenGuard screen="masters_assignments"><AssignmentsPage /></ScreenGuard>,
