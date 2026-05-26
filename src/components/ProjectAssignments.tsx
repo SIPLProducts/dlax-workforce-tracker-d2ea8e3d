@@ -128,20 +128,8 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
     toast.success(`Assigned ${rows.length} ${cfg.title.toLowerCase()}`);
   };
 
-  const bulkUnassign = async () => {
-    if (!canAssign) { toast.error("You don't have edit permission on Projects."); return; }
-    if (assignedItems.length === 0) return;
-    if (!window.confirm(`Unassign ${assignedItems.length} ${cfg.title.toLowerCase()}${hasSearch ? " matching the search" : ""}?`)) return;
-    setBusy(true);
-    const ids = assignedItems.map((i) => i.id);
-    const { error } = await supabase.from(cfg.joinTable as any).delete().eq("project_id", projectId).in(cfg.joinFk, ids);
-    if (error) { toast.error(error.message); setBusy(false); return; }
-    setAssigned((s) => { const n = new Set(s); ids.forEach((id) => n.delete(id)); return n; });
-    setBusy(false);
-    toast.success(`Unassigned ${ids.length} ${cfg.title.toLowerCase()}`);
-  };
-
   return (
+
     <div className="space-y-4">
       {canCreate && (
         <div className="flex gap-2 items-end">
@@ -166,11 +154,6 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Assigned ({assignedItems.length})
             </p>
-            {canAssign && assignedItems.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive hover:text-destructive" onClick={bulkUnassign} disabled={busy}>
-                {hasSearch ? `Unassign all matching (${assignedItems.length})` : `Unassign all (${assignedItems.length})`}
-              </Button>
-            )}
           </div>
           <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
             {assignedItems.length === 0 && <p className="text-sm text-muted-foreground p-3">None assigned yet.</p>}
@@ -191,11 +174,6 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Available ({availableItems.length})
             </p>
-            {canAssign && availableItems.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={bulkAssign} disabled={busy}>
-                {hasSearch ? `Select all matching (${availableItems.length})` : `Select all (${availableItems.length})`}
-              </Button>
-            )}
           </div>
           <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
             {availableItems.length === 0 && <p className="text-sm text-muted-foreground p-3">No more available.</p>}
@@ -210,9 +188,15 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
               </label>
             ))}
           </div>
+          {canAssign && availableItems.length > 0 && (
+            <Button variant="outline" size="sm" className="w-full mt-2" onClick={bulkAssign} disabled={busy}>
+              {hasSearch ? `Select all matching (${availableItems.length})` : `Select all (${availableItems.length})`}
+            </Button>
+          )}
         </div>
       </div>
     </div>
+
   );
 }
 
