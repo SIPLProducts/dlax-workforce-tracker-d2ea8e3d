@@ -511,18 +511,19 @@ function DailyEntryPage() {
       return { ...prev, [cid]: { ...curr, [key]: val } };
     });
 
-  const rowTotal = (r: RowData) => allCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
+  const rowTotal = (r: RowData) => displayCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { total: 0 };
-    allCells.forEach((c) => (t[c.key] = 0));
+    displayCells.forEach((c) => (t[c.key] = 0));
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
-      allCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
+      displayCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
       t.total += rowTotal(r);
     });
     return t;
-  }, [rows, contractors, allCells]);
+  }, [rows, contractors, displayCells]);
+
 
   const handleSave = async () => {
     if (!requireEdit()) return;
