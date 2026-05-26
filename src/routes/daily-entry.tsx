@@ -21,6 +21,10 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/daily-entry")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    project: typeof search.project === "string" ? search.project : undefined,
+    date: typeof search.date === "string" ? search.date : undefined,
+  }),
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
 });
 
