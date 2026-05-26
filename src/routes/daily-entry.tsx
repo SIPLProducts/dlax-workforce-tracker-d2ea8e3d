@@ -907,7 +907,7 @@ function DailyEntryPage() {
           </div>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="[&_th]:sticky [&_th]:top-[112px] [&_th]:z-[5] [&_th]:bg-card">
                 <TableRow>
                   <TableHead>Sheet ID</TableHead>
                   <TableHead>Date</TableHead>
