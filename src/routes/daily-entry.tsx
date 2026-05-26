@@ -592,7 +592,7 @@ function DailyEntryPage() {
               </thead>
               <tbody>
                 {loading && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors. Add some in Masters → Contractors.</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
                 {contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
