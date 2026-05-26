@@ -1,55 +1,56 @@
-# Login Screen — Mesh Gradient Redesign
+# Login Screen Redesign
 
-Replace the current split-screen layout in `src/routes/login.tsx` with a full-bleed mesh-gradient background and a single floating glass login card. Visual-only change; auth logic, routes, and the `signInWithUserId` call stay untouched.
+Refresh `src/routes/login.tsx` only — no behavior, auth, or routing changes. Pure visual / presentational rework matching the requested split-screen enterprise aesthetic.
 
 ## Visual direction
 
-**Background (full viewport)**
-- Base diagonal gradient navy → slate → warm off-white:
-  `linear-gradient(105deg, #0B1A3A 0%, #1B2A4E 28%, #4B5A75 55%, #B9BFCC 78%, #F2EFEA 100%)`.
-- Layered mesh blobs (large blurred radial gradients) absolutely positioned, low opacity, for the soft "mesh" feel:
-  - top-left deep indigo `#1E2F66` blob, `blur-3xl`
-  - mid-left slate `#2E4368` blob
-  - right-side warm cream `#EEE8DC` blob
-  - subtle amber highlight `#F5C56B` near the card for warmth
-- A faint grain/noise overlay via an inline SVG `feTurbulence` mask at ~4% opacity to kill banding.
+**Left panel (≈45% on `lg`, hidden on mobile)**
+- Deep midnight-blue gradient: `#0A1530 → #0F1F47 → #14306B` (top-left → bottom-right).
+- Abstract geometric "connectivity" line art as an SVG layer: thin 1px white/10% lines forming a node-and-edge constellation, plus 2–3 soft amber glow dots at intersections. Subtle, decorative, non-distracting.
+- KPC logo top-left.
+- Centered brand block:
+  - `DLAX` wordmark in large, tight, crisp display weight (Inter 700, tracking-tight).
+  - Tagline "Daily Labour Attendance & Tracking" in small uppercase, wide tracking, slate-300.
+  - One short value sentence below in slate-300/80.
+- Bottom: a single compact "Install on mobile" row with the QR + 2-line copy, sitting on a faint white/5 surface.
+- Footer copyright in slate-500, 11px.
+- Remove the current 3-feature stacked cards (replaced by the cleaner brand + line-art composition).
 
-**Layout**
-- Single full-screen flex container. Card positioned center on mobile, right-of-center on desktop (`lg:justify-end lg:pr-[10vw]`).
-- Small brand mark (KPC logo + "DLAX" wordmark) floats top-left over the dark side of the gradient, white text.
-- Bottom-left small footer line in white/60. Bottom-right small "Install on mobile" QR pill, glass-styled.
-
-**Login card (glass)**
-- ~`w-[420px]`, `rounded-3xl`, `p-9`.
-- `bg-white/70 dark:bg-white/10`, `backdrop-blur-2xl`, `border border-white/40 dark:border-white/15`.
-- Ambient shadow: `shadow-[0_30px_80px_-20px_rgba(11,26,58,0.35),0_8px_24px_-12px_rgba(11,26,58,0.20)]`.
-- Heading "Welcome back" (text-2xl, semibold, slate-900) + muted subhead.
-- Inputs: borderless, `bg-white/60`, `rounded-xl`, `h-12`, with leading icon. Focus → solid white + `ring-2 ring-primary/60`.
-- Password eye toggle preserved.
-- Primary button: full width, `h-12`, `rounded-xl`, deep navy `#0F1F47` background with subtle gradient sheen on hover, white label.
-- "Don't have an account?" muted helper below.
+**Right panel (login card)**
+- Background: very light neutral (`bg-muted/30`) so the card floats.
+- Card: pure white (light) / `bg-card` (dark), `rounded-2xl`, generous `p-10`, no visible border, ambient shadow using layered soft shadows (e.g. `shadow-[0_30px_80px_-20px_rgba(15,31,71,0.18),0_8px_24px_-12px_rgba(15,31,71,0.10)]`).
+- Heading "Welcome back" (text-2xl, semibold) + muted subhead.
+- Inputs:
+  - Borderless, `bg-slate-50` (light) / `bg-white/5` (dark), `rounded-xl`, `h-12`.
+  - Focus state: `ring-2 ring-primary/60` + background turns white, smooth `transition`.
+  - Icon (User / Lock) inset left, eye toggle inset right for password.
+  - Helper text muted, 12px.
+- Primary button: full width, `h-12`, `rounded-xl`, primary background, subtle gradient sheen on hover, loading spinner unchanged.
+- Footer line: "Don't have an account? Contact your administrator." muted, centered.
 
 **Mobile (< lg)**
-- Same background. Card centered with comfortable side padding.
-- Brand mark stacks above the card instead of floating top-left.
-- QR pill moves below the card.
+- Single-column. Top: small KPC logo chip + DLAX wordmark on a slim midnight-blue band (rounded-b-3xl) for brand presence without the full left panel.
+- Same login card centered below with comfortable margins.
+- QR install row appears below the card as today, restyled to match (rounded-xl, soft shadow, no hard border).
 
 ## Tokens / styling rules
 
-- Card chrome and form controls use semantic tokens where possible (`text-foreground`, `text-muted-foreground`, `ring-primary`).
-- Background gradient colors are brand-specific atmospheric assets — kept as inline hex / style values, not theme tokens.
-- Works in light mode primarily; dark mode falls back gracefully (card switches to translucent dark glass via `dark:` classes).
+- Use semantic Tailwind tokens (`bg-card`, `text-foreground`, `text-muted-foreground`, `ring-primary`, etc.). Custom hex values only inside the left panel gradient and the SVG line-art (brand-specific midnight blue & amber accent) — these are visual brand assets, not theme tokens.
+- Inter is already the default sans; no font swap needed.
+- Works in both light and dark mode (right panel adapts via tokens; left panel is always dark by design).
 
 ## Out of scope
 
-- No changes to `useAuth`, `signInWithUserId`, routing, QR URL, or any business logic.
-- No new dependencies or extracted components — everything stays in `src/routes/login.tsx`.
+- No changes to `useAuth`, form submit, `signInWithUserId`, routing, or QR install URL.
+- No new components extracted unless the file becomes unwieldy — keep everything in `src/routes/login.tsx`.
+- No new dependencies.
 
 ## Files
 
-- `src/routes/login.tsx` — full visual rewrite (background layers + glass card + repositioned brand/QR).
+- `src/routes/login.tsx` — full visual rewrite of the JSX + inline SVG line-art; logic preserved verbatim.
 
 ## Verification
 
-- `/login` at 1112×674: mesh gradient spans full screen, card floats right-of-center with visible glass blur, focus rings appear on inputs, submit still works.
-- Resize to mobile: card centers, brand stacks above, QR pill stacks below, no overflow.
+- Visit `/login` on desktop (≥1112px): split layout renders, line art visible, card floats with soft shadow, focus ring appears on inputs.
+- Resize to mobile: left panel hides, top brand band + centered card + QR row stack cleanly.
+- Submit still works (unchanged handler).
