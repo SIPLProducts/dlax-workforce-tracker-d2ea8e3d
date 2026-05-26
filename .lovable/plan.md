@@ -1,61 +1,47 @@
-# Login Page — Premium Redesign
+# DLAX User Manual — PDF with Screenshots
 
-Make the login feel rich, modern, and enterprise-premium. Replace the current flat ice-blue right panel and static left panel with a cohesive dark Midnight Indigo composition, glassmorphism card, animated gradient mesh background, and subtle motion accents.
+A single downloadable PDF covering all 5 roles (Admin, Supervisor, Manager, Project Coordinator, Project Manager), with screenshots auto-captured from the live preview.
 
-## Direction
+## Structure
 
-- **Palette (Midnight Indigo):** `#0A0A1A` base, `#141432` mid, `#1E1E5A` deep accent, `#4F46E5` primary glow, with `#FBBF24` amber spark for brand highlights.
-- **Typography:** Inter (already loaded) — keep, tighten tracking on display headings.
-- **Layout:** Full-bleed split (≈55/45 on `lg`). Left = brand canvas. Right = glass login card centered on a richly textured midnight background — not flat slate.
+1. **Cover page** — DLAX title, KPC branding, version, date
+2. **Introduction** — what DLAX is, login basics (User ID, not email)
+3. **Common screens** (shared by all roles) — Login, Dashboard, Top bar / sidebar
+4. **Role sections** (one per role, ~1–2 pages each):
+   - Who it's for / responsibilities
+   - Screens they can access (from `APP_SCREENS` + `SYSTEM_BASELINE` in `use-permissions.tsx`)
+   - Step-by-step for their main workflow
+   - Annotated screenshots
+5. **Appendix** — Approval workflow diagram (PC → PM), troubleshooting (forgot password, no project access)
 
-## Visual changes (right panel — the main complaint)
+### Per-role workflows
 
-Replace the flat `#E8F1F8` slate background with a layered midnight composition:
+| Role | Main workflow documented |
+|------|--------------------------|
+| Admin | User management, project/contractor/department masters, approval config, project assignments |
+| Supervisor | Daily Entry — add headcount, hours, OT, individual worker check-in/out |
+| Manager | View Dashboard + Reports, export to Excel |
+| Project Coordinator | Approvals queue → L1 approve/reject with remarks |
+| Project Manager | Approvals queue → L2 final approve/reject |
 
-1. **Background:** dark midnight base + animated conic/radial gradient mesh (blurred indigo + violet + amber blobs, very large, slow drift via CSS `@keyframes`).
-2. **Login card:** glassmorphism — `bg-white/[0.04]`, `backdrop-blur-2xl`, 1px white/10 border, `rounded-3xl`, dual-layer ambient shadow + inner highlight. Floats above the mesh.
-3. **Inside the card:**
-   - Small KPC mark + "DLAX" wordmark above heading on mobile (replaces current band).
-   - Heading "Welcome back" in white, semibold, tracking-tight; subhead in slate-400.
-   - Inputs: dark glass — `bg-white/[0.06]`, 1px white/10 border, `rounded-xl`, `h-12`, icon in indigo-300, focus ring `ring-2 ring-indigo-400/70` + subtle outer glow.
-   - Show/hide password eye in slate-400.
-   - Primary CTA: gradient button `from-indigo-500 to-violet-500`, white text, soft `shadow-indigo-500/40` glow, micro lift on hover.
-   - Footer line: muted slate-400.
-4. **Decorative:** thin amber spark line under the heading, animated pulse dot on the brand logo.
+## How screenshots will be captured
 
-## Visual changes (left panel)
+I need login credentials to capture role-specific screens. I'll ask you for these once we're in build mode:
 
-Keep the brand panel but lift it:
+- 1 test account per role (User ID + password), OR
+- One admin account + I'll capture every screen as admin (most screens look the same; I'll annotate role-restricted views textually)
 
-- Replace the current line-art with a denser, more refined SVG constellation (more nodes, varied opacities, 2–3 amber pulse dots with `animate-ping`).
-- Add a soft animated indigo glow orb behind the wordmark.
-- Bigger DLAX wordmark with subtle gradient text (`from-white to-indigo-200`).
-- Brand band at bottom with the QR install card already there — restyle to match new glass aesthetic.
+The browser will navigate to each route, capture a screenshot, and the script will embed them into the PDF using ReportLab. All output saved to `/mnt/documents/DLAX-User-Manual.pdf`.
 
-## Mobile (< lg)
+## Technical
 
-- Hide left panel; entire viewport gets the same animated midnight mesh background.
-- Logo + DLAX wordmark stack above the glass card (no separate band).
-- QR card below the login card uses the same glass treatment.
-
-## Tokens / implementation
-
-- All new visuals are scoped to `src/routes/login.tsx`. No global theme changes.
-- Use Tailwind utility classes; add a small `<style>` block (or inline keyframes via Tailwind arbitrary values) for the slow gradient drift (`@keyframes meshDrift`).
-- No new dependencies. No changes to auth, form submit, routing, or QR URL.
+- ReportLab (Python) for PDF generation — supports embedded images, headings, TOC
+- Browser automation tool to capture each screen at 1280×800
+- Visual QA: convert PDF pages to images and review before delivering
+- Single deliverable: `/mnt/documents/DLAX-User-Manual.pdf` exposed via `<presentation-artifact>`
 
 ## Out of scope
 
-- `useAuth`, `signInWithUserId`, navigation, validation logic, QR URL.
-- Global design tokens in `src/styles.css`.
-- Other routes / layouts.
-
-## Files
-
-- `src/routes/login.tsx` — full visual rewrite (JSX + inline keyframes only).
-
-## Verification
-
-- `/login` desktop ≥1112px: split layout, animated midnight mesh on the right, glass login card with focus glow on inputs.
-- Resize to mobile: single column, mesh background fills viewport, glass card centered with QR card below.
-- Submit still works; loading spinner unchanged.
+- No code changes to the app
+- No DOCX / PPTX versions (PDF only, as chosen)
+- Screenshots reflect current preview UI; will need regeneration if UI changes later
