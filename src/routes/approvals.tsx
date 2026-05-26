@@ -63,13 +63,12 @@ function Page() {
 
   const load = async () => {
     setLoading(true);
-    const [sh, pr, pf, lv] = await Promise.all([
+    const [sh, pr, lv] = await Promise.all([
       supabase.from("daily_manpower_sheets")
         .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels, submitted_by, submitted_at, rejection_remarks")
         .order("entry_date", { ascending: false })
         .limit(500),
       supabase.from("projects").select("id,name,code"),
-      supabase.from("profiles").select("user_id, display_name, login_id"),
       supabase.from("project_approval_levels").select("project_id, level_no, approver_user_id, label"),
     ]);
     // Fetch totals
@@ -81,10 +80,17 @@ function Page() {
     }
     setSheets((sh.data || []).map((s: any) => ({ ...s, total_headcount: totals[s.id] || 0 })));
     setProjects((pr.data || []) as any);
-    const pMap: Record<string, string> = {};
-    (pf.data || []).forEach((p: any) => { pMap[p.user_id] = p.display_name || p.login_id || p.user_id.slice(0, 8); });
-    setProfiles(pMap);
     setLevels((lv.data || []) as Level[]);
+    // Collect all user IDs referenced (submitters + approvers) and resolve via SECURITY DEFINER RPC
+    const userIdSet = new Set<string>();
+    (sh.data || []).forEach((s: any) => { if (s.submitted_by) userIdSet.add(s.submitted_by); });
+    (lv.data || []).forEach((l: any) => { if (l.approver_user_id) userIdSet.add(l.approver_user_id); });
+    const pMap: Record<string, string> = {};
+    if (userIdSet.size) {
+      const { data: pf } = await supabase.rpc("get_user_display_info", { _user_ids: Array.from(userIdSet) });
+      (pf || []).forEach((p: any) => { pMap[p.user_id] = p.login_id || p.display_name || p.user_id.slice(0, 8); });
+    }
+    setProfiles(pMap);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
