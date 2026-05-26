@@ -371,7 +371,7 @@ function DailyEntryPage() {
     }
   };
 
-  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors]);
+  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, assignedDepts, assignedCats]);
 
   // Load all sheets for the saved-entries table below
   const loadAllSheets = async () => {
