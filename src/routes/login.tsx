@@ -238,35 +238,35 @@ function LoginPage() {
 
         {/* Glass login card */}
         <div
-          className="relative w-full max-w-[440px] rounded-3xl border border-white/10 bg-white/[0.04] p-8 sm:p-10 backdrop-blur-2xl animate-fade-in"
+          className="relative w-full max-w-[440px] rounded-3xl border border-slate-200 bg-white p-8 sm:p-10 animate-fade-in"
           style={{
             boxShadow:
-              "0 40px 100px -20px rgba(0,0,0,0.6), 0 8px 32px -8px rgba(79,70,229,0.25), inset 0 1px 0 0 rgba(255,255,255,0.08)",
+              "0 40px 100px -20px rgba(0,0,0,0.45), 0 8px 32px -8px rgba(79,70,229,0.25)",
           }}
         >
           {/* subtle top edge highlight */}
-          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
 
           <div className="mb-7">
-            <h2 className="text-2xl font-semibold tracking-tight text-white">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
               Welcome back
             </h2>
             <div
-              className="mt-2 h-px w-12 origin-left bg-gradient-to-r from-amber-300 to-transparent"
+              className="mt-2 h-px w-12 origin-left bg-gradient-to-r from-indigo-500 to-transparent"
               style={{ animation: "sparkPulse 2.5s ease-in-out infinite" }}
             />
-            <p className="text-sm text-slate-400 mt-3">
+            <p className="text-sm text-slate-600 mt-3">
               Sign in to your DLAX account
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="userId" className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">
+              <Label htmlFor="userId" className="text-[11px] font-semibold tracking-[0.18em] text-slate-700">
                 USER ID
               </Label>
               <div className="relative group">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-300" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-indigo-600" />
                 <Input
                   id="userId"
                   type="text"
@@ -277,7 +277,7 @@ function LoginPage() {
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                   placeholder="e.g. bala"
-                  className="h-12 pl-10 rounded-xl border border-white/10 bg-white/[0.06] text-white placeholder:text-slate-500 shadow-none transition-all hover:bg-white/[0.08] focus-visible:bg-white/[0.1] focus-visible:border-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-400/40 focus-visible:ring-offset-0"
+                  className="h-12 pl-10 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-400 shadow-none transition-all hover:bg-white focus-visible:bg-white focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-400/40 focus-visible:ring-offset-0"
                 />
               </div>
               <p className="text-[11px] text-slate-500 pl-1">
@@ -286,11 +286,11 @@ function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">
+              <Label htmlFor="password" className="text-[11px] font-semibold tracking-[0.18em] text-slate-700">
                 PASSWORD
               </Label>
               <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-300" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-indigo-600" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -299,12 +299,12 @@ function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   minLength={6}
-                  className="h-12 pl-10 pr-11 rounded-xl border border-white/10 bg-white/[0.06] text-white placeholder:text-slate-500 shadow-none transition-all hover:bg-white/[0.08] focus-visible:bg-white/[0.1] focus-visible:border-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-400/40 focus-visible:ring-offset-0"
+                  className="h-12 pl-10 pr-11 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-400 shadow-none transition-all hover:bg-white focus-visible:bg-white focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-400/40 focus-visible:ring-offset-0"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -332,9 +332,9 @@ function LoginPage() {
           </form>
 
           <div className="mt-7 text-center">
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-600">
               Don't have an account?{" "}
-              <span className="text-indigo-300">Contact your administrator.</span>
+              <span className="text-indigo-600 font-medium">Contact your administrator.</span>
             </p>
           </div>
         </div>
