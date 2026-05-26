@@ -280,6 +280,28 @@ function DailyEntryPage() {
 
   const allCells: Cell[] = useMemo(() => groups.flatMap((g) => g.cells), [groups]);
 
+  // Display-only column set: assigned cells + orphan cells (saved earlier but
+  // no longer assigned). Used for rendering and grand totals so the Entry
+  // Sheet total matches Saved Entries. `allCells` stays unchanged for Save.
+  const ORPHAN_STYLE = { headerClass: "bg-amber-100 text-amber-900", cellClass: "bg-amber-50/40" };
+  const orphanGroup: GroupView | null = useMemo(() => {
+    if (orphanCells.length === 0) return null;
+    return {
+      deptId: "__orphan__",
+      deptName: "Unassigned (saved earlier)",
+      headerClass: ORPHAN_STYLE.headerClass,
+      cellClass: ORPHAN_STYLE.cellClass,
+      cells: orphanCells,
+    };
+  }, [orphanCells]);
+  const displayGroups: GroupView[] = useMemo(
+    () => (orphanGroup ? [...groups, orphanGroup] : groups),
+    [groups, orphanGroup]
+  );
+  const displayCells: Cell[] = useMemo(() => displayGroups.flatMap((g) => g.cells), [displayGroups]);
+  const orphanKeySet = useMemo(() => new Set(orphanCells.map((c) => c.key)), [orphanCells]);
+
+
   // Resolve legacy JSON-blob keys → (deptId, catId) using current assigned masters by name.
   const legacyKeyToCell = useMemo(() => {
     const deptByName = new Map(assignedDepts.map((d) => [d.name, d.id] as const));
