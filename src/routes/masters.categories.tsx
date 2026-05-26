@@ -111,7 +111,7 @@ function CategoriesPage() {
       <Input placeholder="Search categories..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>Name</TableHead><TableHead className="w-32">Group</TableHead><TableHead className="w-24">Order</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
+          <TableHeader className="[&_th]:sticky [&_th]:top-[112px] [&_th]:z-[5] [&_th]:bg-card"><TableRow><TableHead>Name</TableHead><TableHead className="w-32">Group</TableHead><TableHead className="w-24">Order</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
           <TableBody>
             {filtered.map((d) => (
               <TableRow key={d.id}>

@@ -199,7 +199,7 @@ function DepartmentsPage() {
       <Card>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="[&_th]:sticky [&_th]:top-[112px] [&_th]:z-[5] [&_th]:bg-card">
               <TableRow>
                 <TableHead className="w-[200px]">Name</TableHead>
                 <TableHead>Categories</TableHead>

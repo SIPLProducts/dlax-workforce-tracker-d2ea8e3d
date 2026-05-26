@@ -801,24 +801,25 @@ function DailyEntryPage() {
               </colgroup>
               <thead>
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 z-30 box-border">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] z-30 box-border">SC Code</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] z-30 box-border text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] z-30 box-border">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 top-[112px] z-40 box-border">Sl.no</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] top-[112px] z-40 box-border">SC Code</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] top-[112px] z-40 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] top-[112px] z-40 box-border">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] top-[112px] z-40 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {displayGroups.map((g) => (
-                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.deptName}</th>
+                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-[112px] z-30", g.headerClass)}>{g.deptName}</th>
                   ))}
-                  <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px]">Remarks</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
+                  <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px] sticky top-[112px] z-30">Total</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px] sticky top-[112px] z-30">Remarks</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px] sticky top-[112px] z-30">Weather</th>
                 </tr>
                 <tr>
                   {displayGroups.flatMap((g) => g.cells.map((c) => (
-                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.catName}</th>
+                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px] sticky top-[148px] z-30", g.headerClass)}>{c.catName}</th>
                   )))}
                 </tr>
               </thead>
+
               <tbody>
                 {loading && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
                 {!loading && contractors.length === 0 && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
@@ -906,7 +907,7 @@ function DailyEntryPage() {
           </div>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="[&_th]:sticky [&_th]:top-[112px] [&_th]:z-[5] [&_th]:bg-card">
                 <TableRow>
                   <TableHead>Sheet ID</TableHead>
                   <TableHead>Date</TableHead>
@@ -986,7 +987,7 @@ function TableWithTopScroll({ children }: { children: React.ReactNode }) {
       <div ref={topRef} onScroll={syncFromTop} className="overflow-x-auto overflow-y-hidden border-b sticky top-0 z-30 bg-background">
         <div style={{ width, height: 1 }} />
       </div>
-      <div ref={bottomRef} onScroll={syncFromBottom} className="overflow-auto">
+      <div ref={bottomRef} onScroll={syncFromBottom} className="overflow-x-auto">
         {children}
       </div>
     </>
