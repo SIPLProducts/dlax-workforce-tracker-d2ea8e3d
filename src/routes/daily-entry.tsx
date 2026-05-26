@@ -307,9 +307,10 @@ function DailyEntryPage() {
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
-        .select("contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
+        .select("id,contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
+
       supabase.from("daily_manpower_sheets")
         .select("id, sheet_code, status, current_level, total_levels, submitted_by")
         .eq("project_id", projectId)
