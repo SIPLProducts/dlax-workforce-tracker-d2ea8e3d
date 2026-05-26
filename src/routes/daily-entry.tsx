@@ -528,7 +528,9 @@ function DailyEntryPage() {
                 <PopoverTrigger asChild><Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar mode="single" selected={date}
-                    onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }} initialFocus />
+                    onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }}
+                    disabled={(d) => d > new Date(new Date().setHours(23, 59, 59, 999))}
+                    initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
