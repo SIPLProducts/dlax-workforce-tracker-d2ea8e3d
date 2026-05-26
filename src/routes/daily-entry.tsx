@@ -356,8 +356,55 @@ function DailyEntryPage() {
       touchedContractors.add(rec.contractor_id);
     });
     const nRows = touchedContractors.size;
+
+    // Detect orphan (dept, cat) pairs — saved data whose dept/cat is no longer
+    // assigned to this project. Render them read-only so totals reconcile and
+    // Save preserves the underlying rows.
+    const assignedCellKeys = new Set<string>();
+    assignedDepts.forEach((d) => assignedCats.forEach((c) => assignedCellKeys.add(cellKey(d.id, c.id))));
+    const orphanPairs = new Map<string, { deptId: string; catId: string }>();
+    const orphanIds: string[] = [];
+    (dm || []).forEach((rec: any) => {
+      if (!rec.department_id || !rec.category_id) return;
+      const ck = cellKey(rec.department_id, rec.category_id);
+      if (assignedCellKeys.has(ck)) return;
+      // Also skip if a legacy-blob path produced this row but the parsed key
+      // maps to a real assigned cell — those are already represented above.
+      orphanPairs.set(ck, { deptId: rec.department_id, catId: rec.category_id });
+      orphanIds.push(rec.id);
+      // Make sure the cell value is reflected on the row map (it already was
+      // by the !isLegacyBlob branch, but defensive merge in case).
+      const r = next[rec.contractor_id] || emptyRow();
+      r.cells[ck] = r.cells[ck] || 0;
+      next[rec.contractor_id] = r;
+    });
+    orphanRowIdsRef.current = orphanIds;
+
+    if (orphanPairs.size > 0) {
+      const deptIds = Array.from(new Set(Array.from(orphanPairs.values()).map((p) => p.deptId)));
+      const catIds = Array.from(new Set(Array.from(orphanPairs.values()).map((p) => p.catId)));
+      const [{ data: ds }, { data: cs }] = await Promise.all([
+        supabase.from("departments").select("id, name").in("id", deptIds),
+        supabase.from("worker_categories").select("id, name").in("id", catIds),
+      ]);
+      const dn = new Map<string, string>((ds || []).map((d: any) => [d.id, d.name]));
+      const cn = new Map<string, string>((cs || []).map((c: any) => [c.id, c.name]));
+      const cells: Cell[] = Array.from(orphanPairs.entries()).map(([key, p]) => ({
+        key,
+        deptId: p.deptId,
+        catId: p.catId,
+        deptName: dn.get(p.deptId) || "Unassigned",
+        catName: cn.get(p.catId) || "Unassigned",
+      })).sort((a, b) => (a.deptName + a.catName).localeCompare(b.deptName + b.catName));
+      setOrphanCells(cells);
+    } else {
+      setOrphanCells([]);
+    }
+
     setRows(next);
     setRowCount(nRows);
+
+
 
     setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels, submitted_by: sh.submitted_by ?? null } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
