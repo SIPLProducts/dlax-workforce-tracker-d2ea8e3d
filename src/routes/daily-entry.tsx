@@ -504,9 +504,8 @@ function DailyEntryPage() {
 
 
 
-    const { error } = await supabase
-      .from("daily_manpower")
-      .upsert(inserts as any, { onConflict: "entry_date,project_id,contractor_id,department_id,category_id" });
+    const { error } = await supabase.from("daily_manpower").insert(inserts as any);
+
     setSaving(false);
     if (error) return toast.error(error.message);
     await loadEntries(); await loadAllSheets();
