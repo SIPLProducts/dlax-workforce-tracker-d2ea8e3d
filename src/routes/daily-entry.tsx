@@ -24,46 +24,46 @@ export const Route = createFileRoute("/daily-entry")({
   component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
 });
 
-type ColDef = { key: string; label: string };
-type GroupDef = { key: "CIVIL" | "MEP" | "NMR"; label: string; cols: ColDef[]; headerClass: string; cellClass: string };
+type Cell = { key: string; deptId: string; catId: string; deptName: string; catName: string };
+type GroupView = { deptId: string; deptName: string; headerClass: string; cellClass: string; cells: Cell[] };
 
-const GROUPS: GroupDef[] = [
-  { key: "CIVIL", label: "CIVIL - Item rate / Subcontract", headerClass: "bg-blue-100 text-blue-900", cellClass: "bg-blue-50/40",
-    cols: [
-      { key: "civil_rod_bending", label: "Rod Bending" },
-      { key: "civil_shuttering", label: "Shuttering" },
-      { key: "civil_mason", label: "Mason" },
-      { key: "civil_scaffolders", label: "Scaffolders" },
-      { key: "civil_painters", label: "Painters" },
-      { key: "civil_helpers", label: "Helpers" },
-    ] },
-  { key: "MEP", label: "MEP - Item rate / Subcontract", headerClass: "bg-emerald-100 text-emerald-900", cellClass: "bg-emerald-50/40",
-    cols: [
-      { key: "mep_plumbers", label: "Plumbers" },
-      { key: "mep_carpenters", label: "Carpenters" },
-      { key: "mep_fitters", label: "Fitters" },
-      { key: "mep_welders", label: "Welders" },
-      { key: "mep_electricians", label: "Electricians" },
-      { key: "mep_helpers", label: "Helpers" },
-    ] },
-  { key: "NMR", label: "NMR Man powers", headerClass: "bg-orange-100 text-orange-900", cellClass: "bg-orange-50/40",
-    cols: [
-      { key: "nmr_mason", label: "Mason" },
-      { key: "nmr_mc", label: "M/C" },
-      { key: "nmr_fc", label: "F/C" },
-    ] },
+const GROUP_PALETTE = [
+  { headerClass: "bg-blue-100 text-blue-900", cellClass: "bg-blue-50/40" },
+  { headerClass: "bg-emerald-100 text-emerald-900", cellClass: "bg-emerald-50/40" },
+  { headerClass: "bg-orange-100 text-orange-900", cellClass: "bg-orange-50/40" },
+  { headerClass: "bg-purple-100 text-purple-900", cellClass: "bg-purple-50/40" },
+  { headerClass: "bg-pink-100 text-pink-900", cellClass: "bg-pink-50/40" },
+  { headerClass: "bg-teal-100 text-teal-900", cellClass: "bg-teal-50/40" },
+  { headerClass: "bg-amber-100 text-amber-900", cellClass: "bg-amber-50/40" },
+  { headerClass: "bg-rose-100 text-rose-900", cellClass: "bg-rose-50/40" },
 ];
+const OTHER_STYLE = { headerClass: "bg-slate-100 text-slate-900", cellClass: "bg-slate-50/40" };
+const cellKey = (d: string, c: string) => `${d}__${c}`;
 
-const ALL_COLS: ColDef[] = GROUPS.flatMap((g) => g.cols);
+type RowData = { cells: Record<string, number>; security: number; deficiency: number; remarks: string; weather: string };
+const emptyRow = (): RowData => ({ cells: {}, security: 0, deficiency: 0, remarks: "", weather: "" });
 
-type RowData = Record<string, number> & { security: number; deficiency: number; remarks: string; weather: string };
-const emptyRow = (): RowData => {
-  const r: any = { security: 0, deficiency: 0, remarks: "", weather: "" };
-  ALL_COLS.forEach((c) => (r[c.key] = 0));
-  return r as RowData;
+// Legacy JSON-blob keys → [department name, category name] for backward-compatible display
+const LEGACY_KEY_MAP: Record<string, [string, string]> = {
+  civil_rod_bending: ["CIVIL", "Rod Bending"],
+  civil_shuttering: ["CIVIL", "Shuttering"],
+  civil_mason: ["CIVIL", "Mason"],
+  civil_scaffolders: ["CIVIL", "Scaffolders"],
+  civil_painters: ["CIVIL", "Painters"],
+  civil_helpers: ["CIVIL", "Helpers"],
+  mep_plumbers: ["MEP", "Plumbers"],
+  mep_carpenters: ["MEP", "Carpenters"],
+  mep_fitters: ["MEP", "Fitters"],
+  mep_welders: ["MEP", "Welders"],
+  mep_electricians: ["MEP", "Electricians"],
+  mep_helpers: ["MEP", "Helpers"],
+  nmr_mason: ["NMR Man powers", "Mason"],
+  nmr_mc: ["NMR Man powers", "M/C"],
+  nmr_fc: ["NMR Man powers", "F /C"],
 };
 
 const WEATHER_OPTIONS = ["Sunny", "Cloudy", "Rainy", "Heavy Rain", "Stormy", "Foggy", "Hot", "Windy"];
+
 
 type SheetRow = {
   id: string;
@@ -96,6 +96,9 @@ function DailyEntryPage() {
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
+  const [assignedDepts, setAssignedDepts] = useState<{ id: string; name: string }[]>([]);
+  const [assignedCats, setAssignedCats] = useState<{ id: string; name: string; display_order: number }[]>([]);
+  const [deptCatLinks, setDeptCatLinks] = useState<{ department_id: string; category_id: string }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
   const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number; submitted_by: string | null } | null>(null);
   const [rowCount, setRowCount] = useState(0);
@@ -181,6 +184,86 @@ function DailyEntryPage() {
     return () => { supabase.removeChannel(channel); };
   }, [projectId]);
 
+  // Strict project scope: load assigned departments / categories / links for this project.
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); return; }
+      const [{ data: pd }, { data: pc }, { data: dc }] = await Promise.all([
+        supabase.from("project_departments").select("department_id").eq("project_id", projectId),
+        supabase.from("project_categories").select("category_id").eq("project_id", projectId),
+        supabase.from("department_categories").select("department_id, category_id"),
+      ]);
+      const deptIds = (pd || []).map((r: any) => r.department_id);
+      const catIds = (pc || []).map((r: any) => r.category_id);
+      const [{ data: depts }, { data: cats }] = await Promise.all([
+        deptIds.length
+          ? supabase.from("departments").select("id,name").in("id", deptIds).order("name")
+          : Promise.resolve({ data: [] as any[] }),
+        catIds.length
+          ? supabase.from("worker_categories").select("id,name,display_order").in("id", catIds).order("display_order").order("name")
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      setAssignedDepts(depts || []);
+      setAssignedCats(cats || []);
+      setDeptCatLinks(dc || []);
+    };
+    fetchAssignments();
+    const channel = supabase.channel("assignments-daily-entry")
+      .on("postgres_changes", { event: "*", schema: "public", table: "project_departments" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "project_categories" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "department_categories" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "departments" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "worker_categories" }, () => fetchAssignments())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [projectId]);
+
+  // Build the dynamic column groups from assignments.
+  const groups: GroupView[] = useMemo(() => {
+    const linksByDept = new Map<string, Set<string>>();
+    deptCatLinks.forEach((l) => {
+      if (!linksByDept.has(l.department_id)) linksByDept.set(l.department_id, new Set());
+      linksByDept.get(l.department_id)!.add(l.category_id);
+    });
+    const assignedCatIds = new Set(assignedCats.map((c) => c.id));
+    const catById = new Map(assignedCats.map((c) => [c.id, c] as const));
+    const placedCatIds = new Set<string>();
+    const out: GroupView[] = assignedDepts.map((d, idx) => {
+      const style = GROUP_PALETTE[idx % GROUP_PALETTE.length];
+      const catIdsForDept = Array.from(linksByDept.get(d.id) || []).filter((cid) => assignedCatIds.has(cid));
+      catIdsForDept.forEach((cid) => placedCatIds.add(cid));
+      const cells: Cell[] = catIdsForDept
+        .map((cid) => catById.get(cid)!)
+        .filter(Boolean)
+        .sort((a, b) => (a.display_order - b.display_order) || a.name.localeCompare(b.name))
+        .map((c) => ({ key: cellKey(d.id, c.id), deptId: d.id, catId: c.id, deptName: d.name, catName: c.name }));
+      return { deptId: d.id, deptName: d.name, headerClass: style.headerClass, cellClass: style.cellClass, cells };
+    });
+    const orphans = assignedCats.filter((c) => !placedCatIds.has(c.id));
+    if (orphans.length > 0) {
+      out.push({
+        deptId: "__other__", deptName: "Other",
+        headerClass: OTHER_STYLE.headerClass, cellClass: OTHER_STYLE.cellClass,
+        cells: orphans.map((c) => ({ key: cellKey("__other__", c.id), deptId: "__other__", catId: c.id, deptName: "Other", catName: c.name })),
+      });
+    }
+    return out.filter((g) => g.cells.length > 0);
+  }, [assignedDepts, assignedCats, deptCatLinks]);
+
+  const allCells: Cell[] = useMemo(() => groups.flatMap((g) => g.cells), [groups]);
+
+  // Resolve legacy JSON-blob keys → (deptId, catId) using current assigned masters by name.
+  const legacyKeyToCell = useMemo(() => {
+    const deptByName = new Map(assignedDepts.map((d) => [d.name, d.id] as const));
+    const catByName = new Map(assignedCats.map((c) => [c.name, c.id] as const));
+    const map: Record<string, string> = {};
+    Object.entries(LEGACY_KEY_MAP).forEach(([k, [dn, cn]]) => {
+      const did = deptByName.get(dn); const cid = catByName.get(cn);
+      if (did && cid) map[k] = cellKey(did, cid);
+    });
+    return map;
+  }, [assignedDepts, assignedCats]);
+
   useEffect(() => {
     setRows((prev) => {
       const next: Record<string, RowData> = {};
@@ -189,13 +272,14 @@ function DailyEntryPage() {
     });
   }, [contractors]);
 
+
   // Load existing sheet for project+date
   const loadEntries = async () => {
     if (!projectId) return;
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
-        .select("contractor_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
+        .select("contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
       supabase.from("daily_manpower_sheets")
@@ -210,26 +294,44 @@ function DailyEntryPage() {
 
     const next: Record<string, RowData> = {};
     contractors.forEach((c) => (next[c.id] = emptyRow()));
-    let nRows = 0;
+    const touchedContractors = new Set<string>();
     (dm || []).forEach((rec: any) => {
       const r = next[rec.contractor_id] || emptyRow();
-      r.security = rec.security_count || 0;
-      r.deficiency = rec.deficiency_manpower || 0;
-      try {
-        const parsed = rec.remarks ? JSON.parse(rec.remarks) : null;
-        if (parsed && typeof parsed === "object") {
-          r.remarks = parsed._remarks || "";
-          ALL_COLS.forEach((c) => { if (typeof parsed[c.key] === "number") (r as any)[c.key] = parsed[c.key]; });
-        } else if (typeof rec.remarks === "string") {
-          r.remarks = rec.remarks;
+      // Header-level fields (kept on every row server-side; max wins on load)
+      r.security = Math.max(r.security, rec.security_count || 0);
+      r.deficiency = Math.max(r.deficiency, rec.deficiency_manpower || 0);
+      r.weather = r.weather || rec.weather_condition || "";
+
+      // Try legacy JSON-blob remarks first
+      let isLegacyBlob = false;
+      if (rec.remarks && typeof rec.remarks === "string" && rec.remarks.trim().startsWith("{")) {
+        try {
+          const parsed = JSON.parse(rec.remarks);
+          if (parsed && typeof parsed === "object") {
+            isLegacyBlob = true;
+            r.remarks = r.remarks || parsed._remarks || "";
+            Object.entries(parsed).forEach(([k, v]) => {
+              if (k === "_remarks") return;
+              const ck = legacyKeyToCell[k];
+              if (ck && typeof v === "number") r.cells[ck] = (r.cells[ck] || 0) + v;
+            });
+          }
+        } catch { /* fall through */ }
+      }
+      if (!isLegacyBlob) {
+        if (rec.remarks && !r.remarks) r.remarks = rec.remarks;
+        if (rec.department_id && rec.category_id) {
+          const ck = cellKey(rec.department_id, rec.category_id);
+          r.cells[ck] = (r.cells[ck] || 0) + (rec.headcount || 0);
         }
-      } catch { r.remarks = rec.remarks || ""; }
-      r.weather = rec.weather_condition || "";
+      }
       next[rec.contractor_id] = r;
-      nRows += 1;
+      touchedContractors.add(rec.contractor_id);
     });
+    const nRows = touchedContractors.size;
     setRows(next);
     setRowCount(nRows);
+
     setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels, submitted_by: sh.submitted_by ?? null } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
     const levelList = (lvs || []) as any[];
@@ -269,7 +371,7 @@ function DailyEntryPage() {
     }
   };
 
-  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors]);
+  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, assignedDepts, assignedCats]);
 
   // Load all sheets for the saved-entries table below
   const loadAllSheets = async () => {
@@ -302,80 +404,92 @@ function DailyEntryPage() {
 
 
   const updateCell = (cid: string, key: string, val: number) =>
-    setRows((prev) => ({ ...prev, [cid]: { ...emptyRow(), ...(prev[cid] || {}), [key]: val } as RowData }));
+    setRows((prev) => {
+      const curr = prev[cid] || emptyRow();
+      return { ...prev, [cid]: { ...curr, cells: { ...curr.cells, [key]: val } } };
+    });
   const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) =>
-    setRows((prev) => ({ ...prev, [cid]: { ...emptyRow(), ...(prev[cid] || {}), [key]: val } as RowData }));
+    setRows((prev) => {
+      const curr = prev[cid] || emptyRow();
+      return { ...prev, [cid]: { ...curr, [key]: val } };
+    });
 
-  const rowTotal = (r: RowData) => ALL_COLS.reduce((s, c) => s + (Number((r as any)[c.key]) || 0), 0);
+  const rowTotal = (r: RowData) => allCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { security: 0, deficiency: 0, total: 0 };
-    ALL_COLS.forEach((c) => (t[c.key] = 0));
+    allCells.forEach((c) => (t[c.key] = 0));
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
-      ALL_COLS.forEach((col) => (t[col.key] += Number((r as any)[col.key]) || 0));
+      allCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
       t.security += Number(r.security) || 0;
       t.deficiency += Number(r.deficiency) || 0;
       t.total += rowTotal(r);
     });
     return t;
-  }, [rows, contractors]);
+  }, [rows, contractors, allCells]);
 
   const handleSave = async () => {
     if (!requireEdit()) return;
     if (!projectId) return toast.error("Select a project");
     if (!user) return toast.error("Not signed in");
     if (!canEdit) return toast.error(editLockReason || "Cannot edit");
+    if (allCells.length === 0) return toast.error("Assign Departments and Categories to this project in Masters → Project Assignments.");
     setSaving(true);
     const entry_date = format(date, "yyyy-MM-dd");
 
-    // Strict project scope: only use department/category assigned to this project.
-    const [{ data: assignedCats }, { data: assignedDeps }] = await Promise.all([
-      supabase.from("project_categories").select("category_id").eq("project_id", projectId).limit(1),
-      supabase.from("project_departments").select("department_id").eq("project_id", projectId).limit(1),
-    ]);
-    const fallbackCat = (assignedCats?.[0] as any)?.category_id as string | undefined;
-    const fallbackDep = (assignedDeps?.[0] as any)?.department_id as string | undefined;
-    if (!fallbackCat || !fallbackDep) {
-      setSaving(false);
-      return toast.error("Assign at least one Department and one Category to this project in Masters → Project Assignments.");
+    // Resolve a real department for "Other" orphan cells via department_categories
+    const orphanCatIds = allCells.filter((c) => c.deptId === "__other__").map((c) => c.catId);
+    const orphanDeptByCat: Record<string, string> = {};
+    if (orphanCatIds.length > 0) {
+      const { data: dcRows } = await supabase
+        .from("department_categories")
+        .select("department_id, category_id")
+        .in("category_id", orphanCatIds);
+      (dcRows || []).forEach((r: any) => { if (!orphanDeptByCat[r.category_id]) orphanDeptByCat[r.category_id] = r.department_id; });
     }
 
     const inserts: any[] = [];
-    const keptContractorIds = new Set<string>();
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
-      const total = rowTotal(r);
-      const hasAny = total > 0 || r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim());
-      if (!hasAny) return;
-      const payload: any = { _remarks: r.remarks || "" };
-      ALL_COLS.forEach((col) => (payload[col.key] = Number((r as any)[col.key]) || 0));
-      keptContractorIds.add(c.id);
-      inserts.push({
-        project_id: projectId,
-        entry_date,
-        contractor_id: c.id,
-        department_id: fallbackDep,
-        category_id: fallbackCat,
-        headcount: total,
-        security_count: Number(r.security) || 0,
-        deficiency_manpower: Number(r.deficiency) || 0,
-        remarks: JSON.stringify(payload),
-        created_by: user.id,
-        submitted_by: user.id,
+      const cellEntries = allCells
+        .map((cell) => ({ cell, n: Number(r.cells[cell.key]) || 0 }))
+        .filter((x) => x.n > 0);
+      const hasHeader = (r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()));
+      if (cellEntries.length === 0 && !hasHeader) return;
+
+      // If only header-level data exists, anchor it to the first available cell (real dept, not "__other__")
+      const anchor = allCells.find((cell) => cell.deptId !== "__other__") || allCells[0];
+      const baseCells = cellEntries.length > 0 ? cellEntries : [{ cell: anchor, n: 0 }];
+
+      baseCells.forEach((x, idx) => {
+        const did = x.cell.deptId === "__other__"
+          ? (orphanDeptByCat[x.cell.catId] || null)
+          : x.cell.deptId;
+        if (!did) return;
+        inserts.push({
+          project_id: projectId,
+          entry_date,
+          contractor_id: c.id,
+          department_id: did,
+          category_id: x.cell.catId,
+          headcount: x.n,
+          security_count: idx === 0 ? (Number(r.security) || 0) : 0,
+          deficiency_manpower: idx === 0 ? (Number(r.deficiency) || 0) : 0,
+          remarks: idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null,
+          weather_condition: idx === 0 ? (r.weather || null) : null,
+          created_by: user.id,
+          submitted_by: user.id,
+        });
       });
     });
 
-    // Delete rows the user cleared from the sheet (only editable statuses are allowed by RLS)
-    let delQuery = supabase
+    // Delete all editable rows for (project, date) then insert fresh. RLS allows delete only for draft/rejected.
+    const { error: delErr } = await supabase
       .from("daily_manpower")
       .delete()
       .eq("project_id", projectId)
       .eq("entry_date", entry_date);
-    if (keptContractorIds.size > 0) {
-      delQuery = delQuery.not("contractor_id", "in", `(${Array.from(keptContractorIds).join(",")})`);
-    }
-    const { error: delErr } = await delQuery;
     if (delErr) {
       setSaving(false);
       return toast.error(delErr.message);
@@ -388,9 +502,10 @@ function DailyEntryPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("daily_manpower")
-      .upsert(inserts as any, { onConflict: "entry_date,project_id,contractor_id,department_id,category_id" });
+
+
+    const { error } = await supabase.from("daily_manpower").insert(inserts as any);
+
     setSaving(false);
     if (error) return toast.error(error.message);
     await loadEntries(); await loadAllSheets();
@@ -575,8 +690,8 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] z-30 box-border text-left">Name of the Contractor</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[268px] z-30 box-border">Contact No</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[388px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
-                  {GROUPS.map((g) => (
-                    <th key={g.key} colSpan={g.cols.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.label}</th>
+                  {groups.map((g) => (
+                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.deptName}</th>
                   ))}
                   <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[70px]">Security</th>
@@ -585,15 +700,16 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
                 </tr>
                 <tr>
-                  {GROUPS.flatMap((g) => g.cols.map((c) => (
-                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.label}</th>
+                  {groups.flatMap((g) => g.cells.map((c) => (
+                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.catName}</th>
                   )))}
                 </tr>
               </thead>
               <tbody>
-                {loading && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + ALL_COLS.length + 5} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {contractors.map((c, idx) => {
+                {loading && (<tr><td colSpan={4 + allCells.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + allCells.length + 5} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={4 + 5} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {allCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
@@ -601,9 +717,9 @@ function DailyEntryPage() {
                       <td className="border px-2 sticky left-[48px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
                       <td className="border px-2 text-center sticky left-[268px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
                       <td className="border px-2 sticky left-[388px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
-                      {GROUPS.map((g) => g.cols.map((col) => (
+                      {groups.map((g) => g.cells.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
-                          {numCell((r as any)[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
+                          {numCell(r.cells[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
                         </td>
                       )))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
@@ -628,14 +744,14 @@ function DailyEntryPage() {
                   );
                 })}
               </tbody>
-              {contractors.length > 0 && (
+              {contractors.length > 0 && allCells.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
                     <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
                     <td className="border sticky left-[48px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[268px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[388px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
-                    {ALL_COLS.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
+                    {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border text-center">{colTotals.security || ""}</td>
                     <td className="border text-center">{colTotals.deficiency || ""}</td>
@@ -643,6 +759,7 @@ function DailyEntryPage() {
                     <td className="border"></td>
                   </tr>
                 </tfoot>
+
               )}
             </table>
           </TableWithTopScroll>
