@@ -791,6 +791,14 @@ export type Database = {
         Args: { _screen_key: string; _user_id: string }
         Returns: Database["public"]["Enums"]["permission_level"]
       }
+      get_user_display_info: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          display_name: string
+          login_id: string
+          user_id: string
+        }[]
+      }
       has_project_access: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
