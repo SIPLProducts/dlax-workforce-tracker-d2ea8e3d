@@ -40,8 +40,8 @@ const GROUP_PALETTE = [
 const OTHER_STYLE = { headerClass: "bg-slate-100 text-slate-900", cellClass: "bg-slate-50/40" };
 const cellKey = (d: string, c: string) => `${d}__${c}`;
 
-type RowData = { cells: Record<string, number>; security: number; deficiency: number; remarks: string; weather: string };
-const emptyRow = (): RowData => ({ cells: {}, security: 0, deficiency: 0, remarks: "", weather: "" });
+type RowData = { cells: Record<string, number>; remarks: string; weather: string };
+const emptyRow = (): RowData => ({ cells: {}, remarks: "", weather: "" });
 
 // Legacy JSON-blob keys → [department name, category name] for backward-compatible display
 const LEGACY_KEY_MAP: Record<string, [string, string]> = {
@@ -297,9 +297,7 @@ function DailyEntryPage() {
     const touchedContractors = new Set<string>();
     (dm || []).forEach((rec: any) => {
       const r = next[rec.contractor_id] || emptyRow();
-      // Header-level fields (kept on every row server-side; max wins on load)
-      r.security = Math.max(r.security, rec.security_count || 0);
-      r.deficiency = Math.max(r.deficiency, rec.deficiency_manpower || 0);
+      // Header-level fields (kept on every row server-side; first non-empty wins)
       r.weather = r.weather || rec.weather_condition || "";
 
       // Try legacy JSON-blob remarks first
@@ -408,7 +406,7 @@ function DailyEntryPage() {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, cells: { ...curr.cells, [key]: val } } };
     });
-  const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) =>
+  const updateField = (cid: string, key: "remarks" | "weather", val: any) =>
     setRows((prev) => {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, [key]: val } };
@@ -417,13 +415,11 @@ function DailyEntryPage() {
   const rowTotal = (r: RowData) => allCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
 
   const colTotals = useMemo(() => {
-    const t: Record<string, number> = { security: 0, deficiency: 0, total: 0 };
+    const t: Record<string, number> = { total: 0 };
     allCells.forEach((c) => (t[c.key] = 0));
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
       allCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
-      t.security += Number(r.security) || 0;
-      t.deficiency += Number(r.deficiency) || 0;
       t.total += rowTotal(r);
     });
     return t;
@@ -455,7 +451,7 @@ function DailyEntryPage() {
       const cellEntries = allCells
         .map((cell) => ({ cell, n: Number(r.cells[cell.key]) || 0 }))
         .filter((x) => x.n > 0);
-      const hasHeader = (r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()));
+      const hasHeader = ((r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()));
       if (cellEntries.length === 0 && !hasHeader) return;
 
       // If only header-level data exists, anchor it to the first available cell (real dept, not "__other__")
@@ -474,8 +470,6 @@ function DailyEntryPage() {
           department_id: did,
           category_id: x.cell.catId,
           headcount: x.n,
-          security_count: idx === 0 ? (Number(r.security) || 0) : 0,
-          deficiency_manpower: idx === 0 ? (Number(r.deficiency) || 0) : 0,
           remarks: idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null,
           weather_condition: idx === 0 ? (r.weather || null) : null,
           created_by: user.id,
@@ -694,8 +688,6 @@ function DailyEntryPage() {
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.deptName}</th>
                   ))}
                   <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[70px]">Security</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[90px]">Deficieny<br/>Manpower</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px]">Remarks</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
                 </tr>
@@ -706,9 +698,9 @@ function DailyEntryPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading && (<tr><td colSpan={4 + allCells.length + 5} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + allCells.length + 5} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={4 + 5} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {loading && (<tr><td colSpan={4 + allCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + allCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={4 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
                 {allCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
@@ -723,8 +715,6 @@ function DailyEntryPage() {
                         </td>
                       )))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
-                      <td className="border">{numCell(r.security, (n) => updateField(c.id, "security", n))}</td>
-                      <td className="border">{numCell(r.deficiency, (n) => updateField(c.id, "deficiency", n))}</td>
                       <td className="border">
                         <input value={r.remarks} disabled={readOnly}
                           onChange={(e) => updateField(c.id, "remarks", e.target.value)}
@@ -753,8 +743,6 @@ function DailyEntryPage() {
                     <td className="border sticky left-[388px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
                     {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
-                    <td className="border text-center">{colTotals.security || ""}</td>
-                    <td className="border text-center">{colTotals.deficiency || ""}</td>
                     <td className="border"></td>
                     <td className="border"></td>
                   </tr>
