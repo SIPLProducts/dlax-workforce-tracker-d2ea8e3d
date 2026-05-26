@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientOnly } from "@tanstack/react-router";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { PageHeader } from "@/components/PageHeader";
+import { ProjectCombobox } from "@/components/ProjectCombobox";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
