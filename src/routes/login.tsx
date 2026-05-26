@@ -40,7 +40,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="flex min-h-screen bg-[#E8F1F8]">
       {/* Left Brand Panel */}
       <div
         className="relative hidden lg:flex lg:w-[45%] xl:w-[48%] flex-col justify-between overflow-hidden p-12 text-white"
@@ -150,7 +150,7 @@ function LoginPage() {
       </div>
 
       {/* Right Login Panel */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10">
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 bg-[#E8F1F8]">
         {/* Mobile brand band */}
         <div
           className="mb-8 flex w-full max-w-[440px] flex-col items-center gap-2 rounded-3xl px-6 py-6 text-white lg:hidden"
@@ -168,28 +168,28 @@ function LoginPage() {
 
         {/* Login card */}
         <div
-          className="w-full max-w-[440px] rounded-2xl bg-card p-8 sm:p-10"
+          className="w-full max-w-[440px] rounded-2xl bg-[#F1F4F8] p-8 sm:p-10"
           style={{
             boxShadow:
-              "0 30px 80px -20px rgba(15,31,71,0.18), 0 8px 24px -12px rgba(15,31,71,0.10)",
+              "0 20px 50px -24px rgba(71,85,105,0.18), 0 4px 16px -8px rgba(71,85,105,0.08)",
           }}
         >
           <div className="mb-7">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-800">
               Welcome back
             </h2>
-            <p className="text-sm text-muted-foreground mt-1.5">
+            <p className="text-sm text-slate-500 mt-1.5">
               Sign in to your DLAX account
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="userId" className="text-xs font-medium text-muted-foreground">
+              <Label htmlFor="userId" className="text-xs font-medium text-slate-500">
                 USER ID
               </Label>
               <div className="relative group">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-primary" />
                 <Input
                   id="userId"
                   type="text"
@@ -200,20 +200,20 @@ function LoginPage() {
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                   placeholder="e.g. bala"
-                  className="h-12 pl-10 rounded-xl border-0 bg-muted/60 transition-all focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-0"
+                  className="h-12 pl-10 rounded-xl border-0 bg-white text-slate-800 placeholder:text-slate-400 shadow-sm transition-all hover:shadow focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-0"
                 />
               </div>
-              <p className="text-[11px] text-muted-foreground pl-1">
+              <p className="text-[11px] text-slate-500 pl-1">
                 Enter your User ID only — not your full email address.
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">
+              <Label htmlFor="password" className="text-xs font-medium text-slate-500">
                 PASSWORD
               </Label>
               <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-primary" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -222,12 +222,12 @@ function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   minLength={6}
-                  className="h-12 pl-10 pr-11 rounded-xl border-0 bg-muted/60 transition-all focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-0"
+                  className="h-12 pl-10 pr-11 rounded-xl border-0 bg-white text-slate-800 placeholder:text-slate-400 shadow-sm transition-all hover:shadow focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-0"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
