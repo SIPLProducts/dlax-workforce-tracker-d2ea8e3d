@@ -806,7 +806,7 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] z-30 box-border text-left">Name of the Contractor</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] z-30 box-border">Contact No</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
-                  {groups.map((g) => (
+                  {displayGroups.map((g) => (
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.deptName}</th>
                   ))}
                   <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
@@ -814,16 +814,16 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
                 </tr>
                 <tr>
-                  {groups.flatMap((g) => g.cells.map((c) => (
+                  {displayGroups.flatMap((g) => g.cells.map((c) => (
                     <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.catName}</th>
                   )))}
                 </tr>
               </thead>
               <tbody>
-                {loading && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
-                {allCells.length > 0 && contractors.map((c, idx) => {
+                {loading && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && displayCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {displayCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
@@ -832,11 +832,23 @@ function DailyEntryPage() {
                       <td className="border px-2 sticky left-[148px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
                       <td className="border px-2 text-center sticky left-[368px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
                       <td className="border px-2 sticky left-[488px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
-                      {groups.map((g) => g.cells.map((col) => (
-                        <td key={col.key} className={cn("border", g.cellClass)}>
-                          {numCell(r.cells[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
-                        </td>
-                      )))}
+                      {displayGroups.map((g) => g.cells.map((col) => {
+                        const isOrphan = orphanKeySet.has(col.key);
+                        const val = r.cells[col.key] || 0;
+                        if (isOrphan) {
+                          return (
+                            <td key={col.key} className={cn("border text-center text-amber-900", g.cellClass)}
+                                title="Department/category no longer assigned to this project — re-assign in Masters → Project Assignments to edit.">
+                              {val || ""}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={col.key} className={cn("border", g.cellClass)}>
+                            {numCell(val, (n) => updateCell(c.id, col.key, n))}
+                          </td>
+                        );
+                      }))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
                       <td className="border">
                         <input value={r.remarks} disabled={readOnly}
@@ -857,7 +869,7 @@ function DailyEntryPage() {
                   );
                 })}
               </tbody>
-              {contractors.length > 0 && allCells.length > 0 && (
+              {contractors.length > 0 && displayCells.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
                     <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
@@ -865,9 +877,10 @@ function DailyEntryPage() {
                     <td className="border sticky left-[148px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[368px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[488px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
-                    {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
+                    {displayCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
+
                     <td className="border"></td>
                   </tr>
                 </tfoot>
