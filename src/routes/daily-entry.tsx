@@ -96,6 +96,9 @@ function DailyEntryPage() {
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
+  const [assignedDepts, setAssignedDepts] = useState<{ id: string; name: string }[]>([]);
+  const [assignedCats, setAssignedCats] = useState<{ id: string; name: string; display_order: number }[]>([]);
+  const [deptCatLinks, setDeptCatLinks] = useState<{ department_id: string; category_id: string }[]>([]);
   const [rows, setRows] = useState<Record<string, RowData>>({});
   const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number; submitted_by: string | null } | null>(null);
   const [rowCount, setRowCount] = useState(0);
