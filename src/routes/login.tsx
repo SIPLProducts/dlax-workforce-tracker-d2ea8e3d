@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2, Smartphone, User, Lock } from "lucide-react";
+import { Eye, EyeOff, Loader2, Smartphone, User, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { KpcLogo } from "@/components/KpcLogo";
@@ -40,16 +40,67 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#E8F1F8]">
+    <div className="relative flex min-h-screen overflow-hidden bg-[#0A0A1A] text-white">
+      {/* Local keyframes for slow gradient drift */}
+      <style>{`
+        @keyframes meshDrift {
+          0%   { transform: translate3d(0,0,0) scale(1); }
+          50%  { transform: translate3d(4%, -3%, 0) scale(1.08); }
+          100% { transform: translate3d(0,0,0) scale(1); }
+        }
+        @keyframes meshDrift2 {
+          0%   { transform: translate3d(0,0,0) scale(1); }
+          50%  { transform: translate3d(-5%, 4%, 0) scale(1.12); }
+          100% { transform: translate3d(0,0,0) scale(1); }
+        }
+        @keyframes sparkPulse {
+          0%, 100% { opacity: 0.55; transform: scaleX(1); }
+          50%      { opacity: 1;    transform: scaleX(1.15); }
+        }
+      `}</style>
+
+      {/* Animated midnight mesh — full viewport, sits beneath everything */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div
+          className="absolute -top-40 -left-40 h-[60vmax] w-[60vmax] rounded-full opacity-70 blur-3xl"
+          style={{
+            background:
+              "radial-gradient(closest-side, #4F46E5 0%, rgba(79,70,229,0) 70%)",
+            animation: "meshDrift 18s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute top-1/3 -right-40 h-[55vmax] w-[55vmax] rounded-full opacity-60 blur-3xl"
+          style={{
+            background:
+              "radial-gradient(closest-side, #7C3AED 0%, rgba(124,58,237,0) 70%)",
+            animation: "meshDrift2 22s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute -bottom-40 left-1/4 h-[45vmax] w-[45vmax] rounded-full opacity-40 blur-3xl"
+          style={{
+            background:
+              "radial-gradient(closest-side, #FBBF24 0%, rgba(251,191,36,0) 70%)",
+            animation: "meshDrift 26s ease-in-out infinite",
+          }}
+        />
+        {/* Subtle grid overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage:
+              "radial-gradient(ellipse at center, black 40%, transparent 75%)",
+          }}
+        />
+      </div>
+
       {/* Left Brand Panel */}
-      <div
-        className="relative hidden lg:flex lg:w-[45%] xl:w-[48%] flex-col justify-between overflow-hidden p-12 text-white"
-        style={{
-          background:
-            "linear-gradient(135deg, #0A1530 0%, #0F1F47 55%, #14306B 100%)",
-        }}
-      >
-        {/* Abstract connectivity line-art */}
+      <div className="relative hidden lg:flex lg:w-[55%] flex-col justify-between overflow-hidden p-12">
+        {/* Constellation line-art */}
         <svg
           className="absolute inset-0 h-full w-full opacity-[0.55]"
           viewBox="0 0 600 800"
@@ -59,12 +110,15 @@ function LoginPage() {
         >
           <defs>
             <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FBBF24" stopOpacity="0.55" />
+              <stop offset="0%" stopColor="#FBBF24" stopOpacity="0.6" />
               <stop offset="100%" stopColor="#FBBF24" stopOpacity="0" />
             </radialGradient>
+            <radialGradient id="glowIndigo" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#818CF8" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#818CF8" stopOpacity="0" />
+            </radialGradient>
           </defs>
-          {/* Edges */}
-          <g stroke="white" strokeOpacity="0.10" strokeWidth="1">
+          <g stroke="white" strokeOpacity="0.12" strokeWidth="1">
             <line x1="80" y1="120" x2="260" y2="220" />
             <line x1="260" y1="220" x2="460" y2="140" />
             <line x1="460" y1="140" x2="540" y2="300" />
@@ -78,12 +132,12 @@ function LoginPage() {
             <line x1="380" y1="420" x2="460" y2="580" />
             <line x1="80" y1="120" x2="180" y2="380" />
             <line x1="240" y1="620" x2="380" y2="420" />
+            <line x1="460" y1="140" x2="380" y2="420" />
+            <line x1="540" y1="300" x2="460" y2="580" />
           </g>
-          {/* Glow halos */}
-          <circle cx="260" cy="220" r="60" fill="url(#glow)" />
-          <circle cx="380" cy="420" r="80" fill="url(#glow)" />
-          <circle cx="460" cy="580" r="55" fill="url(#glow)" />
-          {/* Nodes */}
+          <circle cx="260" cy="220" r="70" fill="url(#glowIndigo)" />
+          <circle cx="380" cy="420" r="100" fill="url(#glow)" />
+          <circle cx="460" cy="580" r="65" fill="url(#glowIndigo)" />
           <g fill="white">
             <circle cx="80" cy="120" r="2" fillOpacity="0.6" />
             <circle cx="260" cy="220" r="3.5" />
@@ -97,38 +151,48 @@ function LoginPage() {
             <circle cx="520" cy="720" r="2" fillOpacity="0.5" />
           </g>
           <g fill="#FBBF24">
-            <circle cx="260" cy="220" r="2" />
-            <circle cx="380" cy="420" r="2" />
-            <circle cx="460" cy="580" r="2" />
+            <circle cx="260" cy="220" r="2.5">
+              <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="380" cy="420" r="2.5">
+              <animate attributeName="opacity" values="1;0.4;1" dur="3.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="460" cy="580" r="2.5">
+              <animate attributeName="opacity" values="0.6;1;0.6" dur="4s" repeatCount="indefinite" />
+            </circle>
           </g>
         </svg>
 
         {/* Top: logo */}
-        <div className="relative z-10">
+        <div className="relative z-10 flex items-center gap-3">
           <KpcLogo variant="on-dark" className="h-10 w-auto" />
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-300/70">
+            Enterprise Edition
+          </span>
         </div>
 
         {/* Centered brand block */}
-        <div className="relative z-10 max-w-md">
-          <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-300/80">
-            Enterprise Edition
-          </p>
-          <h1 className="mt-4 text-7xl font-bold tracking-tight leading-none">
+        <div className="relative z-10 max-w-xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-indigo-200/90 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34D399]" />
+            System Online
+          </div>
+          <h1 className="mt-6 bg-gradient-to-br from-white via-white to-indigo-200 bg-clip-text text-[110px] font-bold leading-[0.95] tracking-tight text-transparent">
             DLAX
           </h1>
-          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.32em] text-amber-300/90">
+          <p className="mt-4 text-[12px] font-semibold uppercase tracking-[0.32em] text-amber-300/90">
             Daily Labour Attendance &amp; Tracking
           </p>
-          <p className="mt-6 text-base leading-relaxed text-slate-300/90 max-w-sm">
+          <p className="mt-6 max-w-md text-base leading-relaxed text-slate-300/80">
             Enterprise workforce management for KPC and partner contractor
-            operations across all project sites.
+            operations across every project site.
           </p>
         </div>
 
         {/* Bottom: QR + footer */}
         <div className="relative z-10 space-y-5">
-          <div className="flex items-center gap-4 rounded-2xl bg-white/[0.04] border border-white/10 p-3.5 backdrop-blur-sm max-w-sm">
-            <div className="rounded-lg bg-white p-2 shrink-0">
+          <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md max-w-sm shadow-[0_20px_60px_-20px_rgba(0,0,0,0.5)]">
+            <div className="rounded-xl bg-white p-2 shrink-0 shadow-md">
               <QRCodeSVG value={INSTALL_URL} size={72} level="M" />
             </div>
             <div className="min-w-0">
@@ -150,46 +214,49 @@ function LoginPage() {
       </div>
 
       {/* Right Login Panel */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 bg-[#E8F1F8]">
-        {/* Mobile brand band */}
-        <div
-          className="mb-8 flex w-full max-w-[440px] flex-col items-center gap-2 rounded-3xl px-6 py-6 text-white lg:hidden"
-          style={{
-            background:
-              "linear-gradient(135deg, #0A1530 0%, #0F1F47 55%, #14306B 100%)",
-          }}
-        >
-          <KpcLogo variant="on-dark" className="h-7 w-auto" />
-          <h1 className="text-2xl font-bold tracking-tight">DLAX</h1>
+      <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-10">
+        {/* Mobile brand */}
+        <div className="mb-8 flex flex-col items-center gap-2 lg:hidden">
+          <KpcLogo variant="on-dark" className="h-8 w-auto" />
+          <h1 className="bg-gradient-to-br from-white to-indigo-200 bg-clip-text text-4xl font-bold tracking-tight text-transparent">
+            DLAX
+          </h1>
           <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-300/90">
             Daily Labour Attendance &amp; Tracking
           </p>
         </div>
 
-        {/* Login card */}
+        {/* Glass login card */}
         <div
-          className="w-full max-w-[440px] rounded-2xl bg-[#F1F4F8] p-8 sm:p-10"
+          className="relative w-full max-w-[440px] rounded-3xl border border-white/10 bg-white/[0.04] p-8 sm:p-10 backdrop-blur-2xl animate-fade-in"
           style={{
             boxShadow:
-              "0 20px 50px -24px rgba(71,85,105,0.18), 0 4px 16px -8px rgba(71,85,105,0.08)",
+              "0 40px 100px -20px rgba(0,0,0,0.6), 0 8px 32px -8px rgba(79,70,229,0.25), inset 0 1px 0 0 rgba(255,255,255,0.08)",
           }}
         >
+          {/* subtle top edge highlight */}
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
           <div className="mb-7">
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-800">
+            <h2 className="text-2xl font-semibold tracking-tight text-white">
               Welcome back
             </h2>
-            <p className="text-sm text-slate-500 mt-1.5">
+            <div
+              className="mt-2 h-px w-12 origin-left bg-gradient-to-r from-amber-300 to-transparent"
+              style={{ animation: "sparkPulse 2.5s ease-in-out infinite" }}
+            />
+            <p className="text-sm text-slate-400 mt-3">
               Sign in to your DLAX account
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="userId" className="text-xs font-medium text-slate-500">
+              <Label htmlFor="userId" className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">
                 USER ID
               </Label>
               <div className="relative group">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-primary" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-300" />
                 <Input
                   id="userId"
                   type="text"
@@ -200,7 +267,7 @@ function LoginPage() {
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                   placeholder="e.g. bala"
-                  className="h-12 pl-10 rounded-xl border-0 bg-white text-slate-800 placeholder:text-slate-400 shadow-sm transition-all hover:shadow focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-0"
+                  className="h-12 pl-10 rounded-xl border border-white/10 bg-white/[0.06] text-white placeholder:text-slate-500 shadow-none transition-all hover:bg-white/[0.08] focus-visible:bg-white/[0.1] focus-visible:border-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-400/40 focus-visible:ring-offset-0"
                 />
               </div>
               <p className="text-[11px] text-slate-500 pl-1">
@@ -209,11 +276,11 @@ function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-xs font-medium text-slate-500">
+              <Label htmlFor="password" className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">
                 PASSWORD
               </Label>
               <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-primary" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-indigo-300" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -222,12 +289,12 @@ function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   minLength={6}
-                  className="h-12 pl-10 pr-11 rounded-xl border-0 bg-white text-slate-800 placeholder:text-slate-400 shadow-sm transition-all hover:shadow focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-0"
+                  className="h-12 pl-10 pr-11 rounded-xl border border-white/10 bg-white/[0.06] text-white placeholder:text-slate-500 shadow-none transition-all hover:bg-white/[0.08] focus-visible:bg-white/[0.1] focus-visible:border-indigo-400/50 focus-visible:ring-2 focus-visible:ring-indigo-400/40 focus-visible:ring-offset-0"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -237,7 +304,7 @@ function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-12 rounded-xl font-semibold text-sm tracking-wide shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30"
+              className="group relative w-full h-12 rounded-xl font-semibold text-sm tracking-wide text-white border-0 bg-gradient-to-r from-indigo-500 via-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 shadow-[0_10px_30px_-8px_rgba(99,102,241,0.6)] hover:shadow-[0_14px_36px_-8px_rgba(99,102,241,0.75)] transition-all hover:-translate-y-0.5"
               disabled={loading}
             >
               {loading ? (
@@ -246,41 +313,39 @@ function LoginPage() {
                   Please wait...
                 </>
               ) : (
-                "Sign In"
+                <>
+                  Sign In
+                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </>
               )}
             </Button>
           </form>
 
           <div className="mt-7 text-center">
-            <p className="text-xs text-muted-foreground">
-              Don't have an account? Please contact your administrator.
+            <p className="text-xs text-slate-400">
+              Don't have an account?{" "}
+              <span className="text-indigo-300">Contact your administrator.</span>
             </p>
           </div>
         </div>
 
         {/* Mobile QR install */}
-        <div
-          className="mt-6 flex w-full max-w-[440px] items-center gap-3 rounded-2xl bg-card p-3.5 lg:hidden"
-          style={{
-            boxShadow:
-              "0 20px 50px -20px rgba(15,31,71,0.12), 0 4px 16px -8px rgba(15,31,71,0.08)",
-          }}
-        >
-          <div className="rounded-lg bg-white p-1.5 border shrink-0">
+        <div className="mt-6 flex w-full max-w-[440px] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 backdrop-blur-md lg:hidden">
+          <div className="rounded-lg bg-white p-1.5 shrink-0">
             <QRCodeSVG value={INSTALL_URL} size={60} level="M" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <Smartphone className="h-3.5 w-3.5 text-primary" />
-              <p className="text-sm font-semibold">Install on Mobile</p>
+              <Smartphone className="h-3.5 w-3.5 text-amber-300" />
+              <p className="text-sm font-semibold text-white">Install on Mobile</p>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+            <p className="text-xs text-slate-400 mt-0.5 leading-snug">
               Scan and tap "Add to Home Screen".
             </p>
           </div>
         </div>
 
-        <p className="mt-6 text-[11px] text-muted-foreground lg:hidden">
+        <p className="mt-6 text-[11px] text-slate-500 lg:hidden">
           © 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
         </p>
       </div>

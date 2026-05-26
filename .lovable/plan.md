@@ -1,56 +1,61 @@
-# Login Screen Redesign
+# Login Page — Premium Redesign
 
-Refresh `src/routes/login.tsx` only — no behavior, auth, or routing changes. Pure visual / presentational rework matching the requested split-screen enterprise aesthetic.
+Make the login feel rich, modern, and enterprise-premium. Replace the current flat ice-blue right panel and static left panel with a cohesive dark Midnight Indigo composition, glassmorphism card, animated gradient mesh background, and subtle motion accents.
 
-## Visual direction
+## Direction
 
-**Left panel (≈45% on `lg`, hidden on mobile)**
-- Deep midnight-blue gradient: `#0A1530 → #0F1F47 → #14306B` (top-left → bottom-right).
-- Abstract geometric "connectivity" line art as an SVG layer: thin 1px white/10% lines forming a node-and-edge constellation, plus 2–3 soft amber glow dots at intersections. Subtle, decorative, non-distracting.
-- KPC logo top-left.
-- Centered brand block:
-  - `DLAX` wordmark in large, tight, crisp display weight (Inter 700, tracking-tight).
-  - Tagline "Daily Labour Attendance & Tracking" in small uppercase, wide tracking, slate-300.
-  - One short value sentence below in slate-300/80.
-- Bottom: a single compact "Install on mobile" row with the QR + 2-line copy, sitting on a faint white/5 surface.
-- Footer copyright in slate-500, 11px.
-- Remove the current 3-feature stacked cards (replaced by the cleaner brand + line-art composition).
+- **Palette (Midnight Indigo):** `#0A0A1A` base, `#141432` mid, `#1E1E5A` deep accent, `#4F46E5` primary glow, with `#FBBF24` amber spark for brand highlights.
+- **Typography:** Inter (already loaded) — keep, tighten tracking on display headings.
+- **Layout:** Full-bleed split (≈55/45 on `lg`). Left = brand canvas. Right = glass login card centered on a richly textured midnight background — not flat slate.
 
-**Right panel (login card)**
-- Background: very light neutral (`bg-muted/30`) so the card floats.
-- Card: pure white (light) / `bg-card` (dark), `rounded-2xl`, generous `p-10`, no visible border, ambient shadow using layered soft shadows (e.g. `shadow-[0_30px_80px_-20px_rgba(15,31,71,0.18),0_8px_24px_-12px_rgba(15,31,71,0.10)]`).
-- Heading "Welcome back" (text-2xl, semibold) + muted subhead.
-- Inputs:
-  - Borderless, `bg-slate-50` (light) / `bg-white/5` (dark), `rounded-xl`, `h-12`.
-  - Focus state: `ring-2 ring-primary/60` + background turns white, smooth `transition`.
-  - Icon (User / Lock) inset left, eye toggle inset right for password.
-  - Helper text muted, 12px.
-- Primary button: full width, `h-12`, `rounded-xl`, primary background, subtle gradient sheen on hover, loading spinner unchanged.
-- Footer line: "Don't have an account? Contact your administrator." muted, centered.
+## Visual changes (right panel — the main complaint)
 
-**Mobile (< lg)**
-- Single-column. Top: small KPC logo chip + DLAX wordmark on a slim midnight-blue band (rounded-b-3xl) for brand presence without the full left panel.
-- Same login card centered below with comfortable margins.
-- QR install row appears below the card as today, restyled to match (rounded-xl, soft shadow, no hard border).
+Replace the flat `#E8F1F8` slate background with a layered midnight composition:
 
-## Tokens / styling rules
+1. **Background:** dark midnight base + animated conic/radial gradient mesh (blurred indigo + violet + amber blobs, very large, slow drift via CSS `@keyframes`).
+2. **Login card:** glassmorphism — `bg-white/[0.04]`, `backdrop-blur-2xl`, 1px white/10 border, `rounded-3xl`, dual-layer ambient shadow + inner highlight. Floats above the mesh.
+3. **Inside the card:**
+   - Small KPC mark + "DLAX" wordmark above heading on mobile (replaces current band).
+   - Heading "Welcome back" in white, semibold, tracking-tight; subhead in slate-400.
+   - Inputs: dark glass — `bg-white/[0.06]`, 1px white/10 border, `rounded-xl`, `h-12`, icon in indigo-300, focus ring `ring-2 ring-indigo-400/70` + subtle outer glow.
+   - Show/hide password eye in slate-400.
+   - Primary CTA: gradient button `from-indigo-500 to-violet-500`, white text, soft `shadow-indigo-500/40` glow, micro lift on hover.
+   - Footer line: muted slate-400.
+4. **Decorative:** thin amber spark line under the heading, animated pulse dot on the brand logo.
 
-- Use semantic Tailwind tokens (`bg-card`, `text-foreground`, `text-muted-foreground`, `ring-primary`, etc.). Custom hex values only inside the left panel gradient and the SVG line-art (brand-specific midnight blue & amber accent) — these are visual brand assets, not theme tokens.
-- Inter is already the default sans; no font swap needed.
-- Works in both light and dark mode (right panel adapts via tokens; left panel is always dark by design).
+## Visual changes (left panel)
+
+Keep the brand panel but lift it:
+
+- Replace the current line-art with a denser, more refined SVG constellation (more nodes, varied opacities, 2–3 amber pulse dots with `animate-ping`).
+- Add a soft animated indigo glow orb behind the wordmark.
+- Bigger DLAX wordmark with subtle gradient text (`from-white to-indigo-200`).
+- Brand band at bottom with the QR install card already there — restyle to match new glass aesthetic.
+
+## Mobile (< lg)
+
+- Hide left panel; entire viewport gets the same animated midnight mesh background.
+- Logo + DLAX wordmark stack above the glass card (no separate band).
+- QR card below the login card uses the same glass treatment.
+
+## Tokens / implementation
+
+- All new visuals are scoped to `src/routes/login.tsx`. No global theme changes.
+- Use Tailwind utility classes; add a small `<style>` block (or inline keyframes via Tailwind arbitrary values) for the slow gradient drift (`@keyframes meshDrift`).
+- No new dependencies. No changes to auth, form submit, routing, or QR URL.
 
 ## Out of scope
 
-- No changes to `useAuth`, form submit, `signInWithUserId`, routing, or QR install URL.
-- No new components extracted unless the file becomes unwieldy — keep everything in `src/routes/login.tsx`.
-- No new dependencies.
+- `useAuth`, `signInWithUserId`, navigation, validation logic, QR URL.
+- Global design tokens in `src/styles.css`.
+- Other routes / layouts.
 
 ## Files
 
-- `src/routes/login.tsx` — full visual rewrite of the JSX + inline SVG line-art; logic preserved verbatim.
+- `src/routes/login.tsx` — full visual rewrite (JSX + inline keyframes only).
 
 ## Verification
 
-- Visit `/login` on desktop (≥1112px): split layout renders, line art visible, card floats with soft shadow, focus ring appears on inputs.
-- Resize to mobile: left panel hides, top brand band + centered card + QR row stack cleanly.
-- Submit still works (unchanged handler).
+- `/login` desktop ≥1112px: split layout, animated midnight mesh on the right, glass login card with focus glow on inputs.
+- Resize to mobile: single column, mesh background fills viewport, glass card centered with QR card below.
+- Submit still works; loading spinner unchanged.
