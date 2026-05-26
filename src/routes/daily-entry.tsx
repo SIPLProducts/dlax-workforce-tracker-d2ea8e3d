@@ -479,24 +479,39 @@ function DailyEntryPage() {
       const anchor = allCells.find((cell) => cell.deptId !== "__other__") || allCells[0];
       const baseCells = cellEntries.length > 0 ? cellEntries : [{ cell: anchor, n: 0 }];
 
+      // Dedupe by (department_id, category_id): "__other__" cells can resolve to a real
+      // department that already has its own cell for the same category. Merge headcounts
+      // and keep the first non-empty remarks/weather so we never violate the unique key.
+      const merged = new Map<string, any>();
       baseCells.forEach((x, idx) => {
         const did = x.cell.deptId === "__other__"
           ? (orphanDeptByCat[x.cell.catId] || null)
           : x.cell.deptId;
         if (!did) return;
-        inserts.push({
+        const key = `${did}|${x.cell.catId}`;
+        const remarks = idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null;
+        const weather = idx === 0 ? (r.weather || null) : null;
+        const existing = merged.get(key);
+        if (existing) {
+          existing.headcount += x.n;
+          if (!existing.remarks && remarks) existing.remarks = remarks;
+          if (!existing.weather_condition && weather) existing.weather_condition = weather;
+          return;
+        }
+        merged.set(key, {
           project_id: projectId,
           entry_date,
           contractor_id: c.id,
           department_id: did,
           category_id: x.cell.catId,
           headcount: x.n,
-          remarks: idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null,
-          weather_condition: idx === 0 ? (r.weather || null) : null,
+          remarks,
+          weather_condition: weather,
           created_by: user.id,
           submitted_by: user.id,
         });
       });
+      merged.forEach((row) => inserts.push(row));
     });
 
     // Delete all editable rows for (project, date) then insert fresh. RLS allows delete only for draft/rejected.
