@@ -99,7 +99,7 @@ function DailyEntryPage() {
 
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [projectId, setProjectId] = useState<string>("");
-  const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null }[]>([]);
+  const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null; contractor_code: string | null }[]>([]);
   const [assignedDepts, setAssignedDepts] = useState<{ id: string; name: string }[]>([]);
   const [assignedCats, setAssignedCats] = useState<{ id: string; name: string; display_order: number }[]>([]);
   const [deptCatLinks, setDeptCatLinks] = useState<{ department_id: string; category_id: string }[]>([]);
