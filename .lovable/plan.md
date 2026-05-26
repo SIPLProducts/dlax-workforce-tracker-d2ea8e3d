@@ -1,39 +1,53 @@
-## Problem
+## Root cause
 
-When saving the Daily Manpower Entry sheet, Postgres rejects the insert with:
+The duplicate-key error on edit is NOT a duplicate row in the new batch — the dedupe fix from last turn is working. The actual problem is that the **delete-then-insert** strategy in `handleSave` silently fails to delete the old rows, leaving them in place. The next insert then collides with them on `(entry_date, project_id, contractor_id, department_id, category_id)`.
 
-```
-duplicate key value violates unique constraint
-"daily_manpower_entry_date_project_id_contractor_id_departme_key"
-```
+Why the delete is silent-failing: `daily_manpower.status` defaults to `'approved'` and the insert at `src/routes/daily-entry.tsx:501-512` **never sets `status`**. So every row written from the entry sheet is stored as `approved`, even though the parent `daily_manpower_sheets` row is `draft`.
 
-The unique key is `(entry_date, project_id, contractor_id, department_id, category_id)`.
-
-### Root cause
-
-In `src/routes/daily-entry.tsx` (`handleSaveDraft`, ~lines 469–522), the grid renders each category once under its assigned department and **again** under the synthetic "Other" group when the same category is also linked to another department globally (visible in the screenshot: "Security" appears both under the *Security* department and inside *Other*).
-
-On save, each `__other__` orphan cell is resolved back to a real `department_id` via `department_categories`. If the user typed a number in **both** the real cell and the "Other" cell for the same category — or even if only the "Other" cell has a value but a real cell for the same `(department_id, category_id)` is also produced by another path — two insert rows end up with the exact same composite key and the DB rejects the batch.
+The RLS policy `"Editors can delete editable manpower"` only allows DELETE when `status IN ('draft','rejected')`. With existing rows stuck at `approved`, the delete at lines 518-522 matches zero rows (no error, just a no-op under RLS). The fresh insert then duplicates the composite key and Postgres rejects it.
 
 ## Fix
 
-Single change in `src/routes/daily-entry.tsx`, inside the contractor loop in `handleSaveDraft`:
+Two coordinated changes — one code, one data backfill.
 
-1. Build a per-contractor map keyed by `${department_id}|${category_id}` instead of pushing directly into `inserts`.
-2. When the same key is produced twice (real cell + resolved "Other" cell), **merge** them:
-   - `headcount`: sum the two values.
-   - `remarks` / `weather_condition`: keep the first non-empty value (these are header-level fields already only set on `idx === 0`).
-3. After the loop for a contractor, push the merged rows into `inserts`.
+### 1. `src/routes/daily-entry.tsx` — set `status: 'draft'` on insert
 
-This eliminates the duplicate composite key before it reaches Postgres while preserving any numbers the user entered in either cell.
+In the `merged.set(key, { ... })` object inside `handleSave` (~line 501), add `status: 'draft'` so newly written rows are deletable on the next edit. Submission via `submit_sheet` RPC will continue to promote them to `pending_l1` / `approved` as it does today (no change to that flow).
 
-### Out of scope
+### 2. Migration — backfill stuck rows
 
-- No DB / RLS / schema changes — the unique constraint is correct and should stay.
-- No UI change to how "Other" cells are rendered (separate question whether to hide categories in "Other" that already have a real department column; not touching that here).
-- No changes to approval flow, delete-then-insert strategy, or any other route.
+For every existing `daily_manpower` row whose parent `daily_manpower_sheets.status` is `draft` or `rejected`, set `daily_manpower.status` to match (`'draft'` or `'rejected'`). This unblocks edits on sheets that are currently in this broken state, including the one in the screenshot (`DE-000038`).
+
+```sql
+UPDATE public.daily_manpower dm
+SET status = s.status::approval_status
+FROM public.daily_manpower_sheets s
+WHERE dm.sheet_id = s.id
+  AND s.status IN ('draft','rejected')
+  AND dm.status NOT IN ('draft','rejected');
+
+-- Rows without a sheet_id link: infer from project+date
+UPDATE public.daily_manpower dm
+SET status = 'draft'
+WHERE dm.sheet_id IS NULL
+  AND dm.status = 'approved'
+  AND EXISTS (
+    SELECT 1 FROM public.daily_manpower_sheets s
+    WHERE s.project_id = dm.project_id
+      AND s.entry_date = dm.entry_date
+      AND s.status IN ('draft','rejected')
+  );
+```
+
+## Out of scope
+
+- No change to the dedupe logic added last turn (still needed).
+- No change to RLS policies, `submit_sheet` RPC, or approval flow.
+- No change to the default of the `status` column (leave as `approved` — explicit insert covers it).
 
 ## Verification
 
-- Reproduce on `/daily-entry` with a project where a category (e.g. *Security*) is assigned to both its own department and appears under *Other*; enter values in both cells and save — should succeed with a single merged row.
-- Existing flows with no "Other" overlap continue to insert one row per cell as before.
+1. Apply migration → existing `DE-000038` draft rows flip to `status = 'draft'`.
+2. Open `/daily-entry`, load `DE-000038`, click edit, change a number, save → succeeds.
+3. Save again → still succeeds (delete now matches old draft rows, insert is clean).
+4. Submit for approval → rows promote through `pending_l1` → `approved` as before.
