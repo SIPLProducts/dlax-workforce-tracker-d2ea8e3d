@@ -118,6 +118,13 @@ function DailyEntryPage() {
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
   const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
+  // Cells from saved daily_manpower rows whose (dept, cat) is no longer in the
+  // project's current assignments. Rendered read-only so totals reconcile and
+  // historical data isn't silently dropped from the grid.
+  const [orphanCells, setOrphanCells] = useState<Cell[]>([]);
+  // IDs of saved daily_manpower rows that are orphan; Save preserves these.
+  const orphanRowIdsRef = useRef<string[]>([]);
+
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
   const isEmpty = sheetStatus === "empty";
@@ -273,6 +280,28 @@ function DailyEntryPage() {
 
   const allCells: Cell[] = useMemo(() => groups.flatMap((g) => g.cells), [groups]);
 
+  // Display-only column set: assigned cells + orphan cells (saved earlier but
+  // no longer assigned). Used for rendering and grand totals so the Entry
+  // Sheet total matches Saved Entries. `allCells` stays unchanged for Save.
+  const ORPHAN_STYLE = { headerClass: "bg-amber-100 text-amber-900", cellClass: "bg-amber-50/40" };
+  const orphanGroup: GroupView | null = useMemo(() => {
+    if (orphanCells.length === 0) return null;
+    return {
+      deptId: "__orphan__",
+      deptName: "Unassigned (saved earlier)",
+      headerClass: ORPHAN_STYLE.headerClass,
+      cellClass: ORPHAN_STYLE.cellClass,
+      cells: orphanCells,
+    };
+  }, [orphanCells]);
+  const displayGroups: GroupView[] = useMemo(
+    () => (orphanGroup ? [...groups, orphanGroup] : groups),
+    [groups, orphanGroup]
+  );
+  const displayCells: Cell[] = useMemo(() => displayGroups.flatMap((g) => g.cells), [displayGroups]);
+  const orphanKeySet = useMemo(() => new Set(orphanCells.map((c) => c.key)), [orphanCells]);
+
+
   // Resolve legacy JSON-blob keys → (deptId, catId) using current assigned masters by name.
   const legacyKeyToCell = useMemo(() => {
     const deptByName = new Map(assignedDepts.map((d) => [d.name, d.id] as const));
@@ -300,9 +329,10 @@ function DailyEntryPage() {
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
-        .select("contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
+        .select("id,contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd")),
+
       supabase.from("daily_manpower_sheets")
         .select("id, sheet_code, status, current_level, total_levels, submitted_by")
         .eq("project_id", projectId)
@@ -348,8 +378,55 @@ function DailyEntryPage() {
       touchedContractors.add(rec.contractor_id);
     });
     const nRows = touchedContractors.size;
+
+    // Detect orphan (dept, cat) pairs — saved data whose dept/cat is no longer
+    // assigned to this project. Render them read-only so totals reconcile and
+    // Save preserves the underlying rows.
+    const assignedCellKeys = new Set<string>();
+    assignedDepts.forEach((d) => assignedCats.forEach((c) => assignedCellKeys.add(cellKey(d.id, c.id))));
+    const orphanPairs = new Map<string, { deptId: string; catId: string }>();
+    const orphanIds: string[] = [];
+    (dm || []).forEach((rec: any) => {
+      if (!rec.department_id || !rec.category_id) return;
+      const ck = cellKey(rec.department_id, rec.category_id);
+      if (assignedCellKeys.has(ck)) return;
+      // Also skip if a legacy-blob path produced this row but the parsed key
+      // maps to a real assigned cell — those are already represented above.
+      orphanPairs.set(ck, { deptId: rec.department_id, catId: rec.category_id });
+      orphanIds.push(rec.id);
+      // Make sure the cell value is reflected on the row map (it already was
+      // by the !isLegacyBlob branch, but defensive merge in case).
+      const r = next[rec.contractor_id] || emptyRow();
+      r.cells[ck] = r.cells[ck] || 0;
+      next[rec.contractor_id] = r;
+    });
+    orphanRowIdsRef.current = orphanIds;
+
+    if (orphanPairs.size > 0) {
+      const deptIds = Array.from(new Set(Array.from(orphanPairs.values()).map((p) => p.deptId)));
+      const catIds = Array.from(new Set(Array.from(orphanPairs.values()).map((p) => p.catId)));
+      const [{ data: ds }, { data: cs }] = await Promise.all([
+        supabase.from("departments").select("id, name").in("id", deptIds),
+        supabase.from("worker_categories").select("id, name").in("id", catIds),
+      ]);
+      const dn = new Map<string, string>((ds || []).map((d: any) => [d.id, d.name]));
+      const cn = new Map<string, string>((cs || []).map((c: any) => [c.id, c.name]));
+      const cells: Cell[] = Array.from(orphanPairs.entries()).map(([key, p]) => ({
+        key,
+        deptId: p.deptId,
+        catId: p.catId,
+        deptName: dn.get(p.deptId) || "Unassigned",
+        catName: cn.get(p.catId) || "Unassigned",
+      })).sort((a, b) => (a.deptName + a.catName).localeCompare(b.deptName + b.catName));
+      setOrphanCells(cells);
+    } else {
+      setOrphanCells([]);
+    }
+
     setRows(next);
     setRowCount(nRows);
+
+
 
     setSheet(sh ? { id: sh.id, sheet_code: sh.sheet_code, status: sh.status, current_level: sh.current_level, total_levels: sh.total_levels, submitted_by: sh.submitted_by ?? null } : null);
     setApprovalEnabled(!!(cfg as any)?.approval_enabled);
@@ -434,18 +511,19 @@ function DailyEntryPage() {
       return { ...prev, [cid]: { ...curr, [key]: val } };
     });
 
-  const rowTotal = (r: RowData) => allCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
+  const rowTotal = (r: RowData) => displayCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { total: 0 };
-    allCells.forEach((c) => (t[c.key] = 0));
+    displayCells.forEach((c) => (t[c.key] = 0));
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
-      allCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
+      displayCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
       t.total += rowTotal(r);
     });
     return t;
-  }, [rows, contractors, allCells]);
+  }, [rows, contractors, displayCells]);
+
 
   const handleSave = async () => {
     if (!requireEdit()) return;
@@ -516,16 +594,25 @@ function DailyEntryPage() {
       merged.forEach((row) => inserts.push(row));
     });
 
-    // Delete all editable rows for (project, date) then insert fresh. RLS allows delete only for draft/rejected.
-    const { error: delErr } = await supabase
+    // Delete editable rows for (project, date) then insert fresh. Preserve any
+    // orphan rows (saved earlier with a dept/cat that is no longer assigned to
+    // this project) so we don't silently destroy data the grid can't represent.
+    // RLS allows delete only for draft/rejected.
+    let delQ = supabase
       .from("daily_manpower")
       .delete()
       .eq("project_id", projectId)
       .eq("entry_date", entry_date);
+    if (orphanRowIdsRef.current.length > 0) {
+      // Postgres `not.in` requires a parenthesised list
+      delQ = delQ.not("id", "in", `(${orphanRowIdsRef.current.join(",")})`);
+    }
+    const { error: delErr } = await delQ;
     if (delErr) {
       setSaving(false);
       return toast.error(delErr.message);
     }
+
 
     if (inserts.length === 0) {
       setSaving(false);
@@ -719,7 +806,7 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] z-30 box-border text-left">Name of the Contractor</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] z-30 box-border">Contact No</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
-                  {groups.map((g) => (
+                  {displayGroups.map((g) => (
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold", g.headerClass)}>{g.deptName}</th>
                   ))}
                   <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px]">Total</th>
@@ -727,16 +814,16 @@ function DailyEntryPage() {
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px]">Weather</th>
                 </tr>
                 <tr>
-                  {groups.flatMap((g) => g.cells.map((c) => (
+                  {displayGroups.flatMap((g) => g.cells.map((c) => (
                     <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px]", g.headerClass)}>{c.catName}</th>
                   )))}
                 </tr>
               </thead>
               <tbody>
-                {loading && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
-                {allCells.length > 0 && contractors.map((c, idx) => {
+                {loading && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && displayCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {displayCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
@@ -745,11 +832,23 @@ function DailyEntryPage() {
                       <td className="border px-2 sticky left-[148px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
                       <td className="border px-2 text-center sticky left-[368px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
                       <td className="border px-2 sticky left-[488px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
-                      {groups.map((g) => g.cells.map((col) => (
-                        <td key={col.key} className={cn("border", g.cellClass)}>
-                          {numCell(r.cells[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
-                        </td>
-                      )))}
+                      {displayGroups.map((g) => g.cells.map((col) => {
+                        const isOrphan = orphanKeySet.has(col.key);
+                        const val = r.cells[col.key] || 0;
+                        if (isOrphan) {
+                          return (
+                            <td key={col.key} className={cn("border text-center text-amber-900", g.cellClass)}
+                                title="Department/category no longer assigned to this project — re-assign in Masters → Project Assignments to edit.">
+                              {val || ""}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={col.key} className={cn("border", g.cellClass)}>
+                            {numCell(val, (n) => updateCell(c.id, col.key, n))}
+                          </td>
+                        );
+                      }))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
                       <td className="border">
                         <input value={r.remarks} disabled={readOnly}
@@ -770,7 +869,7 @@ function DailyEntryPage() {
                   );
                 })}
               </tbody>
-              {contractors.length > 0 && allCells.length > 0 && (
+              {contractors.length > 0 && displayCells.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
                     <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
@@ -778,9 +877,10 @@ function DailyEntryPage() {
                     <td className="border sticky left-[148px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[368px] bg-yellow-100 z-20 box-border"></td>
                     <td className="border sticky left-[488px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
-                    {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
+                    {displayCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
+
                     <td className="border"></td>
                   </tr>
                 </tfoot>
