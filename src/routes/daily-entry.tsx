@@ -404,80 +404,92 @@ function DailyEntryPage() {
 
 
   const updateCell = (cid: string, key: string, val: number) =>
-    setRows((prev) => ({ ...prev, [cid]: { ...emptyRow(), ...(prev[cid] || {}), [key]: val } as RowData }));
+    setRows((prev) => {
+      const curr = prev[cid] || emptyRow();
+      return { ...prev, [cid]: { ...curr, cells: { ...curr.cells, [key]: val } } };
+    });
   const updateField = (cid: string, key: "security" | "deficiency" | "remarks" | "weather", val: any) =>
-    setRows((prev) => ({ ...prev, [cid]: { ...emptyRow(), ...(prev[cid] || {}), [key]: val } as RowData }));
+    setRows((prev) => {
+      const curr = prev[cid] || emptyRow();
+      return { ...prev, [cid]: { ...curr, [key]: val } };
+    });
 
-  const rowTotal = (r: RowData) => ALL_COLS.reduce((s, c) => s + (Number((r as any)[c.key]) || 0), 0);
+  const rowTotal = (r: RowData) => allCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { security: 0, deficiency: 0, total: 0 };
-    ALL_COLS.forEach((c) => (t[c.key] = 0));
+    allCells.forEach((c) => (t[c.key] = 0));
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
-      ALL_COLS.forEach((col) => (t[col.key] += Number((r as any)[col.key]) || 0));
+      allCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
       t.security += Number(r.security) || 0;
       t.deficiency += Number(r.deficiency) || 0;
       t.total += rowTotal(r);
     });
     return t;
-  }, [rows, contractors]);
+  }, [rows, contractors, allCells]);
 
   const handleSave = async () => {
     if (!requireEdit()) return;
     if (!projectId) return toast.error("Select a project");
     if (!user) return toast.error("Not signed in");
     if (!canEdit) return toast.error(editLockReason || "Cannot edit");
+    if (allCells.length === 0) return toast.error("Assign Departments and Categories to this project in Masters → Project Assignments.");
     setSaving(true);
     const entry_date = format(date, "yyyy-MM-dd");
 
-    // Strict project scope: only use department/category assigned to this project.
-    const [{ data: assignedCats }, { data: assignedDeps }] = await Promise.all([
-      supabase.from("project_categories").select("category_id").eq("project_id", projectId).limit(1),
-      supabase.from("project_departments").select("department_id").eq("project_id", projectId).limit(1),
-    ]);
-    const fallbackCat = (assignedCats?.[0] as any)?.category_id as string | undefined;
-    const fallbackDep = (assignedDeps?.[0] as any)?.department_id as string | undefined;
-    if (!fallbackCat || !fallbackDep) {
-      setSaving(false);
-      return toast.error("Assign at least one Department and one Category to this project in Masters → Project Assignments.");
+    // Resolve a real department for "Other" orphan cells via department_categories
+    const orphanCatIds = allCells.filter((c) => c.deptId === "__other__").map((c) => c.catId);
+    const orphanDeptByCat: Record<string, string> = {};
+    if (orphanCatIds.length > 0) {
+      const { data: dcRows } = await supabase
+        .from("department_categories")
+        .select("department_id, category_id")
+        .in("category_id", orphanCatIds);
+      (dcRows || []).forEach((r: any) => { if (!orphanDeptByCat[r.category_id]) orphanDeptByCat[r.category_id] = r.department_id; });
     }
 
     const inserts: any[] = [];
-    const keptContractorIds = new Set<string>();
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
-      const total = rowTotal(r);
-      const hasAny = total > 0 || r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim());
-      if (!hasAny) return;
-      const payload: any = { _remarks: r.remarks || "" };
-      ALL_COLS.forEach((col) => (payload[col.key] = Number((r as any)[col.key]) || 0));
-      keptContractorIds.add(c.id);
-      inserts.push({
-        project_id: projectId,
-        entry_date,
-        contractor_id: c.id,
-        department_id: fallbackDep,
-        category_id: fallbackCat,
-        headcount: total,
-        security_count: Number(r.security) || 0,
-        deficiency_manpower: Number(r.deficiency) || 0,
-        remarks: JSON.stringify(payload),
-        created_by: user.id,
-        submitted_by: user.id,
+      const cellEntries = allCells
+        .map((cell) => ({ cell, n: Number(r.cells[cell.key]) || 0 }))
+        .filter((x) => x.n > 0);
+      const hasHeader = (r.security > 0 || r.deficiency > 0 || (r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()));
+      if (cellEntries.length === 0 && !hasHeader) return;
+
+      // If only header-level data exists, anchor it to the first available cell (real dept, not "__other__")
+      const anchor = allCells.find((cell) => cell.deptId !== "__other__") || allCells[0];
+      const baseCells = cellEntries.length > 0 ? cellEntries : [{ cell: anchor, n: 0 }];
+
+      baseCells.forEach((x, idx) => {
+        const did = x.cell.deptId === "__other__"
+          ? (orphanDeptByCat[x.cell.catId] || null)
+          : x.cell.deptId;
+        if (!did) return;
+        inserts.push({
+          project_id: projectId,
+          entry_date,
+          contractor_id: c.id,
+          department_id: did,
+          category_id: x.cell.catId,
+          headcount: x.n,
+          security_count: idx === 0 ? (Number(r.security) || 0) : 0,
+          deficiency_manpower: idx === 0 ? (Number(r.deficiency) || 0) : 0,
+          remarks: idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null,
+          weather_condition: idx === 0 ? (r.weather || null) : null,
+          created_by: user.id,
+          submitted_by: user.id,
+        });
       });
     });
 
-    // Delete rows the user cleared from the sheet (only editable statuses are allowed by RLS)
-    let delQuery = supabase
+    // Delete all editable rows for (project, date) then insert fresh. RLS allows delete only for draft/rejected.
+    const { error: delErr } = await supabase
       .from("daily_manpower")
       .delete()
       .eq("project_id", projectId)
       .eq("entry_date", entry_date);
-    if (keptContractorIds.size > 0) {
-      delQuery = delQuery.not("contractor_id", "in", `(${Array.from(keptContractorIds).join(",")})`);
-    }
-    const { error: delErr } = await delQuery;
     if (delErr) {
       setSaving(false);
       return toast.error(delErr.message);
@@ -489,6 +501,8 @@ function DailyEntryPage() {
       await loadEntries(); await loadAllSheets();
       return;
     }
+
+
 
     const { error } = await supabase
       .from("daily_manpower")
