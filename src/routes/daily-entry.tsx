@@ -158,18 +158,19 @@ function DailyEntryPage() {
 
   useEffect(() => {
     const fetchContractors = async () => {
-      // Project-scoped with global fallback: if the project has assignments, use those; else use the full pool.
-      let assignedIds: string[] = [];
-      if (projectId) {
-        const { data: joins } = await supabase
-          .from("project_contractors")
-          .select("contractor_id")
-          .eq("project_id", projectId);
-        assignedIds = (joins || []).map((j: any) => j.contractor_id);
-      }
-      let query = supabase.from("contractors").select("id,company_name,contact_number,work_place").order("company_name");
-      if (assignedIds.length > 0) query = query.in("id", assignedIds);
-      const { data } = await query;
+      // Strict project scope: only show contractors assigned to this project via Masters → Project Assignments.
+      if (!projectId) { setContractors([]); return; }
+      const { data: joins } = await supabase
+        .from("project_contractors")
+        .select("contractor_id")
+        .eq("project_id", projectId);
+      const ids = (joins || []).map((j: any) => j.contractor_id);
+      if (ids.length === 0) { setContractors([]); return; }
+      const { data } = await supabase
+        .from("contractors")
+        .select("id,company_name,contact_number,work_place")
+        .in("id", ids)
+        .order("company_name");
       setContractors(data || []);
     };
     fetchContractors();
