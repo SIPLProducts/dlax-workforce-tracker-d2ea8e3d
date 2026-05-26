@@ -114,6 +114,32 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
   const filtered = all.filter((i) => !q || i.label.toLowerCase().includes(q));
   const assignedItems = filtered.filter((i) => assigned.has(i.id));
   const availableItems = filtered.filter((i) => !assigned.has(i.id));
+  const hasSearch = q.length > 0;
+
+  const bulkAssign = async () => {
+    if (!canAssign) { toast.error("You don't have edit permission on Projects."); return; }
+    if (availableItems.length === 0) return;
+    setBusy(true);
+    const rows = availableItems.map((i) => ({ project_id: projectId, [cfg.joinFk]: i.id }));
+    const { error } = await supabase.from(cfg.joinTable as any).insert(rows as any);
+    if (error) { toast.error(error.message); setBusy(false); return; }
+    setAssigned((s) => { const n = new Set(s); availableItems.forEach((i) => n.add(i.id)); return n; });
+    setBusy(false);
+    toast.success(`Assigned ${rows.length} ${cfg.title.toLowerCase()}`);
+  };
+
+  const bulkUnassign = async () => {
+    if (!canAssign) { toast.error("You don't have edit permission on Projects."); return; }
+    if (assignedItems.length === 0) return;
+    if (!window.confirm(`Unassign ${assignedItems.length} ${cfg.title.toLowerCase()}${hasSearch ? " matching the search" : ""}?`)) return;
+    setBusy(true);
+    const ids = assignedItems.map((i) => i.id);
+    const { error } = await supabase.from(cfg.joinTable as any).delete().eq("project_id", projectId).in(cfg.joinFk, ids);
+    if (error) { toast.error(error.message); setBusy(false); return; }
+    setAssigned((s) => { const n = new Set(s); ids.forEach((id) => n.delete(id)); return n; });
+    setBusy(false);
+    toast.success(`Unassigned ${ids.length} ${cfg.title.toLowerCase()}`);
+  };
 
   return (
     <div className="space-y-4">
