@@ -162,9 +162,16 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Assigned ({assignedItems.length})
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Assigned ({assignedItems.length})
+            </p>
+            {canAssign && assignedItems.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive hover:text-destructive" onClick={bulkUnassign} disabled={busy}>
+                {hasSearch ? `Unassign all matching (${assignedItems.length})` : `Unassign all (${assignedItems.length})`}
+              </Button>
+            )}
+          </div>
           <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
             {assignedItems.length === 0 && <p className="text-sm text-muted-foreground p-3">None assigned yet.</p>}
             {assignedItems.map((i) => (
@@ -180,9 +187,16 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
           </div>
         </div>
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Available ({availableItems.length})
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Available ({availableItems.length})
+            </p>
+            {canAssign && availableItems.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={bulkAssign} disabled={busy}>
+                {hasSearch ? `Select all matching (${availableItems.length})` : `Select all (${availableItems.length})`}
+              </Button>
+            )}
+          </div>
           <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
             {availableItems.length === 0 && <p className="text-sm text-muted-foreground p-3">No more available.</p>}
             {availableItems.map((i) => (
