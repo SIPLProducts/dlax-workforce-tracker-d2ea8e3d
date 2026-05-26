@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectAssignments } from "@/components/ProjectAssignments";
+import { ProjectCombobox } from "@/components/ProjectCombobox";
 
 export const Route = createFileRoute("/masters/assignments")({
   component: () => <ScreenGuard screen="masters_assignments"><AssignmentsPage /></ScreenGuard>,
@@ -31,14 +31,7 @@ function AssignmentsPage() {
       <Card>
         <CardContent className="p-4">
           <Label className="text-xs text-muted-foreground">Project</Label>
-          <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger className="max-w-md"><SelectValue placeholder="Select a project" /></SelectTrigger>
-            <SelectContent>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.code ? `${p.code} — ` : ""}{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ProjectCombobox value={projectId} onChange={setProjectId} projects={projects} placeholder="Select a project" className="max-w-md" />
         </CardContent>
       </Card>
 

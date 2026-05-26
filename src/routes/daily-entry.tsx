@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { ProjectCombobox } from "@/components/ProjectCombobox";
 
 export const Route = createFileRoute("/daily-entry")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -659,12 +660,7 @@ function DailyEntryPage() {
           </div>
           <div className="space-y-1 min-w-[240px]">
             <label className="text-xs font-medium">Project</label>
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.code ? `${p.code} — ` : ""}{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ProjectCombobox value={projectId} onChange={setProjectId} projects={projects} placeholder="Select project" />
           </div>
           <div className="ml-auto flex items-center gap-2 flex-wrap">
             {sheet?.sheet_code && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheet.sheet_code}</span></div>}
