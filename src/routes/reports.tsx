@@ -298,13 +298,14 @@ function ReportsPage() {
               </div>
               <div className="space-y-1 min-w-0">
                 <Label>Project</Label>
-                <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {visibleProjects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <ProjectCombobox
+                  value={projectId}
+                  onChange={setProjectId}
+                  projects={visibleProjects}
+                  includeAllOption
+                  className="w-full sm:w-[220px]"
+                  formatLabel={(p) => [p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}
+                />
               </div>
               <div className="space-y-1 min-w-0">
                 <Label>Contractor</Label>
