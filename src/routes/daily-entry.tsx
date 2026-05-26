@@ -184,6 +184,86 @@ function DailyEntryPage() {
     return () => { supabase.removeChannel(channel); };
   }, [projectId]);
 
+  // Strict project scope: load assigned departments / categories / links for this project.
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); return; }
+      const [{ data: pd }, { data: pc }, { data: dc }] = await Promise.all([
+        supabase.from("project_departments").select("department_id").eq("project_id", projectId),
+        supabase.from("project_categories").select("category_id").eq("project_id", projectId),
+        supabase.from("department_categories").select("department_id, category_id"),
+      ]);
+      const deptIds = (pd || []).map((r: any) => r.department_id);
+      const catIds = (pc || []).map((r: any) => r.category_id);
+      const [{ data: depts }, { data: cats }] = await Promise.all([
+        deptIds.length
+          ? supabase.from("departments").select("id,name").in("id", deptIds).order("name")
+          : Promise.resolve({ data: [] as any[] }),
+        catIds.length
+          ? supabase.from("worker_categories").select("id,name,display_order").in("id", catIds).order("display_order").order("name")
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      setAssignedDepts(depts || []);
+      setAssignedCats(cats || []);
+      setDeptCatLinks(dc || []);
+    };
+    fetchAssignments();
+    const channel = supabase.channel("assignments-daily-entry")
+      .on("postgres_changes", { event: "*", schema: "public", table: "project_departments" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "project_categories" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "department_categories" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "departments" }, () => fetchAssignments())
+      .on("postgres_changes", { event: "*", schema: "public", table: "worker_categories" }, () => fetchAssignments())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [projectId]);
+
+  // Build the dynamic column groups from assignments.
+  const groups: GroupView[] = useMemo(() => {
+    const linksByDept = new Map<string, Set<string>>();
+    deptCatLinks.forEach((l) => {
+      if (!linksByDept.has(l.department_id)) linksByDept.set(l.department_id, new Set());
+      linksByDept.get(l.department_id)!.add(l.category_id);
+    });
+    const assignedCatIds = new Set(assignedCats.map((c) => c.id));
+    const catById = new Map(assignedCats.map((c) => [c.id, c] as const));
+    const placedCatIds = new Set<string>();
+    const out: GroupView[] = assignedDepts.map((d, idx) => {
+      const style = GROUP_PALETTE[idx % GROUP_PALETTE.length];
+      const catIdsForDept = Array.from(linksByDept.get(d.id) || []).filter((cid) => assignedCatIds.has(cid));
+      catIdsForDept.forEach((cid) => placedCatIds.add(cid));
+      const cells: Cell[] = catIdsForDept
+        .map((cid) => catById.get(cid)!)
+        .filter(Boolean)
+        .sort((a, b) => (a.display_order - b.display_order) || a.name.localeCompare(b.name))
+        .map((c) => ({ key: cellKey(d.id, c.id), deptId: d.id, catId: c.id, deptName: d.name, catName: c.name }));
+      return { deptId: d.id, deptName: d.name, headerClass: style.headerClass, cellClass: style.cellClass, cells };
+    });
+    const orphans = assignedCats.filter((c) => !placedCatIds.has(c.id));
+    if (orphans.length > 0) {
+      out.push({
+        deptId: "__other__", deptName: "Other",
+        headerClass: OTHER_STYLE.headerClass, cellClass: OTHER_STYLE.cellClass,
+        cells: orphans.map((c) => ({ key: cellKey("__other__", c.id), deptId: "__other__", catId: c.id, deptName: "Other", catName: c.name })),
+      });
+    }
+    return out.filter((g) => g.cells.length > 0);
+  }, [assignedDepts, assignedCats, deptCatLinks]);
+
+  const allCells: Cell[] = useMemo(() => groups.flatMap((g) => g.cells), [groups]);
+
+  // Resolve legacy JSON-blob keys → (deptId, catId) using current assigned masters by name.
+  const legacyKeyToCell = useMemo(() => {
+    const deptByName = new Map(assignedDepts.map((d) => [d.name, d.id] as const));
+    const catByName = new Map(assignedCats.map((c) => [c.name, c.id] as const));
+    const map: Record<string, string> = {};
+    Object.entries(LEGACY_KEY_MAP).forEach(([k, [dn, cn]]) => {
+      const did = deptByName.get(dn); const cid = catByName.get(cn);
+      if (did && cid) map[k] = cellKey(did, cid);
+    });
+    return map;
+  }, [assignedDepts, assignedCats]);
+
   useEffect(() => {
     setRows((prev) => {
       const next: Record<string, RowData> = {};
@@ -191,6 +271,7 @@ function DailyEntryPage() {
       return next;
     });
   }, [contractors]);
+
 
   // Load existing sheet for project+date
   const loadEntries = async () => {
