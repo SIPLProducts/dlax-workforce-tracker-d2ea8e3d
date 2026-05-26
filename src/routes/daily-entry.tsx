@@ -191,7 +191,7 @@ function DailyEntryPage() {
       if (ids.length === 0) { setContractors([]); return; }
       const { data } = await supabase
         .from("contractors")
-        .select("id,company_name,contact_number,work_place")
+        .select("id,company_name,contact_number,work_place,contractor_code")
         .in("id", ids)
         .order("company_name");
       setContractors(data || []);
