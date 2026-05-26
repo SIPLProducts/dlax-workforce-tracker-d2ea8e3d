@@ -40,7 +40,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-[#0A0A1A] text-white">
+    <div className="relative flex min-h-screen overflow-hidden bg-slate-50 text-white">
       {/* Local keyframes for slow gradient drift */}
       <style>{`
         @keyframes meshDrift {
@@ -59,47 +59,16 @@ function LoginPage() {
         }
       `}</style>
 
-      {/* Animated midnight mesh — full viewport, sits beneath everything */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div
-          className="absolute -top-40 -left-40 h-[60vmax] w-[60vmax] rounded-full opacity-70 blur-3xl"
-          style={{
-            background:
-              "radial-gradient(closest-side, #4F46E5 0%, rgba(79,70,229,0) 70%)",
-            animation: "meshDrift 18s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute top-1/3 -right-40 h-[55vmax] w-[55vmax] rounded-full opacity-60 blur-3xl"
-          style={{
-            background:
-              "radial-gradient(closest-side, #7C3AED 0%, rgba(124,58,237,0) 70%)",
-            animation: "meshDrift2 22s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute -bottom-40 left-1/4 h-[45vmax] w-[45vmax] rounded-full opacity-40 blur-3xl"
-          style={{
-            background:
-              "radial-gradient(closest-side, #FBBF24 0%, rgba(251,191,36,0) 70%)",
-            animation: "meshDrift 26s ease-in-out infinite",
-          }}
-        />
-        {/* Subtle grid overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.06]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
-            backgroundSize: "56px 56px",
-            maskImage:
-              "radial-gradient(ellipse at center, black 40%, transparent 75%)",
-          }}
-        />
-      </div>
+      {/* (Background mesh moved into the right login panel only) */}
 
       {/* Left Brand Panel */}
-      <div className="relative hidden lg:flex lg:w-[55%] flex-col justify-between overflow-hidden p-12">
+      <div
+        className="relative hidden lg:flex lg:w-[55%] flex-col justify-between overflow-hidden p-12"
+        style={{
+          background:
+            "linear-gradient(135deg, #0A1530 0%, #0F1F47 55%, #14306B 100%)",
+        }}
+      >
         {/* Constellation line-art */}
         <svg
           className="absolute inset-0 h-full w-full opacity-[0.55]"
@@ -214,7 +183,48 @@ function LoginPage() {
       </div>
 
       {/* Right Login Panel */}
-      <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-10">
+      <div
+        className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6 py-10 bg-[#0A0A1A]"
+      >
+        {/* Animated midnight mesh — only behind the login form */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div
+            className="absolute -top-40 -left-40 h-[60vmax] w-[60vmax] rounded-full opacity-70 blur-3xl"
+            style={{
+              background:
+                "radial-gradient(closest-side, #4F46E5 0%, rgba(79,70,229,0) 70%)",
+              animation: "meshDrift 18s ease-in-out infinite",
+            }}
+          />
+          <div
+            className="absolute top-1/3 -right-40 h-[55vmax] w-[55vmax] rounded-full opacity-60 blur-3xl"
+            style={{
+              background:
+                "radial-gradient(closest-side, #7C3AED 0%, rgba(124,58,237,0) 70%)",
+              animation: "meshDrift2 22s ease-in-out infinite",
+            }}
+          />
+          <div
+            className="absolute -bottom-40 left-1/4 h-[45vmax] w-[45vmax] rounded-full opacity-40 blur-3xl"
+            style={{
+              background:
+                "radial-gradient(closest-side, #FBBF24 0%, rgba(251,191,36,0) 70%)",
+              animation: "meshDrift 26s ease-in-out infinite",
+            }}
+          />
+          <div
+            className="absolute inset-0 opacity-[0.06]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
+              backgroundSize: "56px 56px",
+              maskImage:
+                "radial-gradient(ellipse at center, black 40%, transparent 75%)",
+            }}
+          />
+        </div>
+
+        <div className="relative z-10 flex w-full flex-col items-center">
         {/* Mobile brand */}
         <div className="mb-8 flex flex-col items-center gap-2 lg:hidden">
           <KpcLogo variant="on-dark" className="h-8 w-auto" />
@@ -345,9 +355,10 @@ function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-[11px] text-slate-500 lg:hidden">
-          © 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
-        </p>
+          <p className="mt-6 text-[11px] text-slate-500 lg:hidden">
+            © 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );
