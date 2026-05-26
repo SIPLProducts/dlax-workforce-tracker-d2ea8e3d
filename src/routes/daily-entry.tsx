@@ -415,13 +415,11 @@ function DailyEntryPage() {
   const rowTotal = (r: RowData) => allCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
 
   const colTotals = useMemo(() => {
-    const t: Record<string, number> = { security: 0, deficiency: 0, total: 0 };
+    const t: Record<string, number> = { total: 0 };
     allCells.forEach((c) => (t[c.key] = 0));
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
       allCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
-      t.security += Number(r.security) || 0;
-      t.deficiency += Number(r.deficiency) || 0;
       t.total += rowTotal(r);
     });
     return t;
