@@ -118,6 +118,13 @@ function DailyEntryPage() {
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
   const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
+  // Cells from saved daily_manpower rows whose (dept, cat) is no longer in the
+  // project's current assignments. Rendered read-only so totals reconcile and
+  // historical data isn't silently dropped from the grid.
+  const [orphanCells, setOrphanCells] = useState<Cell[]>([]);
+  // IDs of saved daily_manpower rows that are orphan; Save preserves these.
+  const orphanRowIdsRef = useRef<string[]>([]);
+
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
   const isEmpty = sheetStatus === "empty";
