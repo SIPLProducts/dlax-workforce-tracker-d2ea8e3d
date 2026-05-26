@@ -720,17 +720,18 @@ function DailyEntryPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading && (<tr><td colSpan={4 + allCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={4 + allCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={4 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {loading && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + allCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && allCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
                 {allCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
                       <td className="border text-center sticky left-0 bg-background z-20 box-border">{idx + 1}</td>
-                      <td className="border px-2 sticky left-[48px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
-                      <td className="border px-2 text-center sticky left-[268px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
-                      <td className="border px-2 sticky left-[388px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
+                      <td className="border px-2 text-center sticky left-[48px] bg-background z-20 box-border truncate" title={c.contractor_code || ""}>{c.contractor_code || "—"}</td>
+                      <td className="border px-2 sticky left-[148px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
+                      <td className="border px-2 text-center sticky left-[368px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
+                      <td className="border px-2 sticky left-[488px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
                       {groups.map((g) => g.cells.map((col) => (
                         <td key={col.key} className={cn("border", g.cellClass)}>
                           {numCell(r.cells[col.key] || 0, (n) => updateCell(c.id, col.key, n))}
