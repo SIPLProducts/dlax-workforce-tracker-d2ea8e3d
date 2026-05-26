@@ -762,8 +762,9 @@ function DailyEntryPage() {
                   <tr className="bg-yellow-100 font-bold">
                     <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
                     <td className="border sticky left-[48px] bg-yellow-100 z-20 box-border"></td>
-                    <td className="border sticky left-[268px] bg-yellow-100 z-20 box-border"></td>
-                    <td className="border sticky left-[388px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
+                    <td className="border sticky left-[148px] bg-yellow-100 z-20 box-border"></td>
+                    <td className="border sticky left-[368px] bg-yellow-100 z-20 box-border"></td>
+                    <td className="border sticky left-[488px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
                     {allCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
