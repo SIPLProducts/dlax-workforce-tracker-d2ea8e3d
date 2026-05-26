@@ -48,13 +48,13 @@ const statusBadge = (s: string, current?: number, total?: number) => {
 
 function Page() {
   const { user, hasRole } = useAuth();
+  const navigate = useNavigate();
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [levels, setLevels] = useState<Level[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("pending");
-  const [viewing, setViewing] = useState<Sheet | null>(null);
   const [rejectFor, setRejectFor] = useState<Sheet | null>(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
   const [actioning, setActioning] = useState(false);
