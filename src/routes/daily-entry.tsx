@@ -382,6 +382,7 @@ function DailyEntryPage() {
       pendingModeRef.current = null;
       setMode(requested === "edit" && sheetEditable ? "edit" : "view");
     } else if (isPastDate) {
+      // Past dates always open read-only; user must click Edit to unlock.
       setMode("view");
     } else if (nRows === 0) {
       setMode("edit");
