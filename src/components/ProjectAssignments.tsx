@@ -114,6 +114,32 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
   const filtered = all.filter((i) => !q || i.label.toLowerCase().includes(q));
   const assignedItems = filtered.filter((i) => assigned.has(i.id));
   const availableItems = filtered.filter((i) => !assigned.has(i.id));
+  const hasSearch = q.length > 0;
+
+  const bulkAssign = async () => {
+    if (!canAssign) { toast.error("You don't have edit permission on Projects."); return; }
+    if (availableItems.length === 0) return;
+    setBusy(true);
+    const rows = availableItems.map((i) => ({ project_id: projectId, [cfg.joinFk]: i.id }));
+    const { error } = await supabase.from(cfg.joinTable as any).insert(rows as any);
+    if (error) { toast.error(error.message); setBusy(false); return; }
+    setAssigned((s) => { const n = new Set(s); availableItems.forEach((i) => n.add(i.id)); return n; });
+    setBusy(false);
+    toast.success(`Assigned ${rows.length} ${cfg.title.toLowerCase()}`);
+  };
+
+  const bulkUnassign = async () => {
+    if (!canAssign) { toast.error("You don't have edit permission on Projects."); return; }
+    if (assignedItems.length === 0) return;
+    if (!window.confirm(`Unassign ${assignedItems.length} ${cfg.title.toLowerCase()}${hasSearch ? " matching the search" : ""}?`)) return;
+    setBusy(true);
+    const ids = assignedItems.map((i) => i.id);
+    const { error } = await supabase.from(cfg.joinTable as any).delete().eq("project_id", projectId).in(cfg.joinFk, ids);
+    if (error) { toast.error(error.message); setBusy(false); return; }
+    setAssigned((s) => { const n = new Set(s); ids.forEach((id) => n.delete(id)); return n; });
+    setBusy(false);
+    toast.success(`Unassigned ${ids.length} ${cfg.title.toLowerCase()}`);
+  };
 
   return (
     <div className="space-y-4">
@@ -136,9 +162,16 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Assigned ({assignedItems.length})
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Assigned ({assignedItems.length})
+            </p>
+            {canAssign && assignedItems.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive hover:text-destructive" onClick={bulkUnassign} disabled={busy}>
+                {hasSearch ? `Unassign all matching (${assignedItems.length})` : `Unassign all (${assignedItems.length})`}
+              </Button>
+            )}
+          </div>
           <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
             {assignedItems.length === 0 && <p className="text-sm text-muted-foreground p-3">None assigned yet.</p>}
             {assignedItems.map((i) => (
@@ -154,9 +187,16 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
           </div>
         </div>
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Available ({availableItems.length})
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Available ({availableItems.length})
+            </p>
+            {canAssign && availableItems.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={bulkAssign} disabled={busy}>
+                {hasSearch ? `Select all matching (${availableItems.length})` : `Select all (${availableItems.length})`}
+              </Button>
+            )}
+          </div>
           <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
             {availableItems.length === 0 && <p className="text-sm text-muted-foreground p-3">No more available.</p>}
             {availableItems.map((i) => (

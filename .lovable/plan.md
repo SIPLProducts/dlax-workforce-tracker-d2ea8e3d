@@ -1,24 +1,22 @@
 ## Goal
-Make the Project dropdown searchable (type-to-filter by code or name) on every screen that has one.
-
-## Approach
-Add a small reusable `ProjectCombobox` component using the existing shadcn `Popover` + `Command` primitives (already in the project). Same trigger style as the current `Select` (full-width button showing `CODE — Name`), but the panel has a search input and filtered list. Swap it in for the current `<Select>` project picker on each screen.
+In Project Assignments (all three tabs: Contractors, Departments, Categories), add a "Select all" control in the Available list header that assigns every currently-visible available item in one action, plus an "Unassign all" control on the Assigned side to mirror it.
 
 ## Changes
 
-1. **`src/components/ProjectCombobox.tsx`** (new)
-   - Props: `value: string`, `onChange: (id: string) => void`, `projects: { id: string; name: string; code: string | null }[]`, optional `placeholder`, `includeAllOption?: boolean` (for Reports' "All Projects"), `disabled?: boolean`, `className?: string`.
-   - Uses `Popover` + `Command` + `CommandInput` + `CommandList` + `CommandEmpty` + `CommandItem`.
-   - Filter matches `code` or `name` (case-insensitive).
-   - Selected display: `CODE — Name` (matches current format).
+**`src/components/ProjectAssignments.tsx`** — single section component, applies to all three tabs:
 
-2. **Swap in** the new combobox on these screens (no logic changes):
-   - `src/routes/daily-entry.tsx` (line ~662)
-   - `src/routes/masters.assignments.tsx` (line ~34) — Project Assignments
-   - `src/routes/reports.tsx` (line ~300) — with `includeAllOption`
-   - Approvals page has no project filter dropdown, so no change there.
+- Add `bulkAssign()` and `bulkUnassign()` helpers:
+  - Operates on the currently filtered list (respects the search box) — so "Select all" with a search term scopes to the filtered subset; with no search it selects everything.
+  - `bulkAssign`: builds `availableItems.map(i => ({ project_id, [joinFk]: i.id }))` and does a single `supabase.from(joinTable).insert([...])`. Then merges those ids into the `assigned` set.
+  - `bulkUnassign`: single `supabase.from(joinTable).delete().eq("project_id", projectId).in(joinFk, assignedItemIds)`. Then removes those ids from the set.
+  - Both gated by `canAssign`, show toast on success/error, set `busy`.
+
+- UI additions inside each section:
+  - **Available header**: add a small "Select all" button (text/link style) on the right, disabled when `availableItems.length === 0` or `busy` or `!canAssign`. Label changes to "Select all (N)" using the filtered count. When a search term is active and filters the list, show "Select all matching (N)" instead.
+  - **Assigned header**: add a small "Unassign all" button on the right with the same pattern (disabled when empty / busy / no permission). When a search term is active, label becomes "Unassign all matching (N)".
+  - Confirmation: add a `window.confirm` for unassign-all only (assign-all is reversible per item, but unassign-all wipes the project's set).
 
 ## Out of scope
-- No backend / schema changes.
-- No changes to other dropdowns (contractor, department, etc.) — only the Project picker as the user asked.
-- Reports' other filters and the project-group cascade behavior remain identical.
+- No DB or RLS changes (existing insert/delete policies already cover bulk ops; current per-item RLS expressions match any single row, so inserts/deletes of multiple rows in one statement are evaluated per-row).
+- No change to the tab structure, search input, or the per-item +/× controls.
+- No change to other screens.
