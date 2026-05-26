@@ -1,47 +1,56 @@
-## Bug: Entry Sheet total (6) ≠ Saved Entries total (40)
+# Login Screen Redesign
 
-### Root cause
+Refresh `src/routes/login.tsx` only — no behavior, auth, or routing changes. Pure visual / presentational rework matching the requested split-screen enterprise aesthetic.
 
-Sheet **DE-000038** (project NLCHITES) has 7 rows in `daily_manpower`. One of them is:
+## Visual direction
 
-```
-contractor = ABDUR RAKIB
-department = MEP        ← NOT in project's assigned departments
-category   = Carpenters
-headcount  = 34
-```
+**Left panel (≈45% on `lg`, hidden on mobile)**
+- Deep midnight-blue gradient: `#0A1530 → #0F1F47 → #14306B` (top-left → bottom-right).
+- Abstract geometric "connectivity" line art as an SVG layer: thin 1px white/10% lines forming a node-and-edge constellation, plus 2–3 soft amber glow dots at intersections. Subtle, decorative, non-distracting.
+- KPC logo top-left.
+- Centered brand block:
+  - `DLAX` wordmark in large, tight, crisp display weight (Inter 700, tracking-tight).
+  - Tagline "Daily Labour Attendance & Tracking" in small uppercase, wide tracking, slate-300.
+  - One short value sentence below in slate-300/80.
+- Bottom: a single compact "Install on mobile" row with the QR + 2-line copy, sitting on a faint white/5 surface.
+- Footer copyright in slate-500, 11px.
+- Remove the current 3-feature stacked cards (replaced by the cleaner brand + line-art composition).
 
-The other 6 rows (3 Painters + 3 Security, headcount 1 each) sum to 6, which matches the Entry Sheet TOTAL. The 34 from MEP×Carpenters is silently dropped on display because the Entry Sheet grid only renders columns built from the project's **current** `project_departments × project_categories` assignments (`allCells` in `src/routes/daily-entry.tsx:243-274`). MEP was de-assigned from the NLCHITES project after that record was saved (or saved via a different path), so the column no longer exists.
+**Right panel (login card)**
+- Background: very light neutral (`bg-muted/30`) so the card floats.
+- Card: pure white (light) / `bg-card` (dark), `rounded-2xl`, generous `p-10`, no visible border, ambient shadow using layered soft shadows (e.g. `shadow-[0_30px_80px_-20px_rgba(15,31,71,0.18),0_8px_24px_-12px_rgba(15,31,71,0.10)]`).
+- Heading "Welcome back" (text-2xl, semibold) + muted subhead.
+- Inputs:
+  - Borderless, `bg-slate-50` (light) / `bg-white/5` (dark), `rounded-xl`, `h-12`.
+  - Focus state: `ring-2 ring-primary/60` + background turns white, smooth `transition`.
+  - Icon (User / Lock) inset left, eye toggle inset right for password.
+  - Helper text muted, 12px.
+- Primary button: full width, `h-12`, `rounded-xl`, primary background, subtle gradient sheen on hover, loading spinner unchanged.
+- Footer line: "Don't have an account? Contact your administrator." muted, centered.
 
-Meanwhile **Saved Entries → Total Headcount** sums `daily_manpower.headcount` directly (line 410), so it correctly reports 40.
+**Mobile (< lg)**
+- Single-column. Top: small KPC logo chip + DLAX wordmark on a slim midnight-blue band (rounded-b-3xl) for brand presence without the full left panel.
+- Same login card centered below with comfortable margins.
+- QR install row appears below the card as today, restyled to match (rounded-xl, soft shadow, no hard border).
 
-Two real problems flow from this:
+## Tokens / styling rules
 
-1. **Display mismatch** — the user sees 40 in the list but only 6 in the sheet.
-2. **Silent data loss on Save** — `handleSave` deletes ALL `daily_manpower` rows for (project, date) then re-inserts only what's visible in the grid (lines 519–539). Clicking Save right now would wipe the orphan 34 with no warning.
+- Use semantic Tailwind tokens (`bg-card`, `text-foreground`, `text-muted-foreground`, `ring-primary`, etc.). Custom hex values only inside the left panel gradient and the SVG line-art (brand-specific midnight blue & amber accent) — these are visual brand assets, not theme tokens.
+- Inter is already the default sans; no font swap needed.
+- Works in both light and dark mode (right panel adapts via tokens; left panel is always dark by design).
 
-### Fix
+## Out of scope
 
-In `src/routes/daily-entry.tsx`, when `loadEntries()` finishes loading `daily_manpower` rows, collect any `(department_id, category_id)` pair that appears in the saved data but is NOT in the current `allCells`. Render those as an extra read-only column group labeled **"Unassigned (saved earlier)"** at the right of the grid.
+- No changes to `useAuth`, form submit, `signInWithUserId`, routing, or QR install URL.
+- No new components extracted unless the file becomes unwieldy — keep everything in `src/routes/login.tsx`.
+- No new dependencies.
 
-Concretely:
+## Files
 
-1. Add `orphanCells` state: `{ key, deptId, catId, deptName, catName }[]` derived during `loadEntries` by looking up names from `departments` / `worker_categories` for any DB pair not covered by `allCells`.
-2. Compute a display-only `displayCells = [...allCells, ...orphanCells]` used by:
-   - column headers (extra group "Unassigned" with muted styling)
-   - `rowTotal` / `colTotals` (so grand total = 40)
-   - cell rendering (orphan cells render as `disabled` inputs with a tooltip: "Department/category no longer assigned to this project — re-assign in Masters → Project Assignments to edit.")
-3. Keep `allCells` unchanged for the **Save** path so the existing insert logic is untouched, BUT change the delete step in `handleSave` to preserve orphan rows: instead of `DELETE WHERE project_id=? AND entry_date=?`, only delete rows whose `(department_id, category_id)` is in the currently-assigned set. Orphan rows are left intact so Save never silently destroys data the UI can't represent.
+- `src/routes/login.tsx` — full visual rewrite of the JSX + inline SVG line-art; logic preserved verbatim.
 
-### Out of scope
+## Verification
 
-- No DB / RLS / migration changes.
-- No change to approval flow, Send-to-Approval, or Saved Entries totals (they already report the true total).
-- No UI to delete orphan rows in this pass — user must re-assign the dept/category in Masters to edit or zero them out.
-
-### Verification
-
-1. Open Daily Entry for NLCHITES on 26/05/2026 → grid shows existing 6 cells + an "Unassigned" group with one disabled cell `MEP × Carpenters = 34` on the ABDUR RAKIB row. TOTAL row reads 40. Matches Saved Entries.
-2. Click Edit → Save with no changes → reload → all 7 rows (incl. the 34) still in DB; Saved Entries still shows 40.
-3. Re-assign MEP + Carpenters in Masters → Project Assignments → reopen sheet → 34 now appears in the regular MEP column (no longer in "Unassigned"); fully editable.
-4. Project with no orphan rows → no "Unassigned" group rendered (unchanged behavior).
+- Visit `/login` on desktop (≥1112px): split layout renders, line art visible, card floats with soft shadow, focus ring appears on inputs.
+- Resize to mobile: left panel hides, top brand band + centered card + QR row stack cleanly.
+- Submit still works (unchanged handler).
