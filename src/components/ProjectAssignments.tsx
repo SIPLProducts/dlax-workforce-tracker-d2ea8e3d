@@ -175,6 +175,12 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
               Available ({availableItems.length})
             </p>
           </div>
+          {canAssign && availableItems.length > 0 && (
+
+            <Button variant="outline" size="sm" className="w-full mb-2" onClick={bulkAssign} disabled={busy}>
+              {hasSearch ? `Select all matching (${availableItems.length})` : `Select all (${availableItems.length})`}
+            </Button>
+          )}
           <div className="border rounded-md max-h-64 overflow-y-auto divide-y">
             {availableItems.length === 0 && <p className="text-sm text-muted-foreground p-3">No more available.</p>}
             {availableItems.map((i) => (
@@ -188,11 +194,7 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
               </label>
             ))}
           </div>
-          {canAssign && availableItems.length > 0 && (
-            <Button variant="outline" size="sm" className="w-full mt-2" onClick={bulkAssign} disabled={busy}>
-              {hasSearch ? `Select all matching (${availableItems.length})` : `Select all (${availableItems.length})`}
-            </Button>
-          )}
+
         </div>
       </div>
     </div>
