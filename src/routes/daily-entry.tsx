@@ -986,7 +986,7 @@ function TableWithTopScroll({ children }: { children: React.ReactNode }) {
       <div ref={topRef} onScroll={syncFromTop} className="overflow-x-auto overflow-y-hidden border-b sticky top-0 z-30 bg-background">
         <div style={{ width, height: 1 }} />
       </div>
-      <div ref={bottomRef} onScroll={syncFromBottom} className="overflow-auto">
+      <div ref={bottomRef} onScroll={syncFromBottom} className="overflow-x-auto">
         {children}
       </div>
     </>
