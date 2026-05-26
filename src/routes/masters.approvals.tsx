@@ -414,7 +414,7 @@ function Page() {
     <Card>
       <CardContent className="p-0">
         <Table>
-          <TableHeader className="[&_th]:sticky [&_th]:top-[112px] [&_th]:z-[5] [&_th]:bg-card">
+          <TableHeader className="[&_th]:sticky [&_th]:top-[112px] md:[&_th]:top-[144px] [&_th]:z-[5] [&_th]:bg-card">
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
