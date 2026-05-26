@@ -355,9 +355,10 @@ function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-[11px] text-slate-500 lg:hidden">
-          © 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
-        </p>
+          <p className="mt-6 text-[11px] text-slate-500 lg:hidden">
+            © 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );
