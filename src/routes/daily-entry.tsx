@@ -909,33 +909,32 @@ function DailyEntryPage() {
             </Button>
           </div>
           <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-            <Table>
-              <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card">
-
-                <TableRow>
-                  <TableHead>Sheet ID</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead className="text-right">Total Headcount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <table className="w-full caption-bottom text-sm">
+              <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_tr]:border-b">
+                <tr className="border-b">
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Sheet ID</th>
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Date</th>
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Project</th>
+                  <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground">Total Headcount</th>
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Status</th>
+                  <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="[&_tr:last-child]:border-0">
                 {allSheets.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No saved sheets yet</TableCell></TableRow>
+                  <tr className="border-b"><td colSpan={6} className="text-center text-muted-foreground py-6">No saved sheets yet</td></tr>
                 )}
                 {allSheets.map((s) => {
                   const m = statusMeta(s.status);
                   const editable = s.status === "draft" || s.status === "rejected" || s.status === "empty";
                   return (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-mono font-semibold">{s.sheet_code}</TableCell>
-                      <TableCell>{format(parseDate(s.entry_date, "yyyy-MM-dd", new Date()), "dd/MM/yyyy")}</TableCell>
-                      <TableCell>{projectName(s.project_id)}</TableCell>
-                      <TableCell className="text-right">{s.total}</TableCell>
-                      <TableCell><Badge variant="outline" className={m.cls}>{m.label}</Badge></TableCell>
-                      <TableCell className="text-right">
+                    <tr key={s.id} className="border-b transition-colors hover:bg-muted/50">
+                      <td className="p-2 align-middle font-mono font-semibold">{s.sheet_code}</td>
+                      <td className="p-2 align-middle">{format(parseDate(s.entry_date, "yyyy-MM-dd", new Date()), "dd/MM/yyyy")}</td>
+                      <td className="p-2 align-middle">{projectName(s.project_id)}</td>
+                      <td className="p-2 align-middle text-right">{s.total}</td>
+                      <td className="p-2 align-middle"><Badge variant="outline" className={m.cls}>{m.label}</Badge></td>
+                      <td className="p-2 align-middle text-right">
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => { loadSheetIntoEditor(s, "view"); setActiveTab("entry"); }}><Eye className="w-4 h-4" /></Button>
                           {editable ? (
@@ -952,12 +951,13 @@ function DailyEntryPage() {
                             </Button>
                           )}
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
+
           </div>
         </CardContent>
       </Card>
