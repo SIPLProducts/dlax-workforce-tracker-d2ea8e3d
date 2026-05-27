@@ -1,39 +1,41 @@
-The v12 failure is caused by `psql` variable syntax `:'pw'` being placed inside a PostgreSQL `DO $$ ... $$` block. `psql` does not expand variables inside that dollar-quoted block, so PostgreSQL receives the literal `:'pw'` and throws `syntax error at or near ":"`.
+I’ll make a new clean package, e.g. `dlax-selfhost-studio-only-v15.zip`, focused on one goal: Supabase services + Studio login working reliably. It will not auto-apply DLAX app migrations or seed data.
 
-Plan for v13:
+## What I will change
 
-1. Replace the fragile `DO` block in `scripts/repair-db-roles.sh`
-   - Remove all `:'pw'` usage inside dollar-quoted SQL.
-   - Use a `psql`-native `SELECT format(...) \gexec` approach so password quoting happens safely before each `ALTER ROLE` executes.
-   - Keep SQL piped through `docker exec -T` so no host temp file is referenced inside the container.
+1. Create a Studio-only installer path
+   - Keep Docker Compose Supabase services: db, auth, rest, realtime, storage, meta, studio, kong/functions if already needed by the stack.
+   - Remove or bypass automatic DLAX schema migrations and seed execution during install.
+   - End install once services are healthy and Studio is reachable.
 
-2. Keep the existing safety behavior
-   - Start only the `db` container first.
-   - Wait for PostgreSQL readiness with `pg_isready -d postgres`.
-   - Verify the current `.env` `POSTGRES_PASSWORD` before attempting role repair.
-   - If the existing database volume password does not match `.env`, keep the current clear recovery path / auto-wipe behavior under `--yes`.
+2. Fix the current root issue: missing reserved schemas
+   - Add a DB init script that creates required schemas before service containers run migrations:
+     - `auth`
+     - `storage`
+     - `realtime`
+     - `extensions`
+     - `graphql_public` if required by the compose stack
+   - Grant ownership/permissions to the correct service roles so Auth can create its own internal tables.
+   - Keep the public schema grants already added for service roles.
 
-3. Improve installer resilience
-   - Make `repair-db-roles.sh` print the generated role list and fail with a clear message if `psql` itself fails.
-   - Keep `diagnose-db.sh` in the package for one-command diagnostics if the host environment has a separate Docker/network issue.
-   - Correct the install marker version so it records the real package version.
+3. Make role/password repair safe and simple
+   - Keep the corrected no-temp-file, no-`:pw` role repair method.
+   - Ensure missing internal roles are created.
+   - Ensure every internal service role gets the `.env` password it expects.
 
-4. Package a fresh complete release
-   - Build `dlax-selfhost-complete-v13.zip`.
-   - Update README instructions for the clean install command:
+4. Add a hard reset option for failed previous attempts
+   - Provide a clear command that stops containers and removes only the local Docker volumes for this self-host stack.
+   - This gives a clean database so the new init scripts run from the beginning.
 
-```bash
-unzip -o dlax-selfhost-complete-v13.zip -d dlax-selfhost-supabase
-cd dlax-selfhost-supabase
-sudo bash install.sh --yes
-```
+5. Add final user instructions
+   - Install command:
+     ```bash
+     unzip -o dlax-selfhost-studio-only-v15.zip -d dlax-selfhost-supabase
+     cd dlax-selfhost-supabase
+     sudo bash install.sh --yes --studio-only
+     ```
+   - Open Studio URL, login credentials, and where to paste SQL migrations/seed manually.
+   - Include a troubleshooting command to show service logs if Studio/Auth still fails.
 
-5. Add an emergency fallback command in the README
-   - If a user wants to preserve an existing `.env` and DB volume, they can run only:
+## Expected result
 
-```bash
-sudo bash scripts/repair-db-roles.sh
-sudo bash install.sh --yes
-```
-
-After approval, I’ll generate the v13 zip with the corrected installer.
+After install, you should be able to open Supabase Studio, log in, and manually run your DLAX migrations and seed SQL from the SQL editor without the installer trying to apply them automatically.
