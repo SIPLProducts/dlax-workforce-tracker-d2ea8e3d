@@ -744,7 +744,7 @@ function DailyEntryPage() {
         }
       />
 
-      <Card>
+      <Card className="sticky top-[112px] md:top-[120px] z-20 bg-background">
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label className="text-xs font-medium">Date</label>
