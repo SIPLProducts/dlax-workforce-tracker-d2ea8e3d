@@ -908,9 +908,10 @@ function DailyEntryPage() {
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>
             <Table>
-              <TableHeader className="[&_th]:sticky [&_th]:top-[112px] md:[&_th]:top-[144px] [&_th]:z-[5] [&_th]:bg-card">
+              <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card">
+
                 <TableRow>
                   <TableHead>Sheet ID</TableHead>
                   <TableHead>Date</TableHead>
