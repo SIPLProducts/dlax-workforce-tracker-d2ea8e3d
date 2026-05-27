@@ -790,7 +790,7 @@ function DailyEntryPage() {
         <TabsContent value="entry" className="mt-0">
       <Card>
         <CardContent className="p-0">
-          <TableWithTopScroll>
+          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>
             <table className="border-collapse text-xs w-full min-w-[1600px]">
               <colgroup>
                 <col style={{ width: 48 }} />
@@ -799,26 +799,27 @@ function DailyEntryPage() {
                 <col style={{ width: 120 }} />
                 <col style={{ width: 160 }} />
               </colgroup>
-              <thead>
+              <thead className="bg-slate-100">
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 top-[112px] md:top-[144px] z-40 box-border">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] top-[112px] md:top-[144px] z-40 box-border">SC Code</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] top-[112px] md:top-[144px] z-40 box-border text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] top-[112px] md:top-[144px] z-40 box-border">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] top-[112px] md:top-[144px] z-40 box-border border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 top-0 z-30 box-border">Sl.no</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] top-0 z-30 box-border">SC Code</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] top-0 z-30 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] top-0 z-30 box-border">Contact No</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] top-0 z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {displayGroups.map((g) => (
-                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-[112px] md:top-[144px] z-30", g.headerClass)}>{g.deptName}</th>
+                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-0 z-20", g.headerClass)}>{g.deptName}</th>
                   ))}
-                  <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px] sticky top-[112px] md:top-[144px] z-30">Total</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px] sticky top-[112px] md:top-[144px] z-30">Remarks</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px] sticky top-[112px] md:top-[144px] z-30">Weather</th>
+                  <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px] sticky top-0 z-20">Total</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px] sticky top-0 z-20">Remarks</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px] sticky top-0 z-20">Weather</th>
                 </tr>
                 <tr>
                   {displayGroups.flatMap((g) => g.cells.map((c) => (
-                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px] sticky top-[148px] md:top-[180px] z-30", g.headerClass)}>{c.catName}</th>
+                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px] sticky top-[36px] z-20", g.headerClass)}>{c.catName}</th>
                   )))}
                 </tr>
               </thead>
+
 
 
               <tbody>
@@ -889,7 +890,8 @@ function DailyEntryPage() {
 
               )}
             </table>
-          </TableWithTopScroll>
+          </div>
+
         </CardContent>
       </Card>
         </TabsContent>
@@ -906,33 +908,33 @@ function DailyEntryPage() {
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="[&_th]:sticky [&_th]:top-[112px] md:[&_th]:top-[144px] [&_th]:z-[5] [&_th]:bg-card">
-                <TableRow>
-                  <TableHead>Sheet ID</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead className="text-right">Total Headcount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+            <table className="w-full caption-bottom text-sm">
+              <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_tr]:border-b">
+                <tr className="border-b">
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Sheet ID</th>
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Date</th>
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Project</th>
+                  <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground">Total Headcount</th>
+                  <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">Status</th>
+                  <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="[&_tr:last-child]:border-0">
                 {allSheets.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No saved sheets yet</TableCell></TableRow>
+                  <tr className="border-b"><td colSpan={6} className="text-center text-muted-foreground py-6">No saved sheets yet</td></tr>
                 )}
                 {allSheets.map((s) => {
                   const m = statusMeta(s.status);
                   const editable = s.status === "draft" || s.status === "rejected" || s.status === "empty";
                   return (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-mono font-semibold">{s.sheet_code}</TableCell>
-                      <TableCell>{format(parseDate(s.entry_date, "yyyy-MM-dd", new Date()), "dd/MM/yyyy")}</TableCell>
-                      <TableCell>{projectName(s.project_id)}</TableCell>
-                      <TableCell className="text-right">{s.total}</TableCell>
-                      <TableCell><Badge variant="outline" className={m.cls}>{m.label}</Badge></TableCell>
-                      <TableCell className="text-right">
+                    <tr key={s.id} className="border-b transition-colors hover:bg-muted/50">
+                      <td className="p-2 align-middle font-mono font-semibold">{s.sheet_code}</td>
+                      <td className="p-2 align-middle">{format(parseDate(s.entry_date, "yyyy-MM-dd", new Date()), "dd/MM/yyyy")}</td>
+                      <td className="p-2 align-middle">{projectName(s.project_id)}</td>
+                      <td className="p-2 align-middle text-right">{s.total}</td>
+                      <td className="p-2 align-middle"><Badge variant="outline" className={m.cls}>{m.label}</Badge></td>
+                      <td className="p-2 align-middle text-right">
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => { loadSheetIntoEditor(s, "view"); setActiveTab("entry"); }}><Eye className="w-4 h-4" /></Button>
                           {editable ? (
@@ -949,12 +951,13 @@ function DailyEntryPage() {
                             </Button>
                           )}
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
+
           </div>
         </CardContent>
       </Card>
