@@ -511,7 +511,28 @@ function DailyEntryPage() {
       return { ...prev, [cid]: { ...curr, [key]: val } };
     });
 
-  const rowTotal = (r: RowData) => displayCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
+  // Sum across every cell key present on a row (visible + orphan), so the
+  // green Total column matches what Save will persist.
+  const rowTotal = (r: RowData) => {
+    let s = 0;
+    displayCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
+    orphanCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
+    return s;
+  };
+
+  // Per-contractor totals memoized so React reliably re-renders the green
+  // "Total" cell when any input changes.
+  const rowTotals = useMemo(() => {
+    const m: Record<string, number> = {};
+    contractors.forEach((c) => {
+      const r = rows[c.id]; if (!r) { m[c.id] = 0; return; }
+      let s = 0;
+      displayCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
+      orphanCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
+      m[c.id] = s;
+    });
+    return m;
+  }, [rows, contractors, displayCells, orphanCells]);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { total: 0 };
@@ -519,10 +540,10 @@ function DailyEntryPage() {
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
       displayCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
-      t.total += rowTotal(r);
+      t.total += rowTotals[c.id] || 0;
     });
     return t;
-  }, [rows, contractors, displayCells]);
+  }, [rows, contractors, displayCells, orphanCells, rowTotals]);
 
 
   const handleSave = async () => {
@@ -594,6 +615,17 @@ function DailyEntryPage() {
       merged.forEach((row) => inserts.push(row));
     });
 
+    console.debug("[daily-entry] save", {
+      projectId,
+      entry_date,
+      canEdit,
+      canEditScreen,
+      allCellsCount: allCells.length,
+      contractorsCount: contractors.length,
+      orphanRowIds: orphanRowIdsRef.current.length,
+      insertsCount: inserts.length,
+    });
+
     // Delete editable rows for (project, date) then insert fresh. Preserve any
     // orphan rows (saved earlier with a dept/cat that is no longer assigned to
     // this project) so we don't silently destroy data the grid can't represent.
@@ -610,13 +642,18 @@ function DailyEntryPage() {
     const { error: delErr } = await delQ;
     if (delErr) {
       setSaving(false);
+      console.error("[daily-entry] delete failed", delErr);
       return toast.error(delErr.message);
     }
 
 
     if (inserts.length === 0) {
       setSaving(false);
-      toast.success("Saved (no entries)");
+      if (orphanRowIdsRef.current.length > 0) {
+        toast.success("Saved — only orphan rows preserved");
+      } else {
+        toast("Nothing to save — enter at least one headcount, remark, or weather");
+      }
       await loadEntries(); await loadAllSheets();
       return;
     }
@@ -626,7 +663,10 @@ function DailyEntryPage() {
     const { error } = await supabase.from("daily_manpower").insert(inserts as any);
 
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      console.error("[daily-entry] insert failed", error);
+      return toast.error(error.message);
+    }
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
@@ -854,7 +894,7 @@ function DailyEntryPage() {
                           </td>
                         );
                       }))}
-                      <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
+                      <td className="border bg-green-50 text-center font-semibold">{rowTotals[c.id] || ""}</td>
                       <td className="border">
                         <input value={r.remarks} disabled={readOnly}
                           onChange={(e) => updateField(c.id, "remarks", e.target.value)}
