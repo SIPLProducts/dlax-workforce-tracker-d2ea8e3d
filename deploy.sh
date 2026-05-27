@@ -18,11 +18,22 @@
 set -Eeuo pipefail
 
 # ---------- config (override via env) ----------------------------------------
-DLAX_ROOT="${DLAX_ROOT:-/root/DLAX}"
-SOURCE_DIR="${SOURCE_DIR:-$DLAX_ROOT/source}"
-SUPA_DIR="${SUPA_DIR:-$DLAX_ROOT/supabase-stack}"
-FRONTEND_DIR="$DLAX_ROOT/frontend"
-BACKEND_DIR="$DLAX_ROOT/backend"
+# Script auto-detects layout:
+#   * If deploy.sh sits next to the DLAX project (package.json + supabase-stack/),
+#     SOURCE_DIR = script dir, SUPA_DIR = script dir/supabase-stack.
+#   * Otherwise falls back to /root/DLAX/{source,supabase-stack}.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/package.json" ] && [ -d "$SCRIPT_DIR/supabase-stack" ]; then
+  DLAX_ROOT="${DLAX_ROOT:-$SCRIPT_DIR}"
+  SOURCE_DIR="${SOURCE_DIR:-$SCRIPT_DIR}"
+  SUPA_DIR="${SUPA_DIR:-$SCRIPT_DIR/supabase-stack}"
+else
+  DLAX_ROOT="${DLAX_ROOT:-/root/DLAX}"
+  SOURCE_DIR="${SOURCE_DIR:-$DLAX_ROOT/source}"
+  SUPA_DIR="${SUPA_DIR:-$DLAX_ROOT/supabase-stack}"
+fi
+FRONTEND_DIR="${FRONTEND_DIR:-$DLAX_ROOT/frontend}"
+BACKEND_DIR="${BACKEND_DIR:-$DLAX_ROOT/backend}"
 
 APP_PORT="${APP_PORT:-3000}"
 SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"

@@ -4,63 +4,63 @@ Deploys self-hosted Supabase + the DLAX app onto a fresh Ubuntu 22.04 / 24.04 se
 End state: app live at `http://SERVER_IP:3000`, Supabase Studio at `http://SERVER_IP:8000`,
 schema applied, one admin user seeded, everything running under PM2 + Docker.
 
-## 0. What to copy to the server
-
-Put these three things under `/root/DLAX/` on the server:
+The repo ships with everything you need:
 
 ```
-/root/DLAX/
-  deploy.sh           # this script
-  source/             # the DLAX project (full Lovable repo: src/, supabase/, package.json, ...)
-  supabase-stack/     # the v17 self-host bundle (docker-compose.yml + scripts/ + volumes/)
+<repo>/
+  deploy.sh           # one-shot installer
+  DEPLOY.md           # this file
+  package.json        # the DLAX TanStack app
+  src/                # app source
+  supabase/           # migrations
+  supabase-stack/     # self-hosted Supabase bundle (docker-compose + scripts)
 ```
 
-From your laptop, for example:
+## 1. Copy the repo to the server
+
+Download the repo as a zip (from GitHub or Lovable), `scp` it up, and unzip:
 
 ```bash
-# zip the Lovable project locally as dlax-source.zip, then:
-scp deploy.sh dlax-source.zip dlax-selfhost-complete-v17.zip root@SERVER_IP:/root/
+scp dlax-repo.zip root@SERVER_IP:/root/
 ssh root@SERVER_IP
-mkdir -p /root/DLAX && cd /root/DLAX
-unzip /root/dlax-source.zip            -d source
-unzip /root/dlax-selfhost-complete-v17.zip -d supabase-stack-tmp
-mv supabase-stack-tmp/*/  supabase-stack    # flatten if the zip had one top-level folder
-mv /root/deploy.sh .
+cd /root && unzip dlax-repo.zip      # creates e.g. /root/dlax-main
+mv dlax-* /root/DLAX
+cd /root/DLAX
 chmod +x deploy.sh
 ```
 
-## 1. Run it
+## 2. Run it
 
 ```bash
-# Recommended: set a real admin password first
 export ADMIN_PASSWORD='YourStrongPass#2026'
 export ADMIN_LOGIN_ID='admin'
-
-sudo -E bash /root/DLAX/deploy.sh
+sudo -E ./deploy.sh
 ```
 
-That's it. First run takes 5–10 minutes (apt installs, Docker pull, `bun install`, build).
-The script prints a summary at the end with all URLs and credentials.
+First run takes 5–10 minutes (apt installs, Docker pull, `bun install`, build).
+The script prints a summary with URLs and credentials at the end.
 
-## 2. Useful flags
+## 3. Useful flags
 
 ```bash
-sudo bash /root/DLAX/deploy.sh --rebuild-app   # rebuild only the app, leave Supabase alone
-sudo bash /root/DLAX/deploy.sh --reset         # wipe DB volumes + built artifacts, then redeploy
+sudo ./deploy.sh --rebuild-app   # rebuild the app only, leave Supabase running
+sudo ./deploy.sh --reset         # wipe DB volumes + built artifacts, then redeploy
 ```
 
-## 3. Where things live after deploy
+## 4. Where things live after deploy
 
 | What                          | Path                                  |
 |-------------------------------|---------------------------------------|
-| Frontend (client assets)      | `/root/DLAX/frontend/`                |
-| Backend (TanStack SSR server) | `/root/DLAX/backend/`                 |
-| Supabase docker stack         | `/root/DLAX/supabase-stack/`          |
-| Supabase secrets (.env)       | `/root/DLAX/supabase-stack/.env`      |
-| App env                       | `/root/DLAX/source/.env`              |
+| Frontend (client assets)      | `<repo>/frontend/`                    |
+| Backend (TanStack SSR server) | `<repo>/backend/`                     |
+| Supabase docker stack         | `<repo>/supabase-stack/`              |
+| Supabase secrets (.env)       | `<repo>/supabase-stack/.env`          |
+| App env                       | `<repo>/.env`                         |
 | PM2 process                   | `pm2 status dlax`, `pm2 logs dlax`    |
 
-## 4. Firewall
+(`<repo>` = wherever you unzipped, e.g. `/root/DLAX`.)
+
+## 5. Firewall
 
 Open these inbound ports on the server (UFW / cloud security group):
 
@@ -72,22 +72,23 @@ ufw allow 3000/tcp
 ufw allow 8000/tcp
 ```
 
-## 5. Updating the app later
+## 6. Updating the app later
+
+Pull or re-upload the latest repo and run:
 
 ```bash
-# replace /root/DLAX/source with the new project files, then:
-sudo bash /root/DLAX/deploy.sh --rebuild-app
+sudo ./deploy.sh --rebuild-app
 ```
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
-- **DB not healthy:** `cd /root/DLAX/supabase-stack && docker compose logs db | tail -100`
+- **DB not healthy:** `cd supabase-stack && docker compose logs db | tail -100`
 - **Migrations fail:** they're applied as the local `postgres` superuser via `docker exec` — fix the SQL, then re-run `deploy.sh`.
-- **App 502:** `pm2 logs dlax`. Common cause = wrong Supabase URL; check `/root/DLAX/backend/.env`.
+- **App 502:** `pm2 logs dlax`. Common cause = wrong Supabase URL; check `backend/.env`.
 - **Forgot admin password:** delete the user in Supabase Studio (Auth → Users) and re-run `deploy.sh` with a new `ADMIN_PASSWORD`.
 
-## 7. Security notes
+## 8. Security notes
 
-- This is HTTP only on IP+port. For production add a reverse proxy (Caddy / Nginx) and TLS.
-- The generated `JWT_SECRET`, `SERVICE_ROLE_KEY`, and `POSTGRES_PASSWORD` live in `/root/DLAX/supabase-stack/.env` (mode 600). Back it up; losing it means losing access.
+- HTTP only on IP+port. For production add a reverse proxy (Caddy / Nginx) + TLS.
+- Generated `JWT_SECRET`, `SERVICE_ROLE_KEY`, `POSTGRES_PASSWORD` live in `supabase-stack/.env` (mode 600). Back it up; losing it means losing access.
 - Change the seeded admin password after first login.
