@@ -1,73 +1,59 @@
-## Plan: fix the installer permanently in v9
+## What is happening
 
-The current v8 package still fails after wiping the volume because the fresh database is coming up without a usable `postgres` role, while `repair-db-roles.sh`, health checks, migrations, seed, backup/restore, and several service URLs all assume `postgres` exists.
+The installer is stuck at:
 
-### 1. Fix fresh database initialization
-- Update `docker-compose.yml` for the `db` service to explicitly set:
-  - `POSTGRES_USER=postgres`
-  - `POSTGRES_DB=postgres`
-  - `POSTGRES_PASSWORD=${POSTGRES_PASSWORD}`
-- This ensures a fresh wiped volume actually creates the `postgres` superuser role.
+```text
+[repair-db-roles] waiting for db to accept connections…
+```
 
-### 2. Replace fragile DB init SQL
-- Replace the current `volumes/db/init/00-roles.sql` logic, because `PASSWORD :'POSTGRES_PASSWORD'` inside a `DO $$ ... $$` block is not reliable for psql variable expansion.
-- Use a bootstrap script/SQL pattern that safely creates or updates required internal roles with the generated password:
-  - `anon`
-  - `authenticated`
-  - `service_role`
-  - `authenticator`
-  - `supabase_admin`
-  - `supabase_auth_admin`
-  - `supabase_storage_admin`
-  - realtime/functions/replication helper roles if present/needed
-- Use psql `-v pw=...` plus `SELECT format(..., :'pw') \gexec` so secrets are SQL-quoted safely.
+This means the `dlax-db` container is not reaching a usable Postgres-ready state. In the v9 package, the recovery script waits for `pg_isready`, but the DB container can stay unavailable because the fresh bootstrap path still has a role/healthcheck ordering problem:
 
-### 3. Rewrite `repair-db-roles.sh` again
-- Keep all Postgres commands inside the `db` container.
-- Stop assuming the host socket or a local host Postgres instance.
-- Detect and report separately:
-  - db container not ready
-  - `postgres` role missing on an old/corrupt volume
-  - password mismatch
-  - role alignment SQL failure
-- Change the role reset SQL to avoid `:'pw'` inside a dollar-quoted `DO` block.
-- After success, restart dependent services only if they exist.
+- `docker-compose.yml` healthcheck checks `pg_isready -U postgres`, but the Supabase Postgres image initializes with `supabase_admin` first.
+- The custom init SQL tries to create/alter `postgres` and internal roles during first boot, but if that init path fails or takes too long, `repair-db-roles.sh` only waits and does not print live DB logs while waiting.
+- The install flow depends on repairing roles before starting the full stack, so it appears frozen.
 
-### 4. Improve wipe/reset recovery
-- Update `reset-db-volume.sh` to support both:
-  - `FORCE=1 sudo bash .../reset-db-volume.sh`
-  - `sudo bash .../reset-db-volume.sh --force`
-- Improve interactive prompt so typing the wrong word gives clear guidance.
-- Remove only the project volumes for `dlax-supabase` and avoid accidentally matching unrelated Docker volumes.
+Do I know what the issue is? Yes: the DB bootstrap and readiness checks are still tied to the wrong role/phase. The installer must not wait silently on `postgres` readiness before the `postgres` role is guaranteed to exist.
 
-### 5. Update installer flow
-- On `install.sh --yes`, if repair fails due to missing `postgres` role or password mismatch, automatically:
-  1. stop stack
-  2. remove DB/storage volumes
-  3. recreate DB with corrected compose/init files
-  4. rerun repair
-  5. only then start the full stack
-- If it still fails, print the exact last DB logs and repair log path instead of generic SASL guidance.
+## Plan for v10 fix
 
-### 6. Update helper scripts for consistency
-- Ensure `healthcheck.sh`, `migrate.sh`, `seed.sh`, `backup.sh`, and `restore.sh` all use `docker compose exec -T db` with the `.env` password and the expected `postgres` role.
-- Make error messages say when the database was initialized incorrectly and requires a forced wipe.
+1. **Change DB readiness detection**
+   - Update `repair-db-roles.sh` to wait for the container process and socket using `supabase_admin` / generic server readiness first, not `postgres`.
+   - Add a hard timeout with progress output every few seconds.
+   - If timeout occurs, print `docker logs dlax-db --tail=120` immediately so the real bootstrap error is visible.
 
-### 7. Package and deliver
-- Generate a new artifact:
-  - `dlax-selfhost-complete-v9.zip`
-- Include updated README troubleshooting:
-  - current symptom: `FATAL: role "postgres" does not exist`
-  - current symptom: `password authentication failed for user "supabase_auth_admin"`
-  - one-command fresh recovery: `sudo bash install.sh --yes`
-  - manual wipe: `FORCE=1 sudo bash /root/DLAX/backend/scripts/reset-db-volume.sh`
+2. **Make DB healthcheck bootstrap-safe**
+   - Change the `db` healthcheck in `docker-compose.yml` from `pg_isready -U postgres -h localhost` to a bootstrap-safe check that does not require the `postgres` role before init completes.
+   - Only verify `postgres` password login after role repair succeeds.
 
-### Expected result
-After approval, the new v9 package should allow this flow on your EC2 server:
+3. **Fix first-boot role initialization**
+   - Simplify `volumes/db/init/00-roles.sql` so it does not rely on fragile shell/backtick expansion inside psql init.
+   - Keep first-boot SQL minimal: create required roles only if missing, with safe password assignment.
+   - Move non-critical ownership/default privilege alignment into `repair-db-roles.sh`, where `.env` values are controlled.
+
+4. **Make repair non-hanging**
+   - Add explicit states:
+     - container not running
+     - Postgres process not accepting connections
+     - bootstrap superuser unavailable
+     - role SQL failed
+     - final password verification failed
+   - Return clear exit codes for each state so `install.sh --yes` can recover correctly.
+
+5. **Update install recovery**
+   - On fresh wipe, start only `db`, wait with the new bounded wait function, repair roles, then start the rest.
+   - If the DB still fails after wipe, stop and show exact DB logs instead of looping.
+
+6. **Regenerate package**
+   - Produce a new artifact: `dlax-selfhost-complete-v10.zip`.
+   - Include README troubleshooting for this exact stuck line and the one-command recovery:
 
 ```bash
-cd /home/ubuntu/dlax-selfhost-supabase
 sudo bash install.sh --yes
 ```
 
-And after the automatic wipe, the new DB volume should contain the `postgres` role, internal roles should match `.env`, and `dlax-auth` should no longer fail with SASL/password errors.
+## Expected result
+
+With v10, the installer will either:
+
+- complete the DB bootstrap, create/align `postgres`, `supabase_auth_admin`, `authenticator`, and other internal roles, then start all services; or
+- fail quickly with the actual `dlax-db` bootstrap logs instead of hanging at `waiting for db to accept connections…`.
