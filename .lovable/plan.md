@@ -1,44 +1,47 @@
 ## Goal
 
-On `/daily-entry`, keep the highlighted top portion pinned while scrolling:
-1. `PageHeader` (Daily Manpower Entry title + actions) — already sticky at `top-14`.
-2. Date / Project / Status `Card` — currently scrolls away.
-3. `TabsList` (Entry Sheet / Saved Entries) — currently scrolls away.
+In `src/routes/daily-entry.tsx`, after saving a draft sheet:
+- **Save button does nothing** when clicked again after edits (no toast, no DB update).
+- **Row total** in the green "Total" column doesn't reflect the edited values live.
 
-Only the table content below should scroll.
+Fix both, scoped to the frontend only. No DB schema, RLS, or business‑logic changes.
 
-## Changes — `src/routes/daily-entry.tsx` only
+## Investigation summary
 
-### 1. Make the Date/Project Card sticky beneath the PageHeader
-Wrap or update the `<Card>` (line 747) so it sticks just under `PageHeader`:
+Reading `daily-entry.tsx`:
 
-- Add `sticky top-[112px] md:top-[120px] z-20 bg-background` on the `<Card>`.
-- Use a slight negative `-mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8` + matching `px-*` is NOT needed — the card already lives inside the padded container and only needs a solid background and z-index so rows pass behind it.
-- Offsets: `PageHeader` is `sticky top-14` (56px) and roughly 56–64px tall, so 112–120px puts the card flush below it.
+- `handleSave` is wired correctly; the Save button is gated by `disabled={saving || !canEdit}`. If it appears clickable but produces no toast, the most likely culprits are:
+  1. `requireEdit()` returns false silently when `usePermissions().canEdit("daily_entry")` is false — it *should* show a toast, but if the permission hook returns `undefined` during first render, the click may be a no‑op. (We'll add a hard fallback + a console diagnostic.)
+  2. `allCells.length === 0` early‑returns with a toast, but the toast can be missed; we'll surface the reason more visibly.
+  3. After the first save, `setMode("view")` runs. If the user re‑clicks Edit and the underlying `rows` map was rebuilt by `loadEntries`, but the typed cell key (`cellKey(dept, cat)`) doesn't match what the grid renders (orphan / legacy blob path), edits stay in state but Save's `inserts` array ends up identical to the existing DB rows — feels like "nothing happened". Add a log of the inserts payload to confirm.
 
-### 2. Make the TabsList sticky beneath the Card
-Wrap the existing `<TabsList>` (line 782) in a sticky shell so it stays pinned below the card:
+- `rowTotal(r)` sums `displayCells` only. If a cell value lives under an orphan key (dept/cat no longer assigned) or under a legacy key not in `displayCells`, typing into a visible cell *does* update `rows`, but the green Total just re‑sums `displayCells` — so it should update. Need to confirm whether the total is actually stale or whether the user is reading the *footer* `colTotals` (memoized) which depends correctly on `rows` and `displayCells`.
 
-```tsx
-<div className="sticky top-[208px] md:top-[224px] z-10 bg-background py-2 -mt-2">
-  <TabsList> … </TabsList>
-</div>
-```
+## Plan
 
-Offset = PageHeader (~64px) + Card (~96px including p-4 + flex-wrap) + spacing. Card height varies because content can wrap; if it visually overlaps, bump the constant. Single tweakable number.
+### 1. Add diagnostics to `handleSave` (temporary, removed after confirmation)
+- `console.debug("[daily-entry] save", { projectId, canEdit, canEditScreen, allCellsCount: allCells.length, inserts });` just before the delete/insert.
+- Replace silent guards with explicit `toast.error(...)` messages: if `requireEdit()` short‑circuits because `canEditScreen` is undefined, fall back to allowing admins via `has_role` already implicit in RLS — but at minimum surface a toast like *"You don't have edit permission for Daily Entry."*.
 
-### 3. Reduce the table scroll-container max-height to match
-The table currently uses `maxHeight: calc(100vh - 320px)`. With the extra sticky chrome above, raise the subtracted constant so the scrollable region still fits:
-- Change to `calc(100vh - 360px)` for both the Entry Sheet table (line 793) and the Saved Entries table wrapper.
+### 2. Fix Save no‑op on re‑edit
+- Always toast on every early‑return path in `handleSave` (project, user, canEdit, allCells). Currently each does, but verify; ensure none silently `return;`.
+- After `setMode("view")` post‑save, also clear stale `pendingModeRef` and force a fresh `loadEntries()` so the next Edit cycle reads the just‑written rows (already done — verify ordering).
+- If `inserts.length === 0` AND `orphanRowIdsRef.current.length === 0` AND nothing changed, show *"Nothing to save"* instead of the misleading *"Saved (no entries)"*.
 
-### 4. Keep existing inner sticky `<thead>` as-is
-The `<thead>` already uses `sticky top-0` inside its own scroll container — no change needed. Pinned columns keep their `left-*` classes.
+### 3. Fix row‑total live update
+- Memoize `rowTotal` per contractor with `useMemo` keyed on `[rows, displayCells]` so React reliably re‑renders the green column when any cell mutates. Replace the inline `{rowTotal(r) || ""}` with a lookup into the memo map.
+- Also include **orphan cell values** in the row total so the displayed total matches what will be saved (orphan rows are preserved on Save). Add their values to the sum.
+
+### 4. Re‑verify after change
+- Open Daily Entry, create a draft, click Edit, change a number → green Total updates instantly.
+- Click Save → toast appears, DB row reflects new value, Saved Entries list "Total" column updates after refresh.
+
+## Files touched
+
+- `src/routes/daily-entry.tsx` (only)
 
 ## Out of scope
 
-- No changes to master pages, business logic, queries, RLS, or data shape.
-- No layout changes outside `daily-entry.tsx`.
-
-## Trade-off
-
-The sticky offsets (`top-[112px]`, `top-[208px]`, `calc(100vh - 360px)`) are fixed estimates of stacked chrome height. If the PageHeader actions wrap to a second line on narrow widths, the Card may visually overlap by a few px; the constants can be nudged. A `ResizeObserver`-based measurement is possible but adds complexity for marginal gain.
+- Worker attendance UI (user didn't clarify; not currently part of this screen).
+- Any approval / RLS / schema work.
+- Sticky‑header layout (already shipped in prior turn).
