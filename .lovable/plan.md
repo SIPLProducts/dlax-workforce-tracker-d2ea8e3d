@@ -1,31 +1,30 @@
-# Fix sticky-header overlap on Daily Entry + master pages
+## Problem
 
-## Problem (visible in screenshot)
+On Daily Entry, sticky `<th>` cells use viewport offsets (`top-[144px]`), but the table sits inside `TableWithTopScroll`'s `overflow-x-auto` div — which becomes the sticky scroll context yet has no height limit. Result: the page scrolls (not the container), the header ends up "floating" mid-page and overlapping rows (Image 2). Image 3 is the goal: page chrome fixed, only the table body scrolls.
 
-1. The PageHeader is ~144px tall on desktop (TopBar 56 + PageHeader padding + title + subtitle + border). My current sticky `top-[112px]` sticks the table headers **inside** the PageHeader, overlapping the page title.
-2. On the Daily Entry spreadsheet, the mirrored horizontal scrollbar inside `TableWithTopScroll` is `sticky top-0 z-30`, so it floats above the TopBar.
+## Fix — `src/routes/daily-entry.tsx` only
 
-## Fix
+### Entry Sheet spreadsheet
+- Replace the `TableWithTopScroll` wrapper around the spreadsheet `<table>` with a single scroll container:
+  `<div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>`
+- Make `<thead>` itself sticky: `className="sticky top-0 z-20 bg-slate-100"`.
+- Remove `top-[112px] md:top-[144px]` from every `<th>` (viewport offsets are wrong inside a real scroll container).
+- Row 2 (category cells) gets `top-[36px]` so it pins just below row 1.
+- Keep `left-0 / left-[48px] / left-[148px] / left-[368px] / left-[488px]` on the 5 pinned columns; bump their header z to `z-30` (sticky-top × sticky-left intersection) and body pinned cells stay `z-10`.
 
-### Sticky offsets (responsive)
+### Saved Entries table
+- Wrap in `<div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>`.
+- Change its `<TableHeader>` sticky class from `top-[112px] md:top-[144px]` to `top-0`.
 
-Use `top-[112px] md:top-[144px]` so the column header sits flush under PageHeader on both breakpoints.
+### Cleanup
+- The mirrored top horizontal scrollbar (`TableWithTopScroll`) is no longer needed for this screen — the new container's native bottom scrollbar handles horizontal scroll. The component definition can remain in the file (unused) to avoid touching unrelated callers.
 
-### Files to update
+## Out of scope
 
-- `src/routes/masters.projects.tsx`
-- `src/routes/masters.categories.tsx`
-- `src/routes/masters.departments.tsx`
-- `src/routes/masters.approvals.tsx`
-- `src/routes/daily-entry.tsx` (Saved Entries table)
+- Master pages (already adjusted in a previous turn).
+- No business logic, query, RLS, or data-shape changes.
+- No layout/page-chrome changes.
 
-Change the `TableHeader` className from
-`[&_th]:top-[112px]` → `[&_th]:top-[112px] md:[&_th]:top-[144px]`.
+## Trade-off
 
-### Daily Entry spreadsheet (`daily-entry.tsx`)
-
-- Row 1 `<th>` sticky `top-[112px] md:top-[144px]`
-- Row 2 `<th>` sticky `top-[148px] md:top-[180px]` (row 1 height ~36px)
-- Remove the `sticky top-0 z-30` from the `TableWithTopScroll` mirrored top scrollbar — keep it in normal flow so it doesn't cover the TopBar/PageHeader. The bottom div already shows its own horizontal scrollbar.
-
-No other changes — business logic, queries, and layout untouched.
+`max-height: calc(100vh - 320px)` is a fixed estimate of TopBar (56) + PageHeader (~88) + Date/Project card (~110) + Tabs (~46) + paddings. If those heights change later, the constant needs a tweak. A `ResizeObserver` measurement is possible but adds complexity for marginal gain.
