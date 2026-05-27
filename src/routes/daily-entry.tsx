@@ -615,6 +615,17 @@ function DailyEntryPage() {
       merged.forEach((row) => inserts.push(row));
     });
 
+    console.debug("[daily-entry] save", {
+      projectId,
+      entry_date,
+      canEdit,
+      canEditScreen,
+      allCellsCount: allCells.length,
+      contractorsCount: contractors.length,
+      orphanRowIds: orphanRowIdsRef.current.length,
+      insertsCount: inserts.length,
+    });
+
     // Delete editable rows for (project, date) then insert fresh. Preserve any
     // orphan rows (saved earlier with a dept/cat that is no longer assigned to
     // this project) so we don't silently destroy data the grid can't represent.
@@ -631,13 +642,18 @@ function DailyEntryPage() {
     const { error: delErr } = await delQ;
     if (delErr) {
       setSaving(false);
+      console.error("[daily-entry] delete failed", delErr);
       return toast.error(delErr.message);
     }
 
 
     if (inserts.length === 0) {
       setSaving(false);
-      toast.success("Saved (no entries)");
+      if (orphanRowIdsRef.current.length > 0) {
+        toast.success("Saved — only orphan rows preserved");
+      } else {
+        toast("Nothing to save — enter at least one headcount, remark, or weather");
+      }
       await loadEntries(); await loadAllSheets();
       return;
     }
@@ -647,7 +663,10 @@ function DailyEntryPage() {
     const { error } = await supabase.from("daily_manpower").insert(inserts as any);
 
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      console.error("[daily-entry] insert failed", error);
+      return toast.error(error.message);
+    }
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
