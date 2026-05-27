@@ -792,7 +792,7 @@ function DailyEntryPage() {
         <TabsContent value="entry" className="mt-0">
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 380px)' }}>
             <table className="border-collapse text-xs w-full min-w-[1600px]">
               <colgroup>
                 <col style={{ width: 48 }} />
