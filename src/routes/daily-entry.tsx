@@ -890,7 +890,8 @@ function DailyEntryPage() {
 
               )}
             </table>
-          </TableWithTopScroll>
+          </div>
+
         </CardContent>
       </Card>
         </TabsContent>
