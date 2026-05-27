@@ -744,7 +744,7 @@ function DailyEntryPage() {
         }
       />
 
-      <Card>
+      <Card className="sticky top-[112px] md:top-[120px] z-20 bg-background">
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label className="text-xs font-medium">Date</label>
@@ -779,18 +779,20 @@ function DailyEntryPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="entry">Entry Sheet</TabsTrigger>
-          <TabsTrigger value="saved" className="gap-2">
-            Saved Entries
-            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-semibold">{allSheets.length}</Badge>
-          </TabsTrigger>
-        </TabsList>
+        <div className="sticky top-[240px] md:top-[248px] z-10 bg-background py-2 -mt-2">
+          <TabsList>
+            <TabsTrigger value="entry">Entry Sheet</TabsTrigger>
+            <TabsTrigger value="saved" className="gap-2">
+              Saved Entries
+              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-semibold">{allSheets.length}</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="entry" className="mt-0">
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 380px)' }}>
             <table className="border-collapse text-xs w-full min-w-[1600px]">
               <colgroup>
                 <col style={{ width: 48 }} />
@@ -908,7 +910,7 @@ function DailyEntryPage() {
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
-          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 380px)' }}>
             <table className="w-full caption-bottom text-sm">
               <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_tr]:border-b">
                 <tr className="border-b">
