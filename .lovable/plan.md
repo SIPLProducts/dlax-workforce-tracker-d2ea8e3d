@@ -1,47 +1,85 @@
 ## Goal
 
-In `src/routes/daily-entry.tsx`, after saving a draft sheet:
-- **Save button does nothing** when clicked again after edits (no toast, no DB update).
-- **Row total** in the green "Total" column doesn't reflect the edited values live.
+Produce a production-ready, idempotent Bash deployment kit for a self-hosted Supabase stack on Ubuntu 26, installed at `/root/DLAX/backend`, that can deploy this existing DLAX project (auto-applies `supabase/migrations/*.sql` in order) and ships with helper scripts, sample env, override compose, and optional Nginx + SSL.
 
-Fix both, scoped to the frontend only. No DB schema, RLS, or business‑logic changes.
+Note: this is an infrastructure deliverable — files are generated into `/mnt/documents/` as a downloadable bundle (and previewed as artifacts). Nothing in the Lovable app codebase (`src/`, `supabase/config.toml`, the managed Lovable Cloud project) is modified. Self-hosting Supabase is independent of Lovable Cloud.
 
-## Investigation summary
+## Deliverables (single zip + individual artifacts)
 
-Reading `daily-entry.tsx`:
+```
+dlax-selfhost-supabase/
+  install.sh                  # one-shot installer (root)
+  .env.example                # all secrets/URLs, with generation hints
+  docker-compose.yml          # full Supabase stack
+  docker-compose.override.yml # local overrides (ports, extra mounts)
+  volumes/
+    db/init/                  # roles, schemas, realtime, webhooks, _supabase init SQL
+    api/kong.yml              # Kong declarative config (anon/service routes)
+    functions/main/index.ts   # edge functions entrypoint placeholder
+    logs/vector.yml           # log shipping config
+  nginx/
+    dlax.conf.example         # reverse proxy for studio + api + (optional) functions
+    README-ssl.md             # certbot / self-signed steps
+  scripts/
+    bootstrap.sh              # apt: docker, compose plugin, git, curl, jq, openssl, ufw
+    preflight.sh              # OS/version/ram/disk/ports checks
+    gen-secrets.sh            # generates JWT secret, anon+service keys, DB pw, dashboard pw
+    up.sh / down.sh / restart.sh / status.sh / logs.sh
+    migrate.sh                # applies /supabase/migrations/*.sql in lexicographic order
+    seed.sh                   # applies supabase/seed.sql if present
+    rollback.sh               # restores last DB snapshot + previous compose
+    update.sh                 # pulls newer image tags, runs migrations
+    upgrade.sh                # major version bump w/ pre-backup + confirm prompt
+    backup.sh / restore.sh    # pg_dump + volume tar to ./backups/<ts>/
+    healthcheck.sh            # curls each service, exits non-zero on fail
+    print-summary.sh          # prints URLs, creds, common commands
+  README.md
+```
 
-- `handleSave` is wired correctly; the Save button is gated by `disabled={saving || !canEdit}`. If it appears clickable but produces no toast, the most likely culprits are:
-  1. `requireEdit()` returns false silently when `usePermissions().canEdit("daily_entry")` is false — it *should* show a toast, but if the permission hook returns `undefined` during first render, the click may be a no‑op. (We'll add a hard fallback + a console diagnostic.)
-  2. `allCells.length === 0` early‑returns with a toast, but the toast can be missed; we'll surface the reason more visibly.
-  3. After the first save, `setMode("view")` runs. If the user re‑clicks Edit and the underlying `rows` map was rebuilt by `loadEntries`, but the typed cell key (`cellKey(dept, cat)`) doesn't match what the grid renders (orphan / legacy blob path), edits stay in state but Save's `inserts` array ends up identical to the existing DB rows — feels like "nothing happened". Add a log of the inserts payload to confirm.
+## install.sh behavior (high level)
 
-- `rowTotal(r)` sums `displayCells` only. If a cell value lives under an orphan key (dept/cat no longer assigned) or under a legacy key not in `displayCells`, typing into a visible cell *does* update `rows`, but the green Total just re‑sums `displayCells` — so it should update. Need to confirm whether the total is actually stale or whether the user is reading the *footer* `colTotals` (memoized) which depends correctly on `rows` and `displayCells`.
+1. `set -Eeuo pipefail`, trap → log file at `/var/log/dlax-install.log` (tee).
+2. Refuse if not root; refuse if `$TARGET_DIR` (default `/root/DLAX/backend`) is dirty unless `--force` or matches a prior install marker (`.dlax-installed`).
+3. Run `scripts/preflight.sh`: Ubuntu 24/26 check, ≥2 vCPU / 4 GB RAM / 20 GB free, ports 80/443/3000/5432/8000/8443 free (warn, don't fail), kernel ≥ 5.15.
+4. Run `scripts/bootstrap.sh`: apt update, install `ca-certificates curl gnupg git jq openssl ufw`, add Docker apt repo, install `docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`, enable + start `docker`, add current user to `docker` group (no-op for root).
+5. `mkdir -p /root/DLAX/backend && cd` there. `git`-init only if user passed `--from-git <url>`; otherwise copy the bundled files in place. Idempotent: skip files that already exist unless `--reset-config`.
+6. If `.env` missing → copy `.env.example` → call `scripts/gen-secrets.sh` to fill: `POSTGRES_PASSWORD`, `JWT_SECRET` (32B hex), `ANON_KEY`, `SERVICE_ROLE_KEY` (signed HS256 against `JWT_SECRET` with `role: anon|service_role`, exp 10y), `DASHBOARD_USERNAME/PASSWORD`, `SECRET_KEY_BASE`, `VAULT_ENC_KEY`, `LOGFLARE_API_KEY`, SMTP placeholders, `SITE_URL`, `API_EXTERNAL_URL`, `STUDIO_DEFAULT_ORGANIZATION/PROJECT`.
+7. Look for `supabase/migrations/` next to the script (or `--migrations-dir <path>`). Stage them into `./migrations-staged/` preserving filenames.
+8. `docker compose pull && docker compose up -d`.
+9. `scripts/healthcheck.sh` — polls Kong `/`, GoTrue `/health`, Postgres `pg_isready`, Storage `/status`, Realtime `/api/health`, Studio `/`, Meta `/health` with 60s timeout and exponential backoff.
+10. Once DB healthy → `scripts/migrate.sh` (psql via the `db` container, sorted by filename, recorded in a `public._dlax_migrations(name, applied_at, checksum)` table; skip already-applied checksums; abort + restore on failure).
+11. If `supabase/seed.sql` present → `scripts/seed.sh` (only first run, gated by marker).
+12. Optional `--with-nginx [--domain studio.example.com --email you@x]`: install nginx, copy `nginx/dlax.conf.example` → `/etc/nginx/sites-available/dlax.conf` with substitutions, enable site, run certbot if `--email` given, else leave SSL placeholders + print instructions.
+13. Write `/root/DLAX/backend/.dlax-installed` (version, date, image digests).
+14. `scripts/print-summary.sh` prints:
+    - Studio URL, REST URL, Auth URL, Realtime URL, Storage URL, Functions URL
+    - Postgres connection string (host/port/db/user, password masked + path to `.env`)
+    - Anon + service keys (truncated, file path for full values)
+    - Common commands: `./scripts/{up,down,restart,logs,status,migrate,backup,update}.sh`
 
-## Plan
+## Compose stack
 
-### 1. Add diagnostics to `handleSave` (temporary, removed after confirmation)
-- `console.debug("[daily-entry] save", { projectId, canEdit, canEditScreen, allCellsCount: allCells.length, inserts });` just before the delete/insert.
-- Replace silent guards with explicit `toast.error(...)` messages: if `requireEdit()` short‑circuits because `canEditScreen` is undefined, fall back to allowing admins via `has_role` already implicit in RLS — but at minimum surface a toast like *"You don't have edit permission for Daily Entry."*.
+Pinned Supabase image tags (current stable line):
+- `supabase/postgres:15.8.x` with persistent volume `db-data`, init scripts mounted read-only.
+- `kong:2.8.1` (declarative `kong.yml`).
+- `supabase/gotrue:v2.x`, `supabase/realtime:v2.x`, `supabase/storage-api:v1.x`, `supabase/postgres-meta:v0.x`, `supabase/studio:latest-stable`, `supabase/edge-runtime:v1.x`, `supabase/logflare:latest`, `imgproxy:v3`, `timberio/vector:0.x`.
+- Each service: `restart: unless-stopped`, healthcheck, dependency `depends_on: { db: { condition: service_healthy } }`, env from `.env`, named volumes for `db-data`, `storage-data`, `functions`, `logs`.
+- `docker-compose.override.yml` exposes ports for local dev and adds `./volumes/functions:/home/deno/functions` bind mount so the user can drop in TS files.
 
-### 2. Fix Save no‑op on re‑edit
-- Always toast on every early‑return path in `handleSave` (project, user, canEdit, allCells). Currently each does, but verify; ensure none silently `return;`.
-- After `setMode("view")` post‑save, also clear stale `pendingModeRef` and force a fresh `loadEntries()` so the next Edit cycle reads the just‑written rows (already done — verify ordering).
-- If `inserts.length === 0` AND `orphanRowIdsRef.current.length === 0` AND nothing changed, show *"Nothing to save"* instead of the misleading *"Saved (no entries)"*.
+## Safety / re-run semantics
 
-### 3. Fix row‑total live update
-- Memoize `rowTotal` per contractor with `useMemo` keyed on `[rows, displayCells]` so React reliably re‑renders the green column when any cell mutates. Replace the inline `{rowTotal(r) || ""}` with a lookup into the memo map.
-- Also include **orphan cell values** in the row total so the displayed total matches what will be saved (orphan rows are preserved on Save). Add their values to the sum.
-
-### 4. Re‑verify after change
-- Open Daily Entry, create a draft, click Edit, change a number → green Total updates instantly.
-- Click Save → toast appears, DB row reflects new value, Saved Entries list "Total" column updates after refresh.
-
-## Files touched
-
-- `src/routes/daily-entry.tsx` (only)
+- Every script is `set -Eeuo pipefail` + has `--help`.
+- Migrations tracked by checksum in a dedicated table → safe to rerun; mismatched checksum aborts with diff hint.
+- `update.sh`: `docker compose pull` → `backup.sh` → `up -d` → `migrate.sh` → `healthcheck.sh`; rolls back on health failure.
+- `rollback.sh`: stops stack, restores newest `backups/<ts>/db.sql.gz` + volume tar, brings previous image tags back from `.dlax-installed.prev`.
+- All destructive commands prompt unless `--yes`.
 
 ## Out of scope
 
-- Worker attendance UI (user didn't clarify; not currently part of this screen).
-- Any approval / RLS / schema work.
-- Sticky‑header layout (already shipped in prior turn).
+- No changes to the Lovable project (`src/`, `supabase/config.toml`, Lovable Cloud DB).
+- No automatic DNS, no paid TLS cert purchase (certbot only).
+- No migration of existing Lovable Cloud data into self-hosted Postgres (can be added later via `pg_dump` from the managed DB — call out in README).
+
+## Open question (will assume default if no reply)
+
+Default assumption: bundle the kit as a downloadable zip under `/mnt/documents/dlax-selfhost-supabase.zip` plus a previewable `README.md` and `install.sh`. Reply if you'd rather have it dropped into the repo at `deploy/selfhost/` instead.
