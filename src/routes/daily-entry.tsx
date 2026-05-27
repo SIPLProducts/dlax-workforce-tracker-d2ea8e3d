@@ -511,7 +511,28 @@ function DailyEntryPage() {
       return { ...prev, [cid]: { ...curr, [key]: val } };
     });
 
-  const rowTotal = (r: RowData) => displayCells.reduce((s, c) => s + (Number(r.cells[c.key]) || 0), 0);
+  // Sum across every cell key present on a row (visible + orphan), so the
+  // green Total column matches what Save will persist.
+  const rowTotal = (r: RowData) => {
+    let s = 0;
+    displayCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
+    orphanCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
+    return s;
+  };
+
+  // Per-contractor totals memoized so React reliably re-renders the green
+  // "Total" cell when any input changes.
+  const rowTotals = useMemo(() => {
+    const m: Record<string, number> = {};
+    contractors.forEach((c) => {
+      const r = rows[c.id]; if (!r) { m[c.id] = 0; return; }
+      let s = 0;
+      displayCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
+      orphanCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
+      m[c.id] = s;
+    });
+    return m;
+  }, [rows, contractors, displayCells, orphanCells]);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { total: 0 };
@@ -519,10 +540,10 @@ function DailyEntryPage() {
     contractors.forEach((c) => {
       const r = rows[c.id]; if (!r) return;
       displayCells.forEach((col) => (t[col.key] += Number(r.cells[col.key]) || 0));
-      t.total += rowTotal(r);
+      t.total += rowTotals[c.id] || 0;
     });
     return t;
-  }, [rows, contractors, displayCells]);
+  }, [rows, contractors, displayCells, orphanCells, rowTotals]);
 
 
   const handleSave = async () => {
