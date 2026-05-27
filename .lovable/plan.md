@@ -1,41 +1,57 @@
-I’ll make a new clean package, e.g. `dlax-selfhost-studio-only-v15.zip`, focused on one goal: Supabase services + Studio login working reliably. It will not auto-apply DLAX app migrations or seed data.
+## Plan: v17 Studio-only self-host setup
 
-## What I will change
+I will create a corrected package that stops interfering with the Auth service’s internal migrations. The install will only bring up the backend + Studio, then stop before applying any DLAX migrations or seed data.
 
-1. Create a Studio-only installer path
-   - Keep Docker Compose Supabase services: db, auth, rest, realtime, storage, meta, studio, kong/functions if already needed by the stack.
-   - Remove or bypass automatic DLAX schema migrations and seed execution during install.
-   - End install once services are healthy and Studio is reachable.
+## What will change
 
-2. Fix the current root issue: missing reserved schemas
-   - Add a DB init script that creates required schemas before service containers run migrations:
-     - `auth`
-     - `storage`
-     - `realtime`
-     - `extensions`
-     - `graphql_public` if required by the compose stack
-   - Grant ownership/permissions to the correct service roles so Auth can create its own internal tables.
-   - Keep the public schema grants already added for service roles.
+1. **Remove manual Auth function creation**
+   - Do not create `auth.uid()`, `auth.role()`, or `auth.email()` in any init/repair script.
+   - Do not create Auth internal tables manually.
+   - Let the `dlax-auth` container own and create its own Auth schema objects.
 
-3. Make role/password repair safe and simple
-   - Keep the corrected no-temp-file, no-`:pw` role repair method.
-   - Ensure missing internal roles are created.
-   - Ensure every internal service role gets the `.env` password it expects.
+2. **Keep only safe bootstrap roles/schemas**
+   - Create required database roles only if missing.
+   - Create schemas only when needed, with ownership set so service migrations can run.
+   - Specifically make `auth` schema owned/usable by the role used by the Auth service, instead of pre-creating functions inside it.
 
-4. Add a hard reset option for failed previous attempts
-   - Provide a clear command that stops containers and removes only the local Docker volumes for this self-host stack.
-   - This gives a clean database so the new init scripts run from the beginning.
+3. **Disable all app migration/seed execution during install**
+   - `--studio-only` will not run DLAX application migrations.
+   - `--studio-only` will not run seed SQL.
+   - Installer success condition becomes: database healthy, Auth healthy, REST/Meta/Studio reachable.
 
-5. Add final user instructions
-   - Install command:
-     ```bash
-     unzip -o dlax-selfhost-studio-only-v15.zip -d dlax-selfhost-supabase
-     cd dlax-selfhost-supabase
-     sudo bash install.sh --yes --studio-only
-     ```
-   - Open Studio URL, login credentials, and where to paste SQL migrations/seed manually.
-   - Include a troubleshooting command to show service logs if Studio/Auth still fails.
+4. **Add a clean reset path for broken v16 volumes**
+   - Provide one reset command that removes the old local DB volume so the bad `auth.uid()` ownership cannot remain.
+   - Then reinstall v17 from a clean volume.
+
+5. **Add clear manual migration instructions**
+   - After install, open Studio.
+   - Use SQL Editor to paste/run DLAX schema migrations manually.
+   - Then paste/run seed data manually.
+   - Include log commands if any service still fails.
+
+## Technical fix for your current error
+
+Your current error is:
+
+```text
+ERROR: must be owner of function uid (SQLSTATE 42501)
+```
+
+That happened because the package created `auth.uid()` before the Auth service ran. Then `dlax-auth` tried to run its own migration with `CREATE OR REPLACE FUNCTION auth.uid()`, but it was not the owner of the existing function.
+
+The v17 fix is: **do not create that function at all**. The Auth service must create it itself.
+
+## Expected install command after v17
+
+```bash
+cd /home/ubuntu
+rm -rf dlax-selfhost-supabase
+unzip -o dlax-selfhost-complete-v17.zip -d dlax-selfhost-supabase
+cd dlax-selfhost-supabase
+sudo bash scripts/reset-db-volume.sh
+sudo bash install.sh --yes --studio-only
+```
 
 ## Expected result
 
-After install, you should be able to open Supabase Studio, log in, and manually run your DLAX migrations and seed SQL from the SQL editor without the installer trying to apply them automatically.
+Studio opens successfully, Auth no longer crashes on `auth.uid()`, and you manually apply DLAX migrations/seed SQL from Studio as requested.
