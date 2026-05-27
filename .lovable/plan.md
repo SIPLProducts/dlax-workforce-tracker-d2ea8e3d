@@ -1,30 +1,48 @@
 ## Diagnosis
 
-The new failure is different from the previous missing `API_EXTERNAL_URL` issue. `dlax-auth` now reaches the database, but GoTrue is trying to log in as `supabase_auth_admin` with a password that does not match the password stored in the running Postgres volume:
+The new line is the root cause:
 
 ```text
-password authentication failed for user "supabase_auth_admin"
+./.env: line 27: Backend: command not found
 ```
 
-This usually happens when `.env` / compose variables are regenerated after the database volume already exists, or when the seed SQL creates internal DB users with one password while `docker-compose.yml` passes another password to auth.
-
-## Plan for v5
-
-1. Patch the self-host package so the internal database role passwords are generated and applied consistently.
-   - Ensure `supabase_auth_admin` is created/altered with the same password that `dlax-auth` uses.
-   - Also check related Supabase service DB roles so rest/storage/realtime do not hit the same mismatch next.
-
-2. Update `install.sh` to be idempotent for existing failed installs.
-   - Before service health checks, run a safe DB role-password repair step against the local Postgres container.
-   - This lets users rerun `sudo bash install.sh` without deleting Docker volumes.
-
-3. Update README troubleshooting with an in-place recovery command for users already on v4.
-   - Include a concise command sequence to repair the running database password mismatch and restart `auth`.
-
-4. Package the corrected archive as:
+In v5, `scripts/repair-db-roles.sh` uses shell `source .env`. Your `.env` contains:
 
 ```text
-/mnt/documents/dlax-selfhost-complete-v5.zip
+STUDIO_DEFAULT_PROJECT=DLAX Backend
 ```
 
-5. Provide the new downloadable artifact link after the bundle is generated.
+Because of the space, Bash treats `Backend` as a command, so the repair script exits before it can reset `supabase_auth_admin`. That is why the same auth password error continues.
+
+## Plan for v6
+
+1. **Patch the repair script**
+   - Stop sourcing the whole `.env` file.
+   - Read only `POSTGRES_PASSWORD` safely using a line parser that tolerates other values with spaces.
+   - Keep the role password reset idempotent.
+
+2. **Patch the packaged `.env.example`**
+   - Make `STUDIO_DEFAULT_PROJECT` shell-safe so future helper scripts do not break on values with spaces.
+   - Review other `.env.example` values for the same issue.
+
+3. **Make install recovery clearer**
+   - Keep `install.sh` running the repair step after `docker compose up -d`.
+   - Update the warning text so if repair fails, it prints the exact recovery script to run.
+
+4. **Update README troubleshooting**
+   - Add this exact symptom:
+     ```text
+     ./.env: line 27: Backend: command not found
+     ```
+   - Explain that v5 failed before repairing DB role passwords.
+   - Include the rerun command:
+     ```bash
+     sudo bash install.sh
+     ```
+
+5. **Package the corrected archive**
+   - Build:
+     ```text
+     /mnt/documents/dlax-selfhost-complete-v6.zip
+     ```
+   - Provide the new download link after packaging.
