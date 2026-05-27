@@ -1,39 +1,54 @@
-## Plan: v17.2 fix for `supabase_auth_admin` password failure
+## What's failing now
 
-The current failure means the database role `supabase_auth_admin` exists, but its password does not match the password used by the `dlax-auth` container.
+The database and role passwords are fine. Auth (GoTrue) now starts, connects, and begins running its built-in migrations — but it crashes on:
 
-I will update the self-host package so the database role passwords are repaired before Auth starts.
+```
+/usr/local/etc/auth/migrations/20240729123726_add_mfa_phone_config.up.sql
+ERROR: type "auth.factor_type" does not exist
+```
 
-## Changes to make
+`auth.factor_type` is supposed to be created by an earlier GoTrue migration (`20220114185221_…`). The fact that a later migration runs while the type is missing means GoTrue's migration tracker (`auth.schema_migrations`) believes the earlier migration already ran. That only happens when **something other than GoTrue pre-created the `auth` schema and/or partially populated it**.
 
-1. **Replace the role init logic with a reliable password-reset init script**
-   - Use a Postgres init shell script instead of only SQL.
-   - Read `POSTGRES_PASSWORD` from the container environment.
-   - Force-reset passwords for these service login roles on fresh DB volume startup:
-     - `supabase_auth_admin`
-     - `supabase_storage_admin`
-     - `supabase_admin`
-     - `authenticator`
-   - Keep `anon`, `authenticated`, and `service_role` as non-login API roles.
+In our current package, `volumes/db/init/00-roles.sh` does:
 
-2. **Add an explicit repair step before starting Auth**
-   - Start only the database first.
-   - Run `ALTER ROLE ... PASSWORD ...` from inside the `dlax-db` container as the real database superuser.
-   - Only then start `dlax-auth`, `dlax-rest`, `dlax-meta`, and `dlax-studio`.
-   - This handles both fresh and partially-created volumes.
+```
+CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;
+CREATE SCHEMA IF NOT EXISTS storage AUTHORIZATION supabase_storage_admin;
+```
 
-3. **Keep Studio-only behavior unchanged**
-   - `--studio-only` will still skip all DLAX app migrations.
-   - `--studio-only` will still skip seed data.
-   - You will continue applying migrations manually in Studio as requested.
+That is the culprit. Combined with `supabase/postgres`'s own bootstrap, GoTrue ends up with an `auth` schema in a state it didn't build itself, so its migrator skips ahead and then hits the missing enum.
 
-4. **Improve troubleshooting output**
-   - If Auth still fails, show exact commands to inspect role passwords/startup logs.
-   - Keep the installer focused on getting Studio and Auth healthy.
+## Fix plan for v17.3
 
-## After approval, I will rebuild the zip
+1. **Stop pre-creating `auth` and `storage` schemas.**
+   - Remove the `CREATE SCHEMA … AUTHORIZATION …` lines from `volumes/db/init/00-roles.sh`.
+   - Keep only role creation + password sync in that script.
+   - GoTrue and Storage will create and own their own schemas on first start, and their migrations will run in the correct order from zero.
 
-I will produce a corrected `dlax-selfhost-complete-v17.zip` package versioned as v17.2.
+2. **Keep `scripts/sync-roles.sh` and the install-time password reset.**
+   - That part is correct and is what finally got Auth to connect.
+   - No changes needed there.
+
+3. **Harden `reset-db-volume.sh`.**
+   - Also remove `dlax-supabase_storage-data` (and any other named volume the stack created) so a re-install always starts from a truly clean slate. This prevents a half-migrated `auth` schema from a previous failed run sticking around and reproducing this exact error.
+
+4. **Install flow stays the same and stays studio-only.**
+   - `install.sh --yes --studio-only` will:
+     1. Bring up `dlax-db`.
+     2. Run `sync-roles.sh` to align service-role passwords with `.env`.
+     3. Bring up `auth`, `rest`, `meta`, `kong`, `storage`, `studio`.
+     4. Wait for `auth` to report healthy.
+   - No DLAX app migrations, no seed data — you still apply those manually in Studio, as requested.
+
+5. **Better failure output.**
+   - If `auth` still fails to come healthy, print the last 50 log lines from `dlax-auth` and the exact commands to inspect `auth.schema_migrations` and re-run `sync-roles.sh`.
+
+## Files that will change
+
+- `volumes/db/init/00-roles.sh` — remove `CREATE SCHEMA auth/storage` blocks.
+- `scripts/reset-db-volume.sh` — also remove `dlax-supabase_storage-data` and any other stack-created named volumes.
+- `install.sh` — minor: improve the auth-healthcheck failure message; bump VERSION to `17.3.0`.
+- Repackage as `dlax-selfhost-complete-v17.zip` (v17.3).
 
 ## Commands you will run after downloading the new zip
 
@@ -46,4 +61,4 @@ sudo bash scripts/reset-db-volume.sh
 sudo bash install.sh --yes --studio-only
 ```
 
-Expected result: `dlax-auth` starts successfully, Studio opens, and no DLAX migrations or seed data are applied automatically.
+Expected result: a fully healthy self-hosted Supabase stack (db, kong, auth, rest, meta, storage, studio) with no DLAX migrations applied yet, ready for you to apply migrations manually in Studio.
