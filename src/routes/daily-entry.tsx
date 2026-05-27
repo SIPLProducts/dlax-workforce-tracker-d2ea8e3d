@@ -875,7 +875,7 @@ function DailyEntryPage() {
                           </td>
                         );
                       }))}
-                      <td className="border bg-green-50 text-center font-semibold">{rowTotal(r) || ""}</td>
+                      <td className="border bg-green-50 text-center font-semibold">{rowTotals[c.id] || ""}</td>
                       <td className="border">
                         <input value={r.remarks} disabled={readOnly}
                           onChange={(e) => updateField(c.id, "remarks", e.target.value)}
