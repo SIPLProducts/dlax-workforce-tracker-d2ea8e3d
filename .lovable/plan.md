@@ -1,53 +1,18 @@
-## Root cause
+## Issue
 
-`install.sh` aborts at line 104 with **exit 141** (SIGPIPE) when running `scripts/gen-secrets.sh`.
-
-The culprit is this line in `gen-secrets.sh`:
-
-```bash
-rand_pw() { tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-32}"; }
-```
-
-Because the script runs under `set -Eeuo pipefail`, the moment `head` has read N bytes it closes the pipe, `tr` gets SIGPIPE (exit 141), and `pipefail` propagates that failure → the whole installer dies before `.env` is written.
-
-This is a bug in the bundle, not anything wrong with your server. It will reproduce on every fresh install on modern bash + coreutils.
+`/mnt/documents/dlax-selfhost-complete-v3.zip` doesn't exist on disk — only v1 and v2 are there. The download fails because there's no file to serve.
 
 ## Fix
 
-Patch `scripts/gen-secrets.sh` so the password helpers can't be killed by SIGPIPE.
+Rebuild v3 from the v2 bundle with the healthcheck fix applied:
 
-Replace `rand_pw` with a bounded-input variant:
-
-```bash
-rand_pw() {
-  local n="${1:-32}"
-  # Read enough random bytes up front, then filter — no infinite pipe, no SIGPIPE.
-  LC_ALL=C tr -dc 'A-Za-z0-9' < <(openssl rand -base64 $(( n * 4 ))) | head -c "$n"
-}
-```
-
-(or equivalently wrap the existing pipe in a subshell with `set +o pipefail`).
-
-Also harden `b64url` the same way isn't needed — it consumes a finite stdin.
-
-## Rebuild and redeliver
-
-1. Update `scripts/gen-secrets.sh` inside the source tree.
-2. Bump the bundle to `dlax-selfhost-complete-v2.zip` at `/mnt/documents/`.
-3. README: add a short "Troubleshooting → exit 141 on first install" note pointing at this fix, so anyone with the old zip can patch in place without re-downloading:
+1. Unzip `dlax-selfhost-complete-v2.zip` to a working dir.
+2. Patch `scripts/healthcheck.sh` — replace the Kong probe (and the matching studio probe) so `curl` doesn't fail on 4xx:
    ```bash
-   sed -i 's|tr -dc .A-Za-z0-9. </dev/urandom | head -c|...|' scripts/gen-secrets.sh
+   wait_for kong "code=\$(curl -s -o /dev/null -w '%{http_code}' http://localhost:\${KONG_HTTP_PORT:-8000}/); [[ \"\$code\" =~ ^(200|401|404)$ ]]"
    ```
-   (exact sed shown in README).
+3. Append a "Troubleshooting → Kong healthcheck exit 1" note to `README.md` with the in-place `sed` one-liner so anyone on v2 can patch without re-downloading.
+4. Zip back to `/mnt/documents/dlax-selfhost-complete-v3.zip`.
+5. Re-emit the `<presentation-artifact>` download link.
 
-## Quick manual unblock (so you don't have to wait for the new zip)
-
-On the server, edit `/home/ubuntu/dlax-selfhost-supabase/scripts/gen-secrets.sh` and change the `rand_pw` function to the version above, then re-run:
-
-```bash
-sudo bash install.sh
-```
-
-The installer is idempotent — it will pick up where it failed (generate `.env`, pull images, start stack, run migrations + seed).
-
-Approve and I'll switch to build mode, patch the script, and produce `dlax-selfhost-complete-v2.zip`.
+Approve and I'll switch to build mode and produce v3.
