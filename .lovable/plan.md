@@ -1,37 +1,39 @@
-## Plan
+The v12 failure is caused by `psql` variable syntax `:'pw'` being placed inside a PostgreSQL `DO $$ ... $$` block. `psql` does not expand variables inside that dollar-quoted block, so PostgreSQL receives the literal `:'pw'` and throws `syntax error at or near ":"`.
 
-Create a new v12 self-host installer package that fixes the current `repair-db-roles.sh` failure:
+Plan for v13:
 
-```text
-psql: error: /tmp/tmp.xk97RPBcal: No such file or directory
-```
+1. Replace the fragile `DO` block in `scripts/repair-db-roles.sh`
+   - Remove all `:'pw'` usage inside dollar-quoted SQL.
+   - Use a `psql`-native `SELECT format(...) \gexec` approach so password quoting happens safely before each `ALTER ROLE` executes.
+   - Keep SQL piped through `docker exec -T` so no host temp file is referenced inside the container.
 
-### What I will change
+2. Keep the existing safety behavior
+   - Start only the `db` container first.
+   - Wait for PostgreSQL readiness with `pg_isready -d postgres`.
+   - Verify the current `.env` `POSTGRES_PASSWORD` before attempting role repair.
+   - If the existing database volume password does not match `.env`, keep the current clear recovery path / auto-wipe behavior under `--yes`.
 
-1. Update `scripts/repair-db-roles.sh`
-   - Stop passing a host-side temporary SQL file path into `docker exec`, because that path does not exist inside the database container.
-   - Pipe the SQL directly into `psql` inside the container instead.
-   - Keep the short command timeouts so it cannot hang indefinitely again.
+3. Improve installer resilience
+   - Make `repair-db-roles.sh` print the generated role list and fail with a clear message if `psql` itself fails.
+   - Keep `diagnose-db.sh` in the package for one-command diagnostics if the host environment has a separate Docker/network issue.
+   - Correct the install marker version so it records the real package version.
 
-2. Keep the v11 safety improvements
-   - `pg_isready -d postgres` healthcheck.
-   - Socket/peer-auth login path for the database superuser.
-   - `diagnose-db.sh` fallback tool for collecting root-cause details.
-
-3. Bump package version to `12.0.0`
-   - Update installer version text.
-   - Add a README note explaining that v12 fixes the temp-file/container-path issue.
-
-4. Generate a new downloadable file
-   - Package everything as `dlax-selfhost-complete-v12.zip`.
-   - Provide the exact run command after it is created:
+4. Package a fresh complete release
+   - Build `dlax-selfhost-complete-v13.zip`.
+   - Update README instructions for the clean install command:
 
 ```bash
-unzip dlax-selfhost-complete-v12.zip
+unzip -o dlax-selfhost-complete-v13.zip -d dlax-selfhost-supabase
 cd dlax-selfhost-supabase
 sudo bash install.sh --yes
 ```
 
-### Expected result
+5. Add an emergency fallback command in the README
+   - If a user wants to preserve an existing `.env` and DB volume, they can run only:
 
-The install should get past `repair-db-roles.sh` without the missing `/tmp/tmp...` file error, and if anything else fails, the included diagnostic script will produce a focused log instead of hanging.
+```bash
+sudo bash scripts/repair-db-roles.sh
+sudo bash install.sh --yes
+```
+
+After approval, I’ll generate the v13 zip with the corrected installer.
