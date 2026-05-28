@@ -1,41 +1,39 @@
-## Diagnosis
-The app login flow is User ID based: `admin` is first resolved through `get_email_for_login_id('admin')`, then the returned email is used for password login.
+## Root cause
 
-The likely break is in the local installer seed step: it creates the auth user, but it does not verify that the profile row has `login_id = admin`, that the user has the `admin` role, or that password login works through the same public API URL the browser uses. If the trigger/profile creation failed or Studio-created users were not given a matching `profiles.login_id`, the UI will always show “Invalid User ID or password”.
+The verification step fails with `{"message":"Invalid authentication credentials"}` because **Kong is loading `kong.yml` with the literal string `${SUPABASE_ANON_KEY}` as the registered API key** — the official `kong:2.8.1` image does NOT perform env-var substitution inside the declarative config file. Supabase's upstream stack works around this by pre-processing `kong.yml`; our installer doesn't.
 
-## Plan
-1. Harden `install.sh` admin seeding:
-   - After creating the auth user, read the created user id/email.
-   - Upsert `public.profiles` with `login_id = admin`, `email = admin@dlax.local`, and display name.
-   - Upsert `public.user_roles` with `role = admin` for that user.
-   - This makes the printed `App admin login: admin / admin123456` actually match the app’s User ID login flow.
+So:
+- `mint_jwt anon $JWT` produces a real JWT and we send it as `apikey: <jwt>` to `/rest/v1/rpc/...`
+- Kong compares it against its registered consumer key, which is the unsubstituted text `${SUPABASE_ANON_KEY}`
+- Mismatch → `401 Invalid authentication credentials` (this error is from Kong's key-auth plugin, not PostgREST)
 
-2. Add installer verification checks:
-   - Call `/rest/v1/rpc/get_email_for_login_id` using the generated anon key and assert it returns the admin email.
-   - Call `/auth/v1/token?grant_type=password` with the admin email/password and assert auth succeeds.
-   - If either check fails, stop the install with a clear error before printing “DLAX is up”.
+This is also why the browser sees the same error when logging in.
 
-3. Keep direct IP:port URLs enforced:
-   - Keep `VITE_SUPABASE_URL=http://15.206.37.230:8000` generated at build time.
-   - Keep the existing `nip.io` build-output guard.
-   - Add a short printed reminder that app users must login with User ID (`admin`), not the email address, unless their `profiles.login_id` is set to that value.
+## Plan (install.sh only — no app code change)
 
-4. Deployment steps after approval:
-   - Update `install.sh` only.
-   - You will re-run:
-     ```bash
-     cd /home/ubuntu/dlax-workforce-tracker-d2ea8e3d-main
-     sudo SERVER_IP=15.206.37.230 ADMIN_LOGIN_ID=admin ADMIN_PASSWORD='admin123456' ./install.sh
-     ```
-   - Then hard-refresh the browser and login with:
-     ```text
-     User ID: admin
-     Password: admin123456
-     ```
+1. **Convert `supabase-stack/volumes/api/kong.yml` into a template** consumed by the installer. Rename to `kong.yml.template` (kept in repo), keep the existing `${SUPABASE_ANON_KEY}` / `${SUPABASE_SERVICE_KEY}` placeholders.
 
-## Important note
-Users created manually in Studio must have both:
-- an auth user with email/password, and
-- a matching row in `public.profiles` where `login_id` is the value typed on the login page.
+2. **Render the template in `install.sh`** right after `$ANON` / `$SRK` are minted and before `docker compose up -d`:
+   ```bash
+   SUPABASE_ANON_KEY="$ANON" SUPABASE_SERVICE_KEY="$SRK" \
+     envsubst '${SUPABASE_ANON_KEY} ${SUPABASE_SERVICE_KEY}' \
+     < "$SUPA/volumes/api/kong.yml.template" \
+     > "$SUPA/volumes/api/kong.yml"
+   ```
+   Ensure `envsubst` (from `gettext-base`) is installed; add an apt install step alongside the other prerequisites.
 
-Assigning only an admin role is not enough for this app’s User ID login.
+3. **Remove the now-misleading `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_KEY` env vars from the `kong` service** in `supabase-stack/docker-compose.yml` (they were never honored by Kong, and the rendered file no longer needs them).
+
+4. **Add the rendered `kong.yml` to the wipe step** so a stale render from a previous install can't be reused with a new JWT secret.
+
+5. **Re-run instructions** stay the same:
+   ```bash
+   sudo SERVER_IP=15.206.37.230 ADMIN_LOGIN_ID=admin ADMIN_PASSWORD='admin123456' ./install.sh
+   ```
+   After this change the installer's two verifications (`get_email_for_login_id` RPC + `/auth/v1/token` password sign-in) will pass and browser login with `admin / admin123456` will work.
+
+## Why this matches the symptom
+
+- The DB seeding succeeded (profile + role inserted via direct psql).
+- Only HTTP calls through Kong failed — exactly what an unsubstituted Kong API key would break.
+- The same Kong key-auth gate also fronts `/rest/v1/rpc/get_email_for_login_id` that the browser hits on login, so fixing it fixes both the installer check and the in-app login.
