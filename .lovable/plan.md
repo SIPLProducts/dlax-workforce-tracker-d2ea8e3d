@@ -1,77 +1,46 @@
-## What's happening
+## Plan: Expose services directly on ports 8000/8001/3000
 
-Wrangler crash-looping (94 restarts):
-```
-✘ The directory specified by the "assets.directory" field does not exist: /root/DLAX/client
-```
+AWS SG now allows inbound 80, 3000, 8000, 8001. Switch from nginx hostname vhosts (nip.io) to direct `IP:PORT` access.
 
-The build emits `dist/server/wrangler.json` with `assets.directory = "../client"` — wrangler resolves that relative to its `--cwd`, which the installer sets to `/root/DLAX/backend`, so it looks for `/root/DLAX/backend/../client` = `/root/DLAX/client`. We deploy the static files to `/root/DLAX/frontend` instead, so the path doesn't exist and the worker never boots.
+### Changes to `install.sh`
 
-Plus all the user-facing URL changes from the previous turn (public IP 15.206.37.230, hostname-based nginx vhosts on :80 for app/api/studio) are still pending — not yet in `install.sh`.
+1. **Bind containers to 0.0.0.0 instead of 127.0.0.1**
+   - In `supabase-stack/docker-compose.yml`, change port mappings:
+     - kong: `"${KONG_HTTP_PORT}:8000/tcp"` (drop `127.0.0.1:`)
+     - studio: `"${STUDIO_PORT}:3000/tcp"` (drop `127.0.0.1:`)
+     - db: keep `127.0.0.1:5432` (DB stays internal)
+   - In `install.sh`, start wrangler with `--ip 0.0.0.0` so the app worker on :3000 is reachable externally.
 
-## Plan — single edit to `install.sh`
+2. **Update env URLs to use direct `IP:PORT`**
+   - `supabase-stack/.env`:
+     - `SITE_URL=http://$SERVER_IP:3000/`
+     - `ADDITIONAL_REDIRECT_URLS=http://$SERVER_IP:3000/,http://$SERVER_IP/`
+     - `API_EXTERNAL_URL=http://$SERVER_IP:8000`
+     - `SUPABASE_PUBLIC_URL=http://$SERVER_IP:8000`
+   - App `.env`:
+     - `VITE_SUPABASE_URL=http://$SERVER_IP:8000`
 
-### 1. Fix the wrangler asset path mismatch
+3. **Simplify nginx to a single default vhost on :80**
+   - Drop `app.<ip>.nip.io` / `api.<ip>.nip.io` / `studio.<ip>.nip.io` server blocks.
+   - Keep one `listen 80 default_server` that proxies to the app worker on `127.0.0.1:3000` and serves static `dist/client`.
+   - Keep legacy `/supabase/` and `/studio/` path-based fallbacks (harmless).
 
-Deploy frontend to `/root/DLAX/client` (the path the generated `wrangler.json` already expects) instead of `/root/DLAX/frontend`. One-line change:
+4. **Update summary printout** to list direct URLs:
+   ```
+   App      : http://<IP>/        or  http://<IP>:3000/
+   Supabase : http://<IP>:8000
+   Studio   : http://<IP>:8001   (user: admin / pass: <generated>)
+   ```
+   Update the security warning to note ports 80/3000/8000/8001 are public-facing and Studio is protected only by basic auth — recommend restricting SG to admin IP for 8001, or keep Studio behind nginx `/studio/` only.
 
-```bash
-FRONTEND="$DEPLOY/client"     # was: $DEPLOY/frontend
-```
+### Files touched
+- `install.sh` — wrangler `--ip 0.0.0.0`, env URLs, nginx config simplified, summary
+- `supabase-stack/docker-compose.yml` — kong + studio bind `0.0.0.0`
 
-Nginx `root` and the summary printout pick this up automatically since they reference `$FRONTEND`. No need to patch `wrangler.json` after every build.
-
-### 2. Auto-detect public IP
-
-Replace the current single-line IMDSv1 fetch with:
-1. IMDSv2 (token first, then `/latest/meta-data/public-ipv4`)
-2. `https://api.ipify.org` fallback
-3. `hostname -I` (LAN) as last resort before `127.0.0.1`
-
-`SERVER_IP=` env override still wins. On this box step 1 or 2 will return `15.206.37.230`.
-
-### 3. Hostname-based nginx vhosts on :80 (no new AWS ports)
-
-All three `server` blocks listen on `:80`. Uses `nip.io` so no DNS setup is needed.
-
-- `server_name _` (default) → app on `127.0.0.1:3000`, with legacy `/supabase/` and `/studio/` path routes kept as fallback
-- `server_name app.15.206.37.230.nip.io` → app
-- `server_name api.15.206.37.230.nip.io` → `proxy_pass http://127.0.0.1:8000;` (Kong, root → root, no path rewrite)
-- `server_name studio.15.206.37.230.nip.io` → `proxy_pass http://127.0.0.1:8001;` (Studio, with websocket upgrade headers)
-
-Kong and Studio Docker bindings stay on `127.0.0.1` — they're only reachable via nginx.
-
-### 4. App and Supabase env updated
-
-```
-# app .env
-VITE_SUPABASE_URL=http://api.<SERVER_IP>.nip.io
-
-# supabase-stack/.env
-SITE_URL=http://app.<SERVER_IP>.nip.io/
-ADDITIONAL_REDIRECT_URLS=http://app.<SERVER_IP>.nip.io/,http://<SERVER_IP>/
-API_EXTERNAL_URL=http://api.<SERVER_IP>.nip.io
-SUPABASE_PUBLIC_URL=http://api.<SERVER_IP>.nip.io
-```
-
-### 5. Updated summary printout
-
-```
-App     : http://app.15.206.37.230.nip.io/   (or http://15.206.37.230/)
-API     : http://api.15.206.37.230.nip.io
-Studio  : http://studio.15.206.37.230.nip.io
-```
-
-## Re-deploy
-
+### Re-deploy
 ```bash
 sudo ./install.sh
-# or pin explicitly:
-sudo SERVER_IP='15.206.37.230' ADMIN_PASSWORD='admin2026' ./install.sh
 ```
 
-The wipe step at the top already removes `/root/DLAX/frontend` from the old layout, so re-running is clean.
-
-## Files changed
-
-- `install.sh` only — `FRONTEND` path fix, public-IP auto-detect, hostname vhosts on :80, env URLs, summary.
+### Security note for user
+Exposing Studio (8001) on a public IP means anyone who can reach the EC2 can hit the Studio UI. It has basic auth (admin / generated password) but no rate limiting. Recommended: restrict port 8001 in the AWS SG to your office/home IP only.

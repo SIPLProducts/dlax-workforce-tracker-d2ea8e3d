@@ -7,10 +7,10 @@
 #   chmod +x install.sh
 #   sudo ADMIN_PASSWORD='YourPass#2026' ./install.sh
 #
-# After it finishes (only inbound tcp/80 required in your AWS security group):
-#   App      : http://app.<SERVER_IP>.nip.io/   (or http://<SERVER_IP>/)
-#   Supabase : http://api.<SERVER_IP>.nip.io
-#   Studio   : http://studio.<SERVER_IP>.nip.io
+# After it finishes (open inbound tcp 80, 3000, 8000, 8001 in your AWS SG):
+#   App      : http://<SERVER_IP>/        or  http://<SERVER_IP>:3000/
+#   Supabase : http://<SERVER_IP>:8000
+#   Studio   : http://<SERVER_IP>:8001
 # =============================================================================
 set -Eeuo pipefail
 
@@ -25,9 +25,9 @@ DEPLOY="/root/DLAX"
 FRONTEND="$DEPLOY/client"
 BACKEND="$DEPLOY/backend"
 
-APP_PORT="${APP_PORT:-3000}"             # internal only
-SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"   # internal only
-STUDIO_PORT="${STUDIO_PORT:-8001}"       # internal only
+APP_PORT="${APP_PORT:-3000}"             # bound to 0.0.0.0 (public)
+SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"   # kong, bound to 0.0.0.0 (public)
+STUDIO_PORT="${STUDIO_PORT:-8001}"       # studio, bound to 0.0.0.0 (public)
 
 # Public IP auto-detect: IMDSv2 → ipify → LAN → loopback. SERVER_IP= env overrides.
 detect_ip() {
@@ -47,9 +47,6 @@ detect_ip() {
   echo "127.0.0.1"
 }
 SERVER_IP="${SERVER_IP:-$(detect_ip)}"
-HOST_APP="app.${SERVER_IP}.nip.io"
-HOST_API="api.${SERVER_IP}.nip.io"
-HOST_STUDIO="studio.${SERVER_IP}.nip.io"
 
 ADMIN_LOGIN_ID="${ADMIN_LOGIN_ID:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-ChangeMe123!}"
@@ -171,10 +168,10 @@ SERVICE_ROLE_KEY=$SRK
 DASHBOARD_USERNAME=admin
 DASHBOARD_PASSWORD=$DASH_PASS
 
-SITE_URL=http://$HOST_APP/
-ADDITIONAL_REDIRECT_URLS=http://$HOST_APP/,http://$SERVER_IP/
-API_EXTERNAL_URL=http://$HOST_API
-SUPABASE_PUBLIC_URL=http://$HOST_API
+SITE_URL=http://$SERVER_IP:$APP_PORT/
+ADDITIONAL_REDIRECT_URLS=http://$SERVER_IP:$APP_PORT/,http://$SERVER_IP/
+API_EXTERNAL_URL=http://$SERVER_IP:$SUPABASE_API_PORT
+SUPABASE_PUBLIC_URL=http://$SERVER_IP:$SUPABASE_API_PORT
 
 KONG_HTTP_PORT=$SUPABASE_API_PORT
 STUDIO_PORT=$STUDIO_PORT
@@ -279,7 +276,7 @@ ok "admin user created"
 # =============================================================================
 log "writing app .env"
 cat > "$SRC/.env" <<EOF
-VITE_SUPABASE_URL=http://$HOST_API
+VITE_SUPABASE_URL=http://$SERVER_IP:$SUPABASE_API_PORT
 VITE_SUPABASE_PUBLISHABLE_KEY=$ANON
 VITE_SUPABASE_PROJECT_ID=local
 
@@ -320,12 +317,12 @@ chmod 600 "$BACKEND/.dev.vars"
 ok "worker bundle ready: $BACKEND/index.js"
 
 # =============================================================================
-# 8) PM2 — run worker via wrangler/workerd (bound to 127.0.0.1)
+# 8) PM2 — run worker via wrangler/workerd (bound to 0.0.0.0)
 # =============================================================================
-log "starting backend under PM2 (wrangler dev → 127.0.0.1:$APP_PORT)"
+log "starting backend under PM2 (wrangler dev → 0.0.0.0:$APP_PORT)"
 pm2 delete dlax >/dev/null 2>&1 || true
 pm2 start wrangler --name dlax --cwd "$BACKEND" --update-env -- \
-  dev --local --ip 127.0.0.1 --port "$APP_PORT" --no-bundle --config wrangler.json
+  dev --local --ip 0.0.0.0 --port "$APP_PORT" --no-bundle --config wrangler.json
 pm2 save >/dev/null
 pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 
@@ -386,61 +383,6 @@ server {
   }
 }
 
-# Hostname vhost — app (same upstream as default)
-server {
-  listen 80;
-  server_name $HOST_APP;
-  client_max_body_size 50m;
-  root $FRONTEND;
-  index index.html;
-  location / { try_files \$uri @ssr; }
-  location @ssr {
-    proxy_pass http://127.0.0.1:$APP_PORT;
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-  }
-}
-
-# Hostname vhost — Supabase API (Kong), root → root, no path rewrite
-server {
-  listen 80;
-  server_name $HOST_API;
-  client_max_body_size 50m;
-  location / {
-    proxy_pass http://127.0.0.1:$SUPABASE_API_PORT;
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-  }
-}
-
-# Hostname vhost — Supabase Studio
-server {
-  listen 80;
-  server_name $HOST_STUDIO;
-  client_max_body_size 50m;
-  location / {
-    proxy_pass http://127.0.0.1:$STUDIO_PORT;
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-  }
-}
 NGINX
 ln -sf /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/dlax
 rm -f /etc/nginx/sites-enabled/default
@@ -454,9 +396,9 @@ ok "nginx configured"
 # =============================================================================
 echo
 printf '%s========================  DLAX is up  ========================%s\n' "$G" "$N"
-printf '  App URL          : http://%s/   (or http://%s/)\n' "$HOST_APP" "$SERVER_IP"
-printf '  Supabase API     : http://%s   (legacy: http://%s/supabase/)\n' "$HOST_API" "$SERVER_IP"
-printf '  Supabase Studio  : http://%s   (legacy: http://%s/studio/)   (user: admin  pass: %s)\n' "$HOST_STUDIO" "$SERVER_IP" "$DASH_PASS"
+printf '  App URL          : http://%s/   (or http://%s:%s/)\n' "$SERVER_IP" "$SERVER_IP" "$APP_PORT"
+printf '  Supabase API     : http://%s:%s   (legacy: http://%s/supabase/)\n' "$SERVER_IP" "$SUPABASE_API_PORT" "$SERVER_IP"
+printf '  Supabase Studio  : http://%s:%s   (legacy: http://%s/studio/)   (user: admin  pass: %s)\n' "$SERVER_IP" "$STUDIO_PORT" "$SERVER_IP" "$DASH_PASS"
 printf '  App admin login  : %s   /   %s\n' "$ADMIN_LOGIN_ID" "$ADMIN_PASSWORD"
 printf '  Frontend         : %s\n' "$FRONTEND"
 printf '  Backend          : %s\n' "$BACKEND"
@@ -464,5 +406,6 @@ printf '  Secrets file     : %s/.env\n' "$SUPA"
 printf '  Logs             : pm2 logs dlax  |  docker compose -f %s/docker-compose.yml logs -f  |  journalctl -u nginx -f\n' "$SUPA"
 printf '%s==============================================================%s\n' "$G" "$N"
 echo
-warn "AWS Security Group: only inbound tcp/80 is required. All internal services (5432/8000/8001/$APP_PORT) bind to 127.0.0.1."
+warn "AWS Security Group: open inbound tcp 80, $APP_PORT, $SUPABASE_API_PORT, $STUDIO_PORT. Postgres (5432) stays bound to 127.0.0.1."
+warn "Supabase Studio on :$STUDIO_PORT is publicly reachable — protected only by basic auth. Recommend restricting :$STUDIO_PORT in your SG to admin IPs only."
 warn "Change the admin password after first login."
