@@ -1,37 +1,25 @@
 #!/usr/bin/env bash
 # =============================================================================
-# DLAX one-shot deployer
-#   - Self-hosted Supabase (Docker)
-#   - DLAX TanStack app (frontend assets + Node SSR backend)
-#   - Schema migrations + seeded admin user
+# DLAX one-shot deployer (self-contained, idempotent)
 #
-# Layout you copy to the server BEFORE running this script:
-#   /root/DLAX/
-#     deploy.sh             <- this file
-#     source/               <- the DLAX Lovable project (src/, supabase/, package.json, ...)
-#     supabase-stack/       <- the v17 self-host bundle (docker-compose.yml, volumes/, scripts/, .env.example)
+# Usage on a fresh / dirty Ubuntu 22.04 or 24.04 server:
+#   scp dlax-repo.zip root@SERVER:/root/ && ssh root@SERVER
+#   cd /root && unzip dlax-repo.zip && mv dlax-* DLAX && cd DLAX
+#   chmod +x deploy.sh
+#   sudo -E ADMIN_PASSWORD='YourStrongPass#2026' ./deploy.sh
 #
-# Run:    sudo bash /root/DLAX/deploy.sh
-# Reset:  sudo bash /root/DLAX/deploy.sh --reset
-# App only: sudo bash /root/DLAX/deploy.sh --rebuild-app
+# Every run WIPES the previous install (DB volumes, build output, PM2 process)
+# and rebuilds from scratch. End state:
+#   - App  : http://SERVER_IP:3000        (PM2 process "dlax")
+#   - Supa : http://SERVER_IP:8000        (Kong API + Studio)
 # =============================================================================
 set -Eeuo pipefail
 
 # ---------- config (override via env) ----------------------------------------
-# Script auto-detects layout:
-#   * If deploy.sh sits next to the DLAX project (package.json + supabase-stack/),
-#     SOURCE_DIR = script dir, SUPA_DIR = script dir/supabase-stack.
-#   * Otherwise falls back to /root/DLAX/{source,supabase-stack}.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/package.json" ] && [ -d "$SCRIPT_DIR/supabase-stack" ]; then
-  DLAX_ROOT="${DLAX_ROOT:-$SCRIPT_DIR}"
-  SOURCE_DIR="${SOURCE_DIR:-$SCRIPT_DIR}"
-  SUPA_DIR="${SUPA_DIR:-$SCRIPT_DIR/supabase-stack}"
-else
-  DLAX_ROOT="${DLAX_ROOT:-/root/DLAX}"
-  SOURCE_DIR="${SOURCE_DIR:-$DLAX_ROOT/source}"
-  SUPA_DIR="${SUPA_DIR:-$DLAX_ROOT/supabase-stack}"
-fi
+DLAX_ROOT="${DLAX_ROOT:-$SCRIPT_DIR}"
+SOURCE_DIR="${SOURCE_DIR:-$DLAX_ROOT}"
+SUPA_DIR="${SUPA_DIR:-$DLAX_ROOT/supabase-stack}"
 FRONTEND_DIR="${FRONTEND_DIR:-$DLAX_ROOT/frontend}"
 BACKEND_DIR="${BACKEND_DIR:-$DLAX_ROOT/backend}"
 
@@ -54,34 +42,19 @@ warn() { printf '%s[warn]%s %s\n' "$c_ylw" "$c_rst" "$*"; }
 die()  { printf '%s[fail]%s %s\n' "$c_red" "$c_rst" "$*" >&2; exit 1; }
 trap 'die "deploy.sh failed at line $LINENO"' ERR
 
-# ---------- args --------------------------------------------------------------
-MODE_RESET=0
-MODE_APP_ONLY=0
-for a in "$@"; do
-  case "$a" in
-    --reset)        MODE_RESET=1 ;;
-    --rebuild-app)  MODE_APP_ONLY=1 ;;
-    -h|--help)
-      sed -n '2,18p' "$0"; exit 0 ;;
-    *) die "unknown arg: $a" ;;
-  esac
-done
-
 [ "$(id -u)" -eq 0 ] || die "run as root (sudo bash $0)"
-[ -d "$SOURCE_DIR" ] || die "missing $SOURCE_DIR (copy the DLAX project there)"
-[ -d "$SUPA_DIR" ]   || die "missing $SUPA_DIR (copy the v17 supabase-stack there)"
-
-mkdir -p "$FRONTEND_DIR" "$BACKEND_DIR"
+[ -f "$SOURCE_DIR/package.json" ] || die "missing $SOURCE_DIR/package.json — run this script from the unzipped repo root"
+[ -d "$SUPA_DIR" ]                || die "missing $SUPA_DIR — supabase-stack/ must sit next to deploy.sh"
 
 # =============================================================================
-# 1) Preflight: install dependencies (idempotent)
+# 1) Preflight: install OS deps (idempotent)
 # =============================================================================
 install_pkgs() {
   log "preflight: apt packages"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y >/dev/null
   apt-get install -y --no-install-recommends \
-    curl ca-certificates gnupg lsb-release jq openssl git rsync uuid-runtime >/dev/null
+    curl ca-certificates gnupg lsb-release jq openssl git rsync unzip uuid-runtime >/dev/null
 }
 
 install_docker() {
@@ -122,52 +95,61 @@ install_node_bun() {
   ok "pm2 $(pm2 -v)"
 }
 
-if [ "$MODE_APP_ONLY" -eq 0 ]; then
-  install_pkgs
-  install_docker
-fi
+install_pkgs
+install_docker
 install_node_bun
 
 # =============================================================================
-# 2) Optional --reset
+# 2) WIPE previous install (always)
 # =============================================================================
-if [ "$MODE_RESET" -eq 1 ]; then
-  warn "--reset: stopping containers, wiping volumes and built artifacts"
-  ( cd "$SUPA_DIR" && docker compose down -v --remove-orphans || true )
-  rm -rf "$FRONTEND_DIR"/* "$BACKEND_DIR"/* "$SOURCE_DIR/.output" "$SOURCE_DIR/node_modules" || true
+wipe_previous() {
+  log "wiping previous install"
+  # PM2
   pm2 delete dlax >/dev/null 2>&1 || true
-  ok "reset complete"
-fi
+  # Docker stack
+  if [ -f "$SUPA_DIR/docker-compose.yml" ]; then
+    ( cd "$SUPA_DIR" && docker compose down -v --remove-orphans >/dev/null 2>&1 || true )
+  fi
+  # Stray dlax-* containers
+  local cids
+  cids=$(docker ps -aq --filter "name=^dlax-" 2>/dev/null || true)
+  [ -n "$cids" ] && docker rm -f $cids >/dev/null 2>&1 || true
+  # Volumes
+  for v in dlax-supabase_db-data dlax-supabase_storage-data; do
+    docker volume rm -f "$v" >/dev/null 2>&1 || true
+  done
+  # Built artifacts
+  rm -rf "$FRONTEND_DIR" "$BACKEND_DIR" \
+         "$SOURCE_DIR/.output" "$SOURCE_DIR/node_modules" \
+         "$SOURCE_DIR/.env" "$SUPA_DIR/.env" || true
+  mkdir -p "$FRONTEND_DIR" "$BACKEND_DIR"
+  ok "wipe complete"
+}
+wipe_previous
 
 # =============================================================================
-# 3) Bring up self-hosted Supabase (skipped on --rebuild-app)
+# 3) Generate Supabase .env (fresh secrets every run)
 # =============================================================================
 b64url() { openssl base64 -e -A | tr '+/' '-_' | tr -d '='; }
 
-# Build a Supabase-compatible JWT (HS256) from JWT_SECRET for role=anon|service_role
 mint_jwt() {
-  local role="$1" secret="$2"
-  local iat exp header payload sig
-  iat=$(date +%s)
-  exp=$((iat + 60*60*24*365*10))   # 10 years
+  local role="$1" secret="$2" iat exp header payload sig
+  iat=$(date +%s); exp=$((iat + 60*60*24*365*10))
   header=$(printf '{"alg":"HS256","typ":"JWT"}' | b64url)
   payload=$(printf '{"role":"%s","iss":"supabase","iat":%d,"exp":%d}' "$role" "$iat" "$exp" | b64url)
-  sig=$(printf '%s.%s' "$header" "$payload" \
-        | openssl dgst -binary -sha256 -hmac "$secret" | b64url)
+  sig=$(printf '%s.%s' "$header" "$payload" | openssl dgst -binary -sha256 -hmac "$secret" | b64url)
   printf '%s.%s.%s\n' "$header" "$payload" "$sig"
 }
 
-ensure_supabase_env() {
-  local envf="$SUPA_DIR/.env"
-  if [ ! -f "$envf" ]; then
-    log "generating Supabase .env"
-    local pg_pass jwt_secret anon srk dash_pass
-    pg_pass=$(openssl rand -hex 24)
-    jwt_secret=$(openssl rand -hex 32)
-    dash_pass=$(openssl rand -hex 12)
-    anon=$(mint_jwt anon "$jwt_secret")
-    srk=$(mint_jwt service_role "$jwt_secret")
-    cat > "$envf" <<EOF
+write_supabase_env() {
+  log "generating $SUPA_DIR/.env"
+  local pg_pass jwt_secret anon srk dash_pass
+  pg_pass=$(openssl rand -hex 24)
+  jwt_secret=$(openssl rand -hex 32)
+  dash_pass=$(openssl rand -hex 12)
+  anon=$(mint_jwt anon "$jwt_secret")
+  srk=$(mint_jwt service_role "$jwt_secret")
+  cat > "$SUPA_DIR/.env" <<EOF
 # Generated by deploy.sh on $(date -u +%FT%TZ)
 POSTGRES_PASSWORD=$pg_pass
 POSTGRES_DB=postgres
@@ -195,7 +177,6 @@ ENABLE_EMAIL_SIGNUP=true
 ENABLE_EMAIL_AUTOCONFIRM=true
 ENABLE_ANONYMOUS_USERS=false
 
-# SMTP (placeholders — no real email sending)
 SMTP_ADMIN_EMAIL=admin@example.com
 SMTP_HOST=supabase-mail
 SMTP_PORT=2500
@@ -207,14 +188,17 @@ MAILER_URLPATHS_INVITE=/auth/v1/verify
 MAILER_URLPATHS_RECOVERY=/auth/v1/verify
 MAILER_URLPATHS_EMAIL_CHANGE=/auth/v1/verify
 EOF
-
-    chmod 600 "$envf"
-    ok "wrote $envf (keep this file safe)"
-  else
-    ok "reusing existing $envf"
-  fi
+  chmod 600 "$SUPA_DIR/.env"
+  ok "wrote $SUPA_DIR/.env (back this file up — losing it = losing access)"
 }
+write_supabase_env
 
+# Load Supabase env for the rest of the script
+set -a; . "$SUPA_DIR/.env"; set +a
+
+# =============================================================================
+# 4) Start Supabase
+# =============================================================================
 start_supabase() {
   log "starting Supabase stack"
   ( cd "$SUPA_DIR" && docker compose up -d )
@@ -223,9 +207,9 @@ start_supabase() {
     state=$(docker inspect -f '{{.State.Health.Status}}' "$DB_CONTAINER" 2>/dev/null || echo starting)
     [ "$state" = "healthy" ] && { ok "db healthy"; break; }
     sleep 2
-    [ "$i" = 120 ] && die "db never became healthy. Try: cd $SUPA_DIR && docker compose logs db"
+    [ "$i" = 120 ] && die "db never became healthy — try: cd $SUPA_DIR && docker compose logs db"
   done
-  log "waiting for Kong/REST API on :$SUPABASE_API_PORT"
+  log "waiting for API on :$SUPABASE_API_PORT"
   for i in $(seq 1 60); do
     if curl -fsS "http://127.0.0.1:$SUPABASE_API_PORT/auth/v1/health" >/dev/null 2>&1 \
        || curl -fsS "http://127.0.0.1:$SUPABASE_API_PORT/" >/dev/null 2>&1; then
@@ -233,38 +217,26 @@ start_supabase() {
     fi
     sleep 2
   done
-  warn "API did not respond on /auth/v1/health within 120s — continuing; check 'docker compose ps'"
+  warn "API did not respond within 120s — continuing; check 'docker compose ps'"
 }
-
-if [ "$MODE_APP_ONLY" -eq 0 ]; then
-  ensure_supabase_env
-  start_supabase
-fi
-
-# Load env vars from supabase .env for the rest of the script
-set -a
-# shellcheck disable=SC1091
-. "$SUPA_DIR/.env"
-set +a
+start_supabase
 
 # =============================================================================
-# 4) Apply DLAX migrations + seed admin
+# 5) Apply migrations + seed admin
 # =============================================================================
 apply_migrations() {
   local mdir="$SOURCE_DIR/supabase/migrations"
-  [ -d "$mdir" ] || { warn "no migrations folder at $mdir — skipping schema"; return; }
+  [ -d "$mdir" ] || { warn "no migrations at $mdir — skipping"; return; }
   log "applying migrations from $mdir"
-  # Copy into the db container so psql can read them
   docker exec "$DB_CONTAINER" mkdir -p /tmp/dlax-mig
   docker exec "$DB_CONTAINER" sh -c 'rm -f /tmp/dlax-mig/*.sql'
   for f in $(ls "$mdir"/*.sql 2>/dev/null | sort); do
     base=$(basename "$f")
     docker cp "$f" "$DB_CONTAINER:/tmp/dlax-mig/$base" >/dev/null
     log "  -> $base"
-    # Run as superuser via local socket (peer auth) — survives unknown role passwords
     if ! docker exec --user postgres "$DB_CONTAINER" \
         psql -v ON_ERROR_STOP=1 -U postgres -d postgres -f "/tmp/dlax-mig/$base" >/dev/null; then
-      die "migration $base failed. See: docker logs $DB_CONTAINER"
+      die "migration $base failed — see: docker logs $DB_CONTAINER"
     fi
   done
   ok "migrations applied"
@@ -272,15 +244,6 @@ apply_migrations() {
 
 seed_admin() {
   log "seeding admin user ($ADMIN_LOGIN_ID / $ADMIN_EMAIL)"
-  # If a user with this email already exists, skip
-  local exists
-  exists=$(docker exec --user postgres "$DB_CONTAINER" \
-    psql -tAU postgres -d postgres -c \
-    "SELECT 1 FROM auth.users WHERE email=lower('$ADMIN_EMAIL') LIMIT 1;" 2>/dev/null || echo "")
-  if [ "$exists" = "1" ]; then
-    ok "admin already exists — skipping create"
-    return
-  fi
   local resp http
   resp=$(mktemp)
   http=$(curl -sS -o "$resp" -w '%{http_code}' \
@@ -292,19 +255,17 @@ seed_admin() {
       '{email:$e, password:$p, email_confirm:true, user_metadata:{login_id:$l, display_name:"Administrator"}}')")
   if [ "$http" != "200" ] && [ "$http" != "201" ]; then
     warn "admin create HTTP $http: $(cat "$resp")"
-    rm -f "$resp"
-    die "could not create admin via auth admin API"
+    rm -f "$resp"; die "could not create admin via auth admin API"
   fi
   rm -f "$resp"
-  # handle_new_user() trigger promotes first user to admin and creates profile.login_id
-  ok "admin user created"
+  ok "admin user created (handle_new_user trigger promoted to admin role)"
 }
 
 apply_migrations
 seed_admin
 
 # =============================================================================
-# 5) Build DLAX app
+# 6) Build the app
 # =============================================================================
 write_app_env() {
   log "writing $SOURCE_DIR/.env"
@@ -325,29 +286,25 @@ EOF
 }
 
 build_app() {
-  log "installing app dependencies (bun install)"
+  log "bun install"
   ( cd "$SOURCE_DIR" && bun install --no-progress )
-  log "building app (bun run build)"
+  log "bun run build"
   ( cd "$SOURCE_DIR" && bun run build )
-  [ -d "$SOURCE_DIR/.output" ] || die "build did not produce .output/ — check 'bun run build' logs"
+  [ -d "$SOURCE_DIR/.output" ] || die "build did not produce .output/"
 }
 
 split_output() {
-  log "splitting build into $FRONTEND_DIR (client) and $BACKEND_DIR (server)"
+  log "splitting build → $FRONTEND_DIR (client) and $BACKEND_DIR (server)"
   rm -rf "$FRONTEND_DIR"/* "$BACKEND_DIR"/* || true
-  # client/static assets -> frontend
   if [ -d "$SOURCE_DIR/.output/public" ]; then
     rsync -a "$SOURCE_DIR/.output/public/" "$FRONTEND_DIR/"
   fi
-  # everything else (server entry + node deps) -> backend
   rsync -a --exclude='public' "$SOURCE_DIR/.output/" "$BACKEND_DIR/"
   cp -f "$SOURCE_DIR/.env" "$BACKEND_DIR/.env"
-  ok "frontend: $(find "$FRONTEND_DIR" -type f | wc -l) files"
-  ok "backend:  $(find "$BACKEND_DIR"  -type f | wc -l) files"
+  ok "frontend: $(find "$FRONTEND_DIR" -type f | wc -l) files | backend: $(find "$BACKEND_DIR" -type f | wc -l) files"
 }
 
 start_pm2() {
-  # Locate the server entry produced by TanStack Start
   local entry=""
   for c in \
       "$BACKEND_DIR/server/index.mjs" \
@@ -356,21 +313,15 @@ start_pm2() {
       "$BACKEND_DIR/index.mjs"; do
     [ -f "$c" ] && { entry="$c"; break; }
   done
-  if [ -z "$entry" ]; then
-    warn "couldn't find Node server entry under $BACKEND_DIR — searching..."
-    entry=$(find "$BACKEND_DIR" -maxdepth 4 -type f \( -name 'index.mjs' -o -name 'index.js' -o -name 'server.mjs' \) | head -n1 || true)
-  fi
-  [ -n "$entry" ] || die "no server entry found in $BACKEND_DIR; inspect the .output structure"
+  [ -n "$entry" ] || entry=$(find "$BACKEND_DIR" -maxdepth 4 -type f \( -name 'index.mjs' -o -name 'index.js' -o -name 'server.mjs' \) | head -n1 || true)
+  [ -n "$entry" ] || die "no server entry found in $BACKEND_DIR"
   ok "server entry: $entry"
-
   log "starting under PM2 (name=dlax, port=$APP_PORT)"
-  pm2 delete dlax >/dev/null 2>&1 || true
   PORT=$APP_PORT HOST=0.0.0.0 NODE_ENV=production \
     pm2 start "$entry" --name dlax --update-env --cwd "$BACKEND_DIR"
   pm2 save >/dev/null
-  # systemd auto-start (idempotent)
   pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
-  ok "pm2 status:"; pm2 status dlax || true
+  pm2 status dlax || true
 }
 
 write_app_env
@@ -379,20 +330,18 @@ split_output
 start_pm2
 
 # =============================================================================
-# 6) Summary
+# 7) Summary
 # =============================================================================
 echo
 printf '%s========================  DLAX is up  ========================%s\n' "$c_grn" "$c_rst"
-printf '  App URL          : http://%s:%s\n'        "$SERVER_IP" "$APP_PORT"
-printf '  Supabase Studio  : http://%s:%s\n'        "$SERVER_IP" "$SUPABASE_API_PORT"
-printf '    dashboard user : %s\n'                  "${DASHBOARD_USERNAME:-admin}"
-printf '    dashboard pass : %s\n'                  "${DASHBOARD_PASSWORD:-(see $SUPA_DIR/.env)}"
-printf '  Admin login (app): %s   /   %s\n'         "$ADMIN_LOGIN_ID" "$ADMIN_PASSWORD"
-printf '  Frontend assets  : %s\n'                  "$FRONTEND_DIR"
-printf '  Backend (SSR)    : %s\n'                  "$BACKEND_DIR"
-printf '  Supabase secrets : %s/.env\n'             "$SUPA_DIR"
+printf '  App URL          : http://%s:%s\n'   "$SERVER_IP" "$APP_PORT"
+printf '  Supabase API     : http://%s:%s\n'   "$SERVER_IP" "$SUPABASE_API_PORT"
+printf '    dashboard user : %s\n'             "${DASHBOARD_USERNAME:-admin}"
+printf '    dashboard pass : %s\n'             "${DASHBOARD_PASSWORD}"
+printf '  Admin login      : %s   /   %s\n'    "$ADMIN_LOGIN_ID" "$ADMIN_PASSWORD"
+printf '  Supabase secrets : %s/.env\n'        "$SUPA_DIR"
 printf '  PM2              : pm2 status dlax  |  pm2 logs dlax\n'
 printf '%s==============================================================%s\n' "$c_grn" "$c_rst"
 echo
-warn "Open ports $APP_PORT (app) and $SUPABASE_API_PORT (Supabase) in your firewall / cloud SG."
+warn "Open ports $APP_PORT (app) and $SUPABASE_API_PORT (Supabase) in your firewall."
 warn "CHANGE the admin password after first login."
