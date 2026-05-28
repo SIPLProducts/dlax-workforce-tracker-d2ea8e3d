@@ -1,18 +1,13 @@
 #!/bin/bash
-# v17.4 init: First-boot role bootstrap on a FRESH db volume only.
-# Runs under the official postgres entrypoint as the postgres superuser
-# (env $POSTGRES_USER defaults to postgres in the supabase image's init step).
-# install.sh ALSO runs scripts/sync-roles.sh after the DB is healthy, so this
-# script is best-effort — sync-roles.sh is the authoritative pass.
+# v17.4 init: First-boot role + schema bootstrap on a FRESH db volume only.
 set -e
 
 PW="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
 DB="${POSTGRES_DB:-postgres}"
+PW_ESC="${PW//\'/\'\'}"
 
-PW_ESCAPED="${PW//\'/\'\'}"
-
-# Use the env vars psql picks up from the entrypoint (POSTGRES_USER/POSTGRES_DB).
 psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER:-supabase_admin}" -d "$DB" <<SQL
+-- Roles ---------------------------------------------------------------------
 DO \$\$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN
     CREATE ROLE anon NOLOGIN NOINHERIT;
@@ -25,29 +20,41 @@ DO \$\$ BEGIN
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticator') THEN
-    ALTER ROLE authenticator WITH LOGIN NOINHERIT PASSWORD '${PW_ESCAPED}';
+    ALTER ROLE authenticator WITH LOGIN NOINHERIT PASSWORD '${PW_ESC}';
   ELSE
-    CREATE ROLE authenticator LOGIN NOINHERIT PASSWORD '${PW_ESCAPED}';
+    CREATE ROLE authenticator LOGIN NOINHERIT PASSWORD '${PW_ESC}';
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='supabase_auth_admin') THEN
-    ALTER ROLE supabase_auth_admin WITH LOGIN CREATEROLE PASSWORD '${PW_ESCAPED}';
+    ALTER ROLE supabase_auth_admin WITH LOGIN CREATEROLE PASSWORD '${PW_ESC}';
   ELSE
-    CREATE ROLE supabase_auth_admin LOGIN CREATEROLE PASSWORD '${PW_ESCAPED}';
+    CREATE ROLE supabase_auth_admin LOGIN CREATEROLE PASSWORD '${PW_ESC}';
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='supabase_storage_admin') THEN
-    ALTER ROLE supabase_storage_admin WITH LOGIN CREATEROLE PASSWORD '${PW_ESCAPED}';
+    ALTER ROLE supabase_storage_admin WITH LOGIN CREATEROLE PASSWORD '${PW_ESC}';
   ELSE
-    CREATE ROLE supabase_storage_admin LOGIN CREATEROLE PASSWORD '${PW_ESCAPED}';
+    CREATE ROLE supabase_storage_admin LOGIN CREATEROLE PASSWORD '${PW_ESC}';
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='supabase_admin') THEN
-    ALTER ROLE supabase_admin WITH LOGIN SUPERUSER CREATEDB CREATEROLE REPLICATION BYPASSRLS PASSWORD '${PW_ESCAPED}';
+    ALTER ROLE supabase_admin WITH LOGIN SUPERUSER CREATEDB CREATEROLE REPLICATION BYPASSRLS PASSWORD '${PW_ESC}';
   END IF;
 END \$\$;
 
 GRANT anon, authenticated, service_role TO authenticator;
+
+-- Schemas that GoTrue + Storage migrations need on a FRESH volume ----------
+CREATE SCHEMA IF NOT EXISTS auth    AUTHORIZATION supabase_auth_admin;
+CREATE SCHEMA IF NOT EXISTS storage AUTHORIZATION supabase_storage_admin;
+
+GRANT ALL ON DATABASE postgres TO supabase_auth_admin, supabase_storage_admin;
+GRANT ALL ON SCHEMA auth    TO supabase_auth_admin;
+GRANT ALL ON SCHEMA storage TO supabase_storage_admin;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+ALTER ROLE supabase_auth_admin    SET search_path = auth, public;
+ALTER ROLE supabase_storage_admin SET search_path = storage, public;
 SQL
 
-echo "[dlax init] role passwords synced with POSTGRES_PASSWORD"
+echo "[dlax init] roles + schemas ready"
