@@ -26,6 +26,14 @@ services:
     plugins:
       - name: cors
 
+  - name: auth-v1-health
+    url: http://auth:9999/health
+    routes:
+      - name: auth-v1-health-all
+        strip_path: true
+        paths:
+          - /health
+
   - name: rest-v1
     url: http://rest:3000/
     routes:
@@ -44,6 +52,16 @@ services:
           allow:
             - admin
             - anon
+
+  - name: storage-v1
+    url: http://storage:5000/
+    routes:
+      - name: storage-v1-all
+        strip_path: true
+        paths:
+          - /storage/v1/
+    plugins:
+      - name: cors
 
   - name: meta
     url: http://meta:8080/

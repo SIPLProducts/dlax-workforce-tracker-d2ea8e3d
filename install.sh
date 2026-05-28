@@ -1,34 +1,41 @@
 #!/usr/bin/env bash
 # =============================================================================
-# DLAX install script — clean, minimal, idempotent
+# DLAX install script — AWS-friendly, nginx reverse proxy on port 80
 #
-# Usage (on a fresh Ubuntu 22.04 / 24.04 server):
-#   cd /root/DLAX        # the unzipped repo (contains package.json + supabase-stack/)
+# Usage (fresh Ubuntu 22.04 / 24.04 EC2 instance):
+#   cd <unzipped-repo>
 #   chmod +x install.sh
-#   sudo -E ADMIN_PASSWORD='YourPass#2026' ./install.sh
+#   sudo ADMIN_PASSWORD='YourPass#2026' ./install.sh
 #
-# Every run wipes the previous install and rebuilds from scratch.
-# When it finishes:
-#   App      : http://<SERVER_IP>:3000
-#   Supabase : http://<SERVER_IP>:8000
+# After it finishes (only inbound tcp/80 required in your AWS security group):
+#   App      : http://<SERVER_IP>/
+#   Supabase : http://<SERVER_IP>/supabase/
+#   Studio   : http://<SERVER_IP>/studio/
 # =============================================================================
 set -Eeuo pipefail
 
 # ---------- config ------------------------------------------------------------
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SUPA="$ROOT/supabase-stack"
-FRONTEND="$ROOT/frontend"
-BACKEND="$ROOT/backend"
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SUPA="$SRC/supabase-stack"
 
-APP_PORT="${APP_PORT:-3000}"
-SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"
-SERVER_IP="${SERVER_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
+# Final deployment directory (frontend + backend live here, NOT in the repo)
+DEPLOY="/root/DLAX"
+FRONTEND="$DEPLOY/frontend"
+BACKEND="$DEPLOY/backend"
+
+APP_PORT="${APP_PORT:-3000}"             # internal only
+SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"   # internal only
+STUDIO_PORT="${STUDIO_PORT:-8001}"       # internal only
+
+SERVER_IP="${SERVER_IP:-$(curl -fsS --max-time 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)}"
+[ -z "$SERVER_IP" ] && SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 [ -z "$SERVER_IP" ] && SERVER_IP="127.0.0.1"
 
 ADMIN_LOGIN_ID="${ADMIN_LOGIN_ID:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-ChangeMe123!}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@dlax.local}"
 DB_CONTAINER="dlax-db"
+AUTH_CONTAINER="dlax-auth"
 
 # ---------- logging -----------------------------------------------------------
 G=$'\033[32m'; B=$'\033[34m'; Y=$'\033[33m'; R=$'\033[31m'; N=$'\033[0m'
@@ -38,19 +45,19 @@ warn() { printf '%s[warn]%s %s\n' "$Y" "$N" "$*"; }
 die()  { printf '%s[fail]%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
 trap 'die "install.sh failed at line $LINENO"' ERR
 
-[ "$(id -u)" -eq 0 ]        || die "run as root: sudo ./install.sh"
-[ -f "$ROOT/package.json" ] || die "missing package.json — run this from the unzipped repo root"
-[ -d "$SUPA" ]              || die "missing supabase-stack/ next to install.sh"
+[ "$(id -u)" -eq 0 ]       || die "run as root: sudo ./install.sh"
+[ -f "$SRC/package.json" ] || die "missing package.json — run this from the unzipped repo root"
+[ -d "$SUPA" ]             || die "missing supabase-stack/ next to install.sh"
 
 # =============================================================================
-# 1) Install only what's needed (idempotent)
+# 1) System deps
 # =============================================================================
 log "installing system deps"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y >/dev/null
 apt-get install -y --no-install-recommends \
-  curl ca-certificates gnupg lsb-release jq openssl rsync >/dev/null
-ok "apt deps ready"
+  curl ca-certificates gnupg lsb-release jq openssl rsync nginx >/dev/null
+ok "apt deps ready (incl. nginx)"
 
 if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
   log "installing Docker Engine + compose"
@@ -99,7 +106,8 @@ cids=$(docker ps -aq --filter "name=^dlax-" 2>/dev/null || true)
 for v in dlax-supabase_db-data dlax-supabase_storage-data; do
   docker volume rm -f "$v" >/dev/null 2>&1 || true
 done
-rm -rf "$FRONTEND" "$BACKEND" "$ROOT/.output" "$ROOT/node_modules" "$ROOT/.env" "$SUPA/.env" || true
+rm -rf "$FRONTEND" "$BACKEND" "$SRC/.output" "$SRC/node_modules" "$SRC/.env" "$SUPA/.env" || true
+rm -f /etc/nginx/sites-enabled/dlax /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/default || true
 mkdir -p "$FRONTEND" "$BACKEND"
 ok "wipe complete"
 
@@ -137,14 +145,13 @@ SERVICE_ROLE_KEY=$SRK
 DASHBOARD_USERNAME=admin
 DASHBOARD_PASSWORD=$DASH_PASS
 
-SITE_URL=http://$SERVER_IP:$APP_PORT
-ADDITIONAL_REDIRECT_URLS=http://$SERVER_IP:$APP_PORT
-API_EXTERNAL_URL=http://$SERVER_IP:$SUPABASE_API_PORT
-SUPABASE_PUBLIC_URL=http://$SERVER_IP:$SUPABASE_API_PORT
+SITE_URL=http://$SERVER_IP/
+ADDITIONAL_REDIRECT_URLS=http://$SERVER_IP/
+API_EXTERNAL_URL=http://$SERVER_IP/supabase
+SUPABASE_PUBLIC_URL=http://$SERVER_IP/supabase
 
 KONG_HTTP_PORT=$SUPABASE_API_PORT
-KONG_HTTPS_PORT=8443
-STUDIO_PORT=8001
+STUDIO_PORT=$STUDIO_PORT
 
 DISABLE_SIGNUP=false
 ENABLE_EMAIL_SIGNUP=true
@@ -179,25 +186,39 @@ for i in $(seq 1 120); do
   [ "$i" = 120 ] && die "db never healthy — check: cd $SUPA && docker compose logs db"
 done
 
-log "waiting for API on :$SUPABASE_API_PORT"
-for i in $(seq 1 60); do
-  if curl -fsS "http://127.0.0.1:$SUPABASE_API_PORT/auth/v1/health" >/dev/null 2>&1 \
-     || curl -fsS "http://127.0.0.1:$SUPABASE_API_PORT/" >/dev/null 2>&1; then
-    ok "API up"; break
+log "waiting for GoTrue migrations to finish"
+for i in $(seq 1 90); do
+  if docker logs "$AUTH_CONTAINER" 2>&1 | grep -qiE 'GoTrue.*started|listening on|API started'; then
+    ok "auth started"; break
   fi
   sleep 2
-  [ "$i" = 60 ] && warn "API slow to respond — continuing"
+  if [ "$i" = 90 ]; then
+    warn "auth slow to log readiness — recent log tail:"
+    docker logs --tail 80 "$AUTH_CONTAINER" || true
+  fi
+done
+
+log "waiting for kong → auth health on 127.0.0.1:$SUPABASE_API_PORT/auth/v1/health"
+for i in $(seq 1 60); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$SUPABASE_API_PORT/auth/v1/health" || echo 000)
+  [ "$code" = "200" ] && { ok "Supabase API up"; break; }
+  sleep 2
+  if [ "$i" = 60 ]; then
+    warn "Supabase API not returning 200 (last code=$code). Recent auth + kong logs:"
+    docker logs --tail 60 "$AUTH_CONTAINER" || true
+    docker logs --tail 30 dlax-kong || true
+    die "Supabase API never became ready"
+  fi
 done
 
 # =============================================================================
-# 5) Apply migrations + seed admin
+# 5) Apply migrations
 # =============================================================================
-MDIR="$ROOT/supabase/migrations"
-if [ -d "$MDIR" ]; then
+MDIR="$SRC/supabase/migrations"
+if [ -d "$MDIR" ] && ls "$MDIR"/*.sql >/dev/null 2>&1; then
   log "applying migrations from supabase/migrations/"
-  docker exec "$DB_CONTAINER" mkdir -p /tmp/dlax-mig
-  docker exec "$DB_CONTAINER" sh -c 'rm -f /tmp/dlax-mig/*.sql'
-  for f in $(ls "$MDIR"/*.sql 2>/dev/null | sort); do
+  docker exec "$DB_CONTAINER" sh -c 'mkdir -p /tmp/dlax-mig && rm -f /tmp/dlax-mig/*.sql'
+  for f in $(ls "$MDIR"/*.sql | sort); do
     base=$(basename "$f")
     docker cp "$f" "$DB_CONTAINER:/tmp/dlax-mig/$base" >/dev/null
     log "  -> $base"
@@ -210,6 +231,9 @@ else
   warn "no migrations directory"
 fi
 
+# =============================================================================
+# 6) Seed admin user
+# =============================================================================
 log "seeding admin user ($ADMIN_LOGIN_ID / $ADMIN_EMAIL)"
 RESP=$(mktemp)
 HTTP=$(curl -sS -o "$RESP" -w '%{http_code}' \
@@ -225,35 +249,37 @@ rm -f "$RESP"
 ok "admin user created"
 
 # =============================================================================
-# 6) Write app .env, build, and run under PM2
+# 7) Build the app
 # =============================================================================
 log "writing app .env"
-cat > "$ROOT/.env" <<EOF
-VITE_SUPABASE_URL=http://$SERVER_IP:$SUPABASE_API_PORT
+cat > "$SRC/.env" <<EOF
+VITE_SUPABASE_URL=http://$SERVER_IP/supabase
 VITE_SUPABASE_PUBLISHABLE_KEY=$ANON
 VITE_SUPABASE_PROJECT_ID=local
 
-SUPABASE_URL=http://$SERVER_IP:$SUPABASE_API_PORT
+SUPABASE_URL=http://127.0.0.1:$SUPABASE_API_PORT
 SUPABASE_PUBLISHABLE_KEY=$ANON
 SUPABASE_SERVICE_ROLE_KEY=$SRK
 
 PORT=$APP_PORT
-HOST=0.0.0.0
+HOST=127.0.0.1
 NODE_ENV=production
 EOF
-chmod 600 "$ROOT/.env"
+chmod 600 "$SRC/.env"
 
 log "bun install"
-( cd "$ROOT" && bun install --no-progress )
+( cd "$SRC" && bun install --no-progress )
 
 log "bun run build"
-( cd "$ROOT" && bun run build )
-[ -d "$ROOT/.output" ] || die "build did not produce .output/"
+( cd "$SRC" && bun run build )
+[ -d "$SRC/.output" ] || die "build did not produce .output/"
 
-log "splitting build → frontend/ + backend/"
-[ -d "$ROOT/.output/public" ] && rsync -a "$ROOT/.output/public/" "$FRONTEND/"
-rsync -a --exclude='public' "$ROOT/.output/" "$BACKEND/"
-cp -f "$ROOT/.env" "$BACKEND/.env"
+log "deploying → $FRONTEND + $BACKEND"
+rm -rf "$FRONTEND" "$BACKEND"
+mkdir -p "$FRONTEND" "$BACKEND"
+[ -d "$SRC/.output/public" ] && rsync -a "$SRC/.output/public/" "$FRONTEND/"
+rsync -a --exclude='public' "$SRC/.output/" "$BACKEND/"
+cp -f "$SRC/.env" "$BACKEND/.env"
 
 ENTRY=""
 for c in "$BACKEND/server/index.mjs" "$BACKEND/server/index.js" "$BACKEND/index.mjs"; do
@@ -263,25 +289,93 @@ done
 [ -n "$ENTRY" ] || die "no server entry under $BACKEND"
 ok "server entry: $ENTRY"
 
-log "starting under PM2"
-PORT=$APP_PORT HOST=0.0.0.0 NODE_ENV=production \
+# =============================================================================
+# 8) PM2 (bound to 127.0.0.1)
+# =============================================================================
+log "starting backend under PM2 (127.0.0.1:$APP_PORT)"
+PORT=$APP_PORT HOST=127.0.0.1 NODE_ENV=production \
   pm2 start "$ENTRY" --name dlax --update-env --cwd "$BACKEND"
 pm2 save >/dev/null
 pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 
 # =============================================================================
-# 7) Summary
+# 9) Nginx reverse proxy (port 80 only)
+# =============================================================================
+log "configuring nginx reverse proxy on :80"
+cat > /etc/nginx/sites-available/dlax <<NGINX
+server {
+  listen 80 default_server;
+  server_name _;
+
+  client_max_body_size 50m;
+
+  # Static frontend (built assets shipped to $FRONTEND)
+  root $FRONTEND;
+  index index.html;
+
+  # Try static file first; fall through to the SSR/server-fn process
+  location / {
+    try_files \$uri @ssr;
+  }
+
+  location @ssr {
+    proxy_pass http://127.0.0.1:$APP_PORT;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 300s;
+  }
+
+  # Supabase API — /supabase/* → kong on 127.0.0.1:$SUPABASE_API_PORT
+  location /supabase/ {
+    rewrite ^/supabase/(.*)\$ /\$1 break;
+    proxy_pass http://127.0.0.1:$SUPABASE_API_PORT;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 300s;
+  }
+
+  # Supabase Studio (admin DB UI)
+  location /studio/ {
+    rewrite ^/studio/(.*)\$ /\$1 break;
+    proxy_pass http://127.0.0.1:$STUDIO_PORT;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
+NGINX
+ln -sf /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/dlax
+rm -f /etc/nginx/sites-enabled/default
+nginx -t >/dev/null || die "nginx config invalid"
+systemctl enable --now nginx >/dev/null
+systemctl reload nginx
+ok "nginx configured"
+
+# =============================================================================
+# 10) Summary
 # =============================================================================
 echo
 printf '%s========================  DLAX is up  ========================%s\n' "$G" "$N"
-printf '  App URL          : http://%s:%s\n' "$SERVER_IP" "$APP_PORT"
-printf '  Supabase API     : http://%s:%s\n' "$SERVER_IP" "$SUPABASE_API_PORT"
-printf '    dashboard user : admin\n'
-printf '    dashboard pass : %s\n' "$DASH_PASS"
+printf '  App URL          : http://%s/\n' "$SERVER_IP"
+printf '  Supabase API     : http://%s/supabase/\n' "$SERVER_IP"
+printf '  Supabase Studio  : http://%s/studio/   (user: admin  pass: %s)\n' "$SERVER_IP" "$DASH_PASS"
 printf '  App admin login  : %s   /   %s\n' "$ADMIN_LOGIN_ID" "$ADMIN_PASSWORD"
+printf '  Frontend         : %s\n' "$FRONTEND"
+printf '  Backend          : %s\n' "$BACKEND"
 printf '  Secrets file     : %s/.env\n' "$SUPA"
-printf '  PM2              : pm2 status dlax  |  pm2 logs dlax\n'
+printf '  Logs             : pm2 logs dlax  |  docker compose -f %s/docker-compose.yml logs -f  |  journalctl -u nginx -f\n' "$SUPA"
 printf '%s==============================================================%s\n' "$G" "$N"
 echo
-warn "Open ports $APP_PORT and $SUPABASE_API_PORT in your firewall."
+warn "AWS Security Group: only inbound tcp/80 is required. All internal services (5432/8000/8001/$APP_PORT) bind to 127.0.0.1."
 warn "Change the admin password after first login."
