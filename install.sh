@@ -383,61 +383,6 @@ server {
   }
 }
 
-# Hostname vhost — app (same upstream as default)
-server {
-  listen 80;
-  server_name $HOST_APP;
-  client_max_body_size 50m;
-  root $FRONTEND;
-  index index.html;
-  location / { try_files \$uri @ssr; }
-  location @ssr {
-    proxy_pass http://127.0.0.1:$APP_PORT;
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-  }
-}
-
-# Hostname vhost — Supabase API (Kong), root → root, no path rewrite
-server {
-  listen 80;
-  server_name $HOST_API;
-  client_max_body_size 50m;
-  location / {
-    proxy_pass http://127.0.0.1:$SUPABASE_API_PORT;
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-  }
-}
-
-# Hostname vhost — Supabase Studio
-server {
-  listen 80;
-  server_name $HOST_STUDIO;
-  client_max_body_size 50m;
-  location / {
-    proxy_pass http://127.0.0.1:$STUDIO_PORT;
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 300s;
-  }
-}
 NGINX
 ln -sf /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/dlax
 rm -f /etc/nginx/sites-enabled/default
