@@ -59,6 +59,13 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 ALTER ROLE supabase_auth_admin    SET search_path = auth, public;
 ALTER ROLE supabase_storage_admin SET search_path = storage, public;
+
+-- Realtime publication (empty; app migrations ADD TABLE into it) -----------
+DO \$\$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname='supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END \$\$;
 SQL
 
 echo "[dlax init] roles + schemas ready"
