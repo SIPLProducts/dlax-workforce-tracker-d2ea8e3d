@@ -1,44 +1,63 @@
-## Progress
+## What broke
 
-GoTrue migrations now succeed (the `postgres` role fix worked). New failure:
+Database is fully set up now (all migrations applied, admin user seeded). The build also succeeds — but `install.sh` expects the old `.output/` directory layout from Nitro/Node-target TanStack builds. The current template uses **`@cloudflare/vite-plugin`**, which emits:
 
 ```
-ERROR: publication "supabase_realtime" does not exist
-STATEMENT: ALTER PUBLICATION supabase_realtime ADD TABLE public.contractors;
+dist/client/        ← static assets
+dist/server/
+  index.js          ← Cloudflare Worker bundle (workerd runtime)
+  wrangler.json     ← auto-generated worker config
+  .dev.vars         ← env-var file for the worker
 ```
 
-## Root cause
+This is a **Cloudflare Worker bundle**, not a Node server. PM2 cannot run it with `node …` — it needs the `workerd` runtime, which is shipped by `wrangler`.
 
-App migrations call `ALTER PUBLICATION supabase_realtime ADD TABLE …` to enable Realtime on tables. Hosted Supabase pre-creates this publication; our self-hosted stack doesn't (we have no realtime container, and the db image doesn't ship the publication on a fresh volume). Editing 19+ app migrations is not the right fix — we should provide the publication so the migrations run as-written.
+## Plan
 
-## Fix
+Update **`install.sh` only**. No app code, no Vite config, no Cloudflare plugin removal. Run the Worker locally via `wrangler dev --local` (which embeds `workerd`) under PM2, still bound to 127.0.0.1:3000, still proxied by nginx on :80.
 
-Edit only **`supabase-stack/volumes/db/init/00-roles.sh`**. Append at the end of the SQL block:
+### Changes to `install.sh`
 
-```sql
-CREATE PUBLICATION supabase_realtime;
-```
+1. **Install wrangler globally** alongside the other npm tools:
+   ```bash
+   npm install -g wrangler
+   ```
+2. **Replace the `.output/`-based deploy block** with:
+   ```bash
+   [ -d "$SRC/dist/server" ] || die "build did not produce dist/server/"
+   [ -d "$SRC/dist/client" ] || die "build did not produce dist/client/"
+   rsync -a --delete "$SRC/dist/client/" "$FRONTEND/"
+   rsync -a --delete "$SRC/dist/server/" "$BACKEND/"
+   ```
+3. **Write a fresh `.dev.vars`** inside `$BACKEND` (wrangler reads it for `process.env` inside the worker — this is how server-side Supabase secrets reach the handler):
+   ```
+   SUPABASE_URL=http://127.0.0.1:8000
+   SUPABASE_PUBLISHABLE_KEY=$ANON
+   SUPABASE_SERVICE_ROLE_KEY=$SRK
+   ```
+   (overwrites the build-time `.dev.vars` so prod-on-server values win)
+4. **Replace the PM2 start command**:
+   ```bash
+   pm2 start wrangler --name dlax --cwd "$BACKEND" -- \
+     dev index.js --local --ip 127.0.0.1 --port "$APP_PORT" --no-bundle \
+     --config wrangler.json --var-file .dev.vars
+   ```
+   (If `--var-file` is not a wrangler flag in the installed version, fall back to `.dev.vars` autodiscovery — wrangler picks it up from `cwd` automatically.)
+5. **Keep nginx config exactly as-is** — it already proxies `/` → `127.0.0.1:3000` (the worker), `/supabase/` → `127.0.0.1:8000` (kong), `/studio/` → `127.0.0.1:8001`.
+6. **Drop the now-obsolete `ENTRY` detection loop** that looked for `server/index.mjs` under `.output/`.
 
-Wrapped in a guard so it's idempotent:
+### Why not switch the build target to Node SSR
 
-```sql
-DO \$\$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname='supabase_realtime') THEN
-    CREATE PUBLICATION supabase_realtime;
-  END IF;
-END \$\$;
-```
+That would mean removing `@cloudflare/vite-plugin`, changing the Lovable-managed Vite config wrapper, and likely editing files the template warns not to touch. Running the existing Worker bundle under `workerd` via wrangler is the minimum change that gets you live on AWS today, and matches what the framework expects.
 
-This is an empty publication; the `ALTER PUBLICATION … ADD TABLE` calls in our migrations will then populate it. Without a realtime container running, the publication just sits there unused — harmless.
-
-## Re-deploy
+### Re-deploy
 
 ```bash
 sudo ADMIN_PASSWORD='admin2026' ./install.sh
 ```
 
-`install.sh` wipes the db volume on every run, so the updated init script will execute on the fresh cluster.
+The wipe step at the top already drops the dist/, node_modules/, PM2 process, and nginx site, so a re-run is clean.
 
 ## Files changed
 
-- `supabase-stack/volumes/db/init/00-roles.sh` — add idempotent `CREATE PUBLICATION supabase_realtime`
+- `install.sh` — install wrangler; deploy from `dist/client` + `dist/server`; PM2 starts `wrangler dev --local`; write `.dev.vars` for server-side secrets.

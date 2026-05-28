@@ -95,6 +95,12 @@ if ! command -v pm2 >/dev/null; then
 fi
 ok "pm2 $(pm2 -v)"
 
+if ! command -v wrangler >/dev/null; then
+  log "installing wrangler (bundles workerd runtime)"
+  npm install -g wrangler >/dev/null
+fi
+ok "wrangler $(wrangler --version 2>/dev/null | head -n1)"
+
 # =============================================================================
 # 2) Wipe previous install
 # =============================================================================
@@ -272,29 +278,34 @@ log "bun install"
 
 log "bun run build"
 ( cd "$SRC" && bun run build )
-[ -d "$SRC/.output" ] || die "build did not produce .output/"
+[ -d "$SRC/dist/server" ] || die "build did not produce dist/server/"
+[ -d "$SRC/dist/client" ] || die "build did not produce dist/client/"
 
 log "deploying → $FRONTEND + $BACKEND"
 rm -rf "$FRONTEND" "$BACKEND"
 mkdir -p "$FRONTEND" "$BACKEND"
-[ -d "$SRC/.output/public" ] && rsync -a "$SRC/.output/public/" "$FRONTEND/"
-rsync -a --exclude='public' "$SRC/.output/" "$BACKEND/"
-cp -f "$SRC/.env" "$BACKEND/.env"
+rsync -a --delete "$SRC/dist/client/" "$FRONTEND/"
+rsync -a --delete "$SRC/dist/server/" "$BACKEND/"
 
-ENTRY=""
-for c in "$BACKEND/server/index.mjs" "$BACKEND/server/index.js" "$BACKEND/index.mjs"; do
-  [ -f "$c" ] && { ENTRY="$c"; break; }
-done
-[ -n "$ENTRY" ] || ENTRY=$(find "$BACKEND" -maxdepth 4 -type f \( -name 'index.mjs' -o -name 'index.js' \) | head -n1)
-[ -n "$ENTRY" ] || die "no server entry under $BACKEND"
-ok "server entry: $ENTRY"
+# wrangler reads .dev.vars from cwd → exposed inside the worker as process.env.*
+cat > "$BACKEND/.dev.vars" <<EOF
+SUPABASE_URL=http://127.0.0.1:$SUPABASE_API_PORT
+SUPABASE_PUBLISHABLE_KEY=$ANON
+SUPABASE_SERVICE_ROLE_KEY=$SRK
+EOF
+chmod 600 "$BACKEND/.dev.vars"
+
+[ -f "$BACKEND/index.js" ] || die "missing $BACKEND/index.js (worker bundle)"
+[ -f "$BACKEND/wrangler.json" ] || die "missing $BACKEND/wrangler.json"
+ok "worker bundle ready: $BACKEND/index.js"
 
 # =============================================================================
-# 8) PM2 (bound to 127.0.0.1)
+# 8) PM2 — run worker via wrangler/workerd (bound to 127.0.0.1)
 # =============================================================================
-log "starting backend under PM2 (127.0.0.1:$APP_PORT)"
-PORT=$APP_PORT HOST=127.0.0.1 NODE_ENV=production \
-  pm2 start "$ENTRY" --name dlax --update-env --cwd "$BACKEND"
+log "starting backend under PM2 (wrangler dev → 127.0.0.1:$APP_PORT)"
+pm2 delete dlax >/dev/null 2>&1 || true
+pm2 start wrangler --name dlax --cwd "$BACKEND" --update-env -- \
+  dev --local --ip 127.0.0.1 --port "$APP_PORT" --no-bundle --config wrangler.json
 pm2 save >/dev/null
 pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 
