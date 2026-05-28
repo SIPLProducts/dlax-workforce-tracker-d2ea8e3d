@@ -255,9 +255,17 @@ else
 fi
 
 # =============================================================================
-# 6) Seed admin user
+# 6) Seed admin user (auth user + profile + role) and verify login works
 # =============================================================================
 log "seeding admin user ($ADMIN_LOGIN_ID / $ADMIN_EMAIL)"
+
+# Wipe any pre-existing admin row in the DB so re-runs are idempotent
+docker exec --user postgres "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres -c "
+DELETE FROM public.user_roles WHERE user_id IN (SELECT id FROM auth.users WHERE email = '$ADMIN_EMAIL');
+DELETE FROM public.profiles  WHERE user_id IN (SELECT id FROM auth.users WHERE email = '$ADMIN_EMAIL');
+DELETE FROM auth.users WHERE email = '$ADMIN_EMAIL';
+" >/dev/null
+
 RESP=$(mktemp)
 HTTP=$(curl -sS -o "$RESP" -w '%{http_code}' \
   -X POST "http://127.0.0.1:$SUPABASE_API_PORT/auth/v1/admin/users" \
@@ -268,8 +276,52 @@ if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
   cat "$RESP"; rm -f "$RESP"
   die "admin create failed (HTTP $HTTP)"
 fi
+ADMIN_UID=$(jq -r '.id' < "$RESP")
 rm -f "$RESP"
-ok "admin user created"
+[ -n "$ADMIN_UID" ] && [ "$ADMIN_UID" != "null" ] || die "could not parse admin user id from auth response"
+ok "admin auth user created (uid=$ADMIN_UID)"
+
+# Ensure profile row has the requested login_id and admin role exists.
+# The handle_new_user trigger usually does this, but we force it to be safe.
+docker exec --user postgres "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres -c "
+INSERT INTO public.profiles (user_id, email, display_name, login_id)
+VALUES ('$ADMIN_UID', '$ADMIN_EMAIL', 'Administrator', '$ADMIN_LOGIN_ID')
+ON CONFLICT (user_id) DO UPDATE
+  SET login_id = EXCLUDED.login_id,
+      email = EXCLUDED.email,
+      display_name = COALESCE(public.profiles.display_name, EXCLUDED.display_name);
+
+INSERT INTO public.user_roles (user_id, role)
+VALUES ('$ADMIN_UID', 'admin')
+ON CONFLICT (user_id, role) DO NOTHING;
+" >/dev/null || die "failed to upsert admin profile/role"
+ok "admin profile + role ensured (login_id=$ADMIN_LOGIN_ID)"
+
+# Verify: login_id resolves via the public RPC the browser actually calls
+log "verifying login_id RPC resolves to admin email"
+RPC_RESP=$(curl -sS -X POST \
+  "http://127.0.0.1:$SUPABASE_API_PORT/rest/v1/rpc/get_email_for_login_id" \
+  -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
+  -H "Content-Type: application/json" \
+  --data "$(jq -n --arg l "$ADMIN_LOGIN_ID" '{_login_id:$l}')")
+RPC_EMAIL=$(echo "$RPC_RESP" | jq -r 'if type=="string" then . else empty end')
+if [ "$RPC_EMAIL" != "$ADMIN_EMAIL" ]; then
+  warn "RPC response: $RPC_RESP"
+  die "get_email_for_login_id('$ADMIN_LOGIN_ID') did not return $ADMIN_EMAIL"
+fi
+ok "login_id RPC OK ($ADMIN_LOGIN_ID -> $ADMIN_EMAIL)"
+
+# Verify: password sign-in actually works against the same API
+log "verifying password sign-in via /auth/v1/token"
+TOK_RESP=$(curl -sS -X POST \
+  "http://127.0.0.1:$SUPABASE_API_PORT/auth/v1/token?grant_type=password" \
+  -H "apikey: $ANON" -H "Content-Type: application/json" \
+  --data "$(jq -n --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_PASSWORD" '{email:$e, password:$p}')")
+if ! echo "$TOK_RESP" | jq -e '.access_token' >/dev/null 2>&1; then
+  warn "token response: $TOK_RESP"
+  die "password sign-in failed for $ADMIN_EMAIL — check GOTRUE logs"
+fi
+ok "admin password sign-in verified"
 
 # =============================================================================
 # 7) Build the app
