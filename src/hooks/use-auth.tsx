@@ -52,8 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          // Use setTimeout to avoid blocking the callback
-          setTimeout(() => fetchRoles(session.user.id), 0);
+          fetchRoles(session.user.id);
         } else {
           setRoles([]);
         }
