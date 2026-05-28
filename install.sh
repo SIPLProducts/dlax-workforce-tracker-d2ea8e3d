@@ -73,8 +73,8 @@ log "installing system deps"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y >/dev/null
 apt-get install -y --no-install-recommends \
-  curl ca-certificates gnupg lsb-release jq openssl rsync nginx >/dev/null
-ok "apt deps ready (incl. nginx)"
+  curl ca-certificates gnupg lsb-release jq openssl rsync nginx gettext-base >/dev/null
+ok "apt deps ready (incl. nginx, envsubst)"
 
 if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
   log "installing Docker Engine + compose"
@@ -129,7 +129,7 @@ cids=$(docker ps -aq --filter "name=^dlax-" 2>/dev/null || true)
 for v in dlax-supabase_db-data dlax-supabase_storage-data; do
   docker volume rm -f "$v" >/dev/null 2>&1 || true
 done
-rm -rf "$FRONTEND" "$BACKEND" "$SRC/.output" "$SRC/dist" "$SRC/node_modules" "$SRC/.env" "$SUPA/.env" || true
+rm -rf "$FRONTEND" "$BACKEND" "$SRC/.output" "$SRC/dist" "$SRC/node_modules" "$SRC/.env" "$SUPA/.env" "$SUPA/volumes/api/kong.yml" || true
 rm -f /etc/nginx/sites-enabled/dlax /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/default || true
 mkdir -p "$FRONTEND" "$BACKEND"
 ok "wipe complete"
@@ -194,6 +194,17 @@ MAILER_URLPATHS_EMAIL_CHANGE=/auth/v1/verify
 EOF
 chmod 600 "$SUPA/.env"
 ok "wrote supabase-stack/.env (back this up — losing it = losing access)"
+
+log "rendering kong.yml from template (substituting anon/service JWTs)"
+[ -f "$SUPA/volumes/api/kong.yml.template" ] || die "missing $SUPA/volumes/api/kong.yml.template"
+SUPABASE_ANON_KEY="$ANON" SUPABASE_SERVICE_KEY="$SRK" \
+  envsubst '${SUPABASE_ANON_KEY} ${SUPABASE_SERVICE_KEY}' \
+  < "$SUPA/volumes/api/kong.yml.template" \
+  > "$SUPA/volumes/api/kong.yml"
+if grep -q '\${SUPABASE_' "$SUPA/volumes/api/kong.yml"; then
+  die "kong.yml still has unsubstituted placeholders — envsubst failed"
+fi
+ok "kong.yml rendered"
 
 # =============================================================================
 # 4) Start Supabase
