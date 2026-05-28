@@ -47,9 +47,6 @@ detect_ip() {
   echo "127.0.0.1"
 }
 SERVER_IP="${SERVER_IP:-$(detect_ip)}"
-HOST_APP="app.${SERVER_IP}.nip.io"
-HOST_API="api.${SERVER_IP}.nip.io"
-HOST_STUDIO="studio.${SERVER_IP}.nip.io"
 
 ADMIN_LOGIN_ID="${ADMIN_LOGIN_ID:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-ChangeMe123!}"
