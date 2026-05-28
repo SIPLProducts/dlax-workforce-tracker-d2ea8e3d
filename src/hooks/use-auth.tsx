@@ -79,7 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasRole = (role: AppRole) => roles.includes(role);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data?.session) {
+      setSession(data.session);
+      setUser(data.user ?? null);
+      if (data.user) fetchRoles(data.user.id);
+    }
     return { error: error as Error | null };
   };
 
@@ -89,8 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error: lookupError } = await supabase.rpc("get_email_for_login_id", { _login_id: trimmed });
     if (lookupError) return { error: lookupError as unknown as Error };
     if (!data) return { error: new Error("Invalid User ID or password") };
-    const { error } = await supabase.auth.signInWithPassword({ email: data, password });
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: data, password });
     if (error) return { error: new Error("Invalid User ID or password") };
+    if (signInData?.session) {
+      setSession(signInData.session);
+      setUser(signInData.user ?? null);
+      if (signInData.user) fetchRoles(signInData.user.id);
+    }
     return { error: null };
   };
 
