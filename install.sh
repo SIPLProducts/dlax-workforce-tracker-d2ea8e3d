@@ -276,7 +276,7 @@ ok "admin user created"
 # =============================================================================
 log "writing app .env"
 cat > "$SRC/.env" <<EOF
-VITE_SUPABASE_URL=http://$HOST_API
+VITE_SUPABASE_URL=http://$SERVER_IP:$SUPABASE_API_PORT
 VITE_SUPABASE_PUBLISHABLE_KEY=$ANON
 VITE_SUPABASE_PROJECT_ID=local
 
