@@ -7,10 +7,10 @@
 #   chmod +x install.sh
 #   sudo ADMIN_PASSWORD='YourPass#2026' ./install.sh
 #
-# After it finishes (only inbound tcp/80 required in your AWS security group):
-#   App      : http://app.<SERVER_IP>.nip.io/   (or http://<SERVER_IP>/)
-#   Supabase : http://api.<SERVER_IP>.nip.io
-#   Studio   : http://studio.<SERVER_IP>.nip.io
+# After it finishes (open inbound tcp 80, 3000, 8000, 8001 in your AWS SG):
+#   App      : http://<SERVER_IP>/        or  http://<SERVER_IP>:3000/
+#   Supabase : http://<SERVER_IP>:8000
+#   Studio   : http://<SERVER_IP>:8001
 # =============================================================================
 set -Eeuo pipefail
 
