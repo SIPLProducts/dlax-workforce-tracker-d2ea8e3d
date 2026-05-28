@@ -265,6 +265,21 @@ else
   warn "no migrations directory"
 fi
 
+# Tell PostgREST to reload its schema cache so freshly created functions
+# (e.g. public.get_email_for_login_id) become visible via /rest/v1/rpc/...
+log "reloading PostgREST schema cache"
+docker exec --user postgres "$DB_CONTAINER" \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c "NOTIFY pgrst, 'reload schema';" >/dev/null || warn "schema reload NOTIFY failed (continuing)"
+# Belt-and-suspenders: restart PostgREST so it definitely re-reads the schema
+docker restart dlax-rest >/dev/null 2>&1 || true
+for i in $(seq 1 30); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' \
+    "http://127.0.0.1:$SUPABASE_API_PORT/rest/v1/" -H "apikey: $ANON" || echo 000)
+  case "$code" in 200|301|302|404) ok "PostgREST ready"; break ;; esac
+  sleep 1
+done
+
 # =============================================================================
 # 6) Seed admin user (auth user + profile + role) and verify login works
 # =============================================================================
