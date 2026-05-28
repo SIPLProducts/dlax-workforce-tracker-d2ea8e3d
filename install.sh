@@ -265,6 +265,21 @@ else
   warn "no migrations directory"
 fi
 
+# Tell PostgREST to reload its schema cache so freshly created functions
+# (e.g. public.get_email_for_login_id) become visible via /rest/v1/rpc/...
+log "reloading PostgREST schema cache"
+docker exec --user postgres "$DB_CONTAINER" \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c "NOTIFY pgrst, 'reload schema';" >/dev/null || warn "schema reload NOTIFY failed (continuing)"
+# Belt-and-suspenders: restart PostgREST so it definitely re-reads the schema
+docker restart dlax-rest >/dev/null 2>&1 || true
+for i in $(seq 1 30); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' \
+    "http://127.0.0.1:$SUPABASE_API_PORT/rest/v1/" -H "apikey: $ANON" || echo 000)
+  case "$code" in 200|301|302|404) ok "PostgREST ready"; break ;; esac
+  sleep 1
+done
+
 # =============================================================================
 # 6) Seed admin user (auth user + profile + role) and verify login works
 # =============================================================================
@@ -308,17 +323,39 @@ ON CONFLICT (user_id, role) DO NOTHING;
 " >/dev/null || die "failed to upsert admin profile/role"
 ok "admin profile + role ensured (login_id=$ADMIN_LOGIN_ID)"
 
-# Verify: login_id resolves via the public RPC the browser actually calls
+# Verify: login_id resolves via the public RPC the browser actually calls.
+# PostgREST caches its schema; retry while nudging it to reload if the
+# function isn't visible yet (PGRST202).
 log "verifying login_id RPC resolves to admin email"
-RPC_RESP=$(curl -sS -X POST \
-  "http://127.0.0.1:$SUPABASE_API_PORT/rest/v1/rpc/get_email_for_login_id" \
-  -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
-  -H "Content-Type: application/json" \
-  --data "$(jq -n --arg l "$ADMIN_LOGIN_ID" '{_login_id:$l}')")
-RPC_EMAIL=$(echo "$RPC_RESP" | jq -r 'if type=="string" then . else empty end')
+RPC_EMAIL=""
+RPC_RESP=""
+for attempt in 1 2 3 4 5 6; do
+  RPC_RESP=$(curl -sS -X POST \
+    "http://127.0.0.1:$SUPABASE_API_PORT/rest/v1/rpc/get_email_for_login_id" \
+    -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
+    -H "Content-Type: application/json" \
+    --data "$(jq -n --arg l "$ADMIN_LOGIN_ID" '{_login_id:$l}')")
+  RPC_EMAIL=$(echo "$RPC_RESP" | jq -r 'if type=="string" then . else empty end')
+  [ "$RPC_EMAIL" = "$ADMIN_EMAIL" ] && break
+  # If the function is missing from the schema cache, nudge PostgREST.
+  if echo "$RPC_RESP" | grep -q 'PGRST202'; then
+    warn "RPC not in schema cache yet (attempt $attempt) — reloading PostgREST"
+    docker exec --user postgres "$DB_CONTAINER" psql -U postgres -d postgres \
+      -c "NOTIFY pgrst, 'reload schema';" >/dev/null 2>&1 || true
+    docker restart dlax-rest >/dev/null 2>&1 || true
+    sleep 3
+  else
+    sleep 2
+  fi
+done
 if [ "$RPC_EMAIL" != "$ADMIN_EMAIL" ]; then
   warn "RPC response: $RPC_RESP"
-  die "get_email_for_login_id('$ADMIN_LOGIN_ID') did not return $ADMIN_EMAIL"
+  warn "diagnosing in-database state:"
+  docker exec --user postgres "$DB_CONTAINER" psql -U postgres -d postgres -c \
+    "SELECT n.nspname, p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE p.proname='get_email_for_login_id';" || true
+  docker exec --user postgres "$DB_CONTAINER" psql -U postgres -d postgres -c \
+    "SELECT user_id, login_id, email FROM public.profiles WHERE lower(login_id)=lower('$ADMIN_LOGIN_ID');" || true
+  die "get_email_for_login_id('$ADMIN_LOGIN_ID') did not return $ADMIN_EMAIL — if pg_proc shows the function exists, restart the rest container: docker restart dlax-rest"
 fi
 ok "login_id RPC OK ($ADMIN_LOGIN_ID -> $ADMIN_EMAIL)"
 
