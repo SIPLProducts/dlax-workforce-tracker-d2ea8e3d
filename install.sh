@@ -129,7 +129,7 @@ cids=$(docker ps -aq --filter "name=^dlax-" 2>/dev/null || true)
 for v in dlax-supabase_db-data dlax-supabase_storage-data; do
   docker volume rm -f "$v" >/dev/null 2>&1 || true
 done
-rm -rf "$FRONTEND" "$BACKEND" "$SRC/.output" "$SRC/node_modules" "$SRC/.env" "$SUPA/.env" || true
+rm -rf "$FRONTEND" "$BACKEND" "$SRC/.output" "$SRC/dist" "$SRC/node_modules" "$SRC/.env" "$SUPA/.env" || true
 rm -f /etc/nginx/sites-enabled/dlax /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/default || true
 mkdir -p "$FRONTEND" "$BACKEND"
 ok "wipe complete"
@@ -293,10 +293,16 @@ chmod 600 "$SRC/.env"
 log "bun install"
 ( cd "$SRC" && bun install --no-progress )
 
+log "build env: SERVER_IP=$SERVER_IP  VITE_SUPABASE_URL=http://$SERVER_IP:$SUPABASE_API_PORT"
 log "bun run build"
 ( cd "$SRC" && bun run build )
 [ -d "$SRC/dist/server" ] || die "build did not produce dist/server/"
 [ -d "$SRC/dist/client" ] || die "build did not produce dist/client/"
+
+if grep -r -l "nip\.io" "$SRC/dist" >/dev/null 2>&1; then
+  grep -r -l "nip\.io" "$SRC/dist" || true
+  die "stale nip.io URL leaked into build output — aborting deploy"
+fi
 
 log "deploying → $FRONTEND + $BACKEND"
 rm -rf "$FRONTEND" "$BACKEND"
