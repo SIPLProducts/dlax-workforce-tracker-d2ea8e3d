@@ -20,16 +20,36 @@ SUPA="$SRC/supabase-stack"
 
 # Final deployment directory (frontend + backend live here, NOT in the repo)
 DEPLOY="/root/DLAX"
-FRONTEND="$DEPLOY/frontend"
+# NOTE: must be /root/DLAX/client — the generated dist/server/wrangler.json
+# has assets.directory="../client", resolved relative to BACKEND cwd.
+FRONTEND="$DEPLOY/client"
 BACKEND="$DEPLOY/backend"
 
 APP_PORT="${APP_PORT:-3000}"             # internal only
 SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"   # internal only
 STUDIO_PORT="${STUDIO_PORT:-8001}"       # internal only
 
-SERVER_IP="${SERVER_IP:-$(curl -fsS --max-time 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)}"
-[ -z "$SERVER_IP" ] && SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-[ -z "$SERVER_IP" ] && SERVER_IP="127.0.0.1"
+# Public IP auto-detect: IMDSv2 → ipify → LAN → loopback. SERVER_IP= env overrides.
+detect_ip() {
+  local ip token
+  token=$(curl -fsS --max-time 2 -X PUT \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+    http://169.254.169.254/latest/api/token 2>/dev/null || true)
+  if [ -n "$token" ]; then
+    ip=$(curl -fsS --max-time 2 -H "X-aws-ec2-metadata-token: $token" \
+      http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)
+    [ -n "$ip" ] && { echo "$ip"; return; }
+  fi
+  ip=$(curl -fsS --max-time 3 https://api.ipify.org 2>/dev/null || true)
+  [ -n "$ip" ] && { echo "$ip"; return; }
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  [ -n "$ip" ] && { echo "$ip"; return; }
+  echo "127.0.0.1"
+}
+SERVER_IP="${SERVER_IP:-$(detect_ip)}"
+HOST_APP="app.${SERVER_IP}.nip.io"
+HOST_API="api.${SERVER_IP}.nip.io"
+HOST_STUDIO="studio.${SERVER_IP}.nip.io"
 
 ADMIN_LOGIN_ID="${ADMIN_LOGIN_ID:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-ChangeMe123!}"

@@ -1,63 +1,77 @@
-## What broke
+## What's happening
 
-Database is fully set up now (all migrations applied, admin user seeded). The build also succeeds — but `install.sh` expects the old `.output/` directory layout from Nitro/Node-target TanStack builds. The current template uses **`@cloudflare/vite-plugin`**, which emits:
-
+Wrangler crash-looping (94 restarts):
 ```
-dist/client/        ← static assets
-dist/server/
-  index.js          ← Cloudflare Worker bundle (workerd runtime)
-  wrangler.json     ← auto-generated worker config
-  .dev.vars         ← env-var file for the worker
+✘ The directory specified by the "assets.directory" field does not exist: /root/DLAX/client
 ```
 
-This is a **Cloudflare Worker bundle**, not a Node server. PM2 cannot run it with `node …` — it needs the `workerd` runtime, which is shipped by `wrangler`.
+The build emits `dist/server/wrangler.json` with `assets.directory = "../client"` — wrangler resolves that relative to its `--cwd`, which the installer sets to `/root/DLAX/backend`, so it looks for `/root/DLAX/backend/../client` = `/root/DLAX/client`. We deploy the static files to `/root/DLAX/frontend` instead, so the path doesn't exist and the worker never boots.
 
-## Plan
+Plus all the user-facing URL changes from the previous turn (public IP 15.206.37.230, hostname-based nginx vhosts on :80 for app/api/studio) are still pending — not yet in `install.sh`.
 
-Update **`install.sh` only**. No app code, no Vite config, no Cloudflare plugin removal. Run the Worker locally via `wrangler dev --local` (which embeds `workerd`) under PM2, still bound to 127.0.0.1:3000, still proxied by nginx on :80.
+## Plan — single edit to `install.sh`
 
-### Changes to `install.sh`
+### 1. Fix the wrangler asset path mismatch
 
-1. **Install wrangler globally** alongside the other npm tools:
-   ```bash
-   npm install -g wrangler
-   ```
-2. **Replace the `.output/`-based deploy block** with:
-   ```bash
-   [ -d "$SRC/dist/server" ] || die "build did not produce dist/server/"
-   [ -d "$SRC/dist/client" ] || die "build did not produce dist/client/"
-   rsync -a --delete "$SRC/dist/client/" "$FRONTEND/"
-   rsync -a --delete "$SRC/dist/server/" "$BACKEND/"
-   ```
-3. **Write a fresh `.dev.vars`** inside `$BACKEND` (wrangler reads it for `process.env` inside the worker — this is how server-side Supabase secrets reach the handler):
-   ```
-   SUPABASE_URL=http://127.0.0.1:8000
-   SUPABASE_PUBLISHABLE_KEY=$ANON
-   SUPABASE_SERVICE_ROLE_KEY=$SRK
-   ```
-   (overwrites the build-time `.dev.vars` so prod-on-server values win)
-4. **Replace the PM2 start command**:
-   ```bash
-   pm2 start wrangler --name dlax --cwd "$BACKEND" -- \
-     dev index.js --local --ip 127.0.0.1 --port "$APP_PORT" --no-bundle \
-     --config wrangler.json --var-file .dev.vars
-   ```
-   (If `--var-file` is not a wrangler flag in the installed version, fall back to `.dev.vars` autodiscovery — wrangler picks it up from `cwd` automatically.)
-5. **Keep nginx config exactly as-is** — it already proxies `/` → `127.0.0.1:3000` (the worker), `/supabase/` → `127.0.0.1:8000` (kong), `/studio/` → `127.0.0.1:8001`.
-6. **Drop the now-obsolete `ENTRY` detection loop** that looked for `server/index.mjs` under `.output/`.
-
-### Why not switch the build target to Node SSR
-
-That would mean removing `@cloudflare/vite-plugin`, changing the Lovable-managed Vite config wrapper, and likely editing files the template warns not to touch. Running the existing Worker bundle under `workerd` via wrangler is the minimum change that gets you live on AWS today, and matches what the framework expects.
-
-### Re-deploy
+Deploy frontend to `/root/DLAX/client` (the path the generated `wrangler.json` already expects) instead of `/root/DLAX/frontend`. One-line change:
 
 ```bash
-sudo ADMIN_PASSWORD='admin2026' ./install.sh
+FRONTEND="$DEPLOY/client"     # was: $DEPLOY/frontend
 ```
 
-The wipe step at the top already drops the dist/, node_modules/, PM2 process, and nginx site, so a re-run is clean.
+Nginx `root` and the summary printout pick this up automatically since they reference `$FRONTEND`. No need to patch `wrangler.json` after every build.
+
+### 2. Auto-detect public IP
+
+Replace the current single-line IMDSv1 fetch with:
+1. IMDSv2 (token first, then `/latest/meta-data/public-ipv4`)
+2. `https://api.ipify.org` fallback
+3. `hostname -I` (LAN) as last resort before `127.0.0.1`
+
+`SERVER_IP=` env override still wins. On this box step 1 or 2 will return `15.206.37.230`.
+
+### 3. Hostname-based nginx vhosts on :80 (no new AWS ports)
+
+All three `server` blocks listen on `:80`. Uses `nip.io` so no DNS setup is needed.
+
+- `server_name _` (default) → app on `127.0.0.1:3000`, with legacy `/supabase/` and `/studio/` path routes kept as fallback
+- `server_name app.15.206.37.230.nip.io` → app
+- `server_name api.15.206.37.230.nip.io` → `proxy_pass http://127.0.0.1:8000;` (Kong, root → root, no path rewrite)
+- `server_name studio.15.206.37.230.nip.io` → `proxy_pass http://127.0.0.1:8001;` (Studio, with websocket upgrade headers)
+
+Kong and Studio Docker bindings stay on `127.0.0.1` — they're only reachable via nginx.
+
+### 4. App and Supabase env updated
+
+```
+# app .env
+VITE_SUPABASE_URL=http://api.<SERVER_IP>.nip.io
+
+# supabase-stack/.env
+SITE_URL=http://app.<SERVER_IP>.nip.io/
+ADDITIONAL_REDIRECT_URLS=http://app.<SERVER_IP>.nip.io/,http://<SERVER_IP>/
+API_EXTERNAL_URL=http://api.<SERVER_IP>.nip.io
+SUPABASE_PUBLIC_URL=http://api.<SERVER_IP>.nip.io
+```
+
+### 5. Updated summary printout
+
+```
+App     : http://app.15.206.37.230.nip.io/   (or http://15.206.37.230/)
+API     : http://api.15.206.37.230.nip.io
+Studio  : http://studio.15.206.37.230.nip.io
+```
+
+## Re-deploy
+
+```bash
+sudo ./install.sh
+# or pin explicitly:
+sudo SERVER_IP='15.206.37.230' ADMIN_PASSWORD='admin2026' ./install.sh
+```
+
+The wipe step at the top already removes `/root/DLAX/frontend` from the old layout, so re-running is clean.
 
 ## Files changed
 
-- `install.sh` — install wrangler; deploy from `dist/client` + `dist/server`; PM2 starts `wrangler dev --local`; write `.dev.vars` for server-side secrets.
+- `install.sh` only — `FRONTEND` path fix, public-IP auto-detect, hostname vhosts on :80, env URLs, summary.
