@@ -1,33 +1,23 @@
-## Goal
-When a department is assigned to a project in Project Assignments, automatically assign the categories that are mapped to that department (via `department_categories`) into the project's Categories list as well. This keeps the Daily Entry Sheet's category dropdown aligned with the Department → Category mapping.
+## Fix Login Right Panel Background
 
-## Scope
-Frontend-only change in `src/components/ProjectAssignments.tsx`. No DB schema changes, no changes to the Departments master screen or Daily Entry screen.
+The right side of the login screen currently uses pure black (`#0A0A1A`) with indigo/violet mesh blobs, which clashes against the navy gradient on the left (`#0A1530 → #14306B`). The seam between the two panels is very visible.
 
-## Behavior
+### Change
 
-1. **Single assign** (checking one department in the Departments tab):
-   - Insert into `project_departments` (current behavior).
-   - Look up `department_categories.category_id` for that department.
-   - Insert any not-yet-assigned ones into `project_categories` (ignore conflicts on the unique `(project_id, category_id)` pair).
-   - Show a toast like "Also auto-assigned N categories".
+In `src/routes/login.tsx`, on the right login panel container:
 
-2. **Bulk assign** (Select all in Departments tab):
-   - After bulk-inserting departments, gather all mapped categories for the inserted department ids, dedupe, and insert missing ones into `project_categories`.
+- Replace `bg-[#0A0A1A]` with a navy gradient that continues from where the left panel ends, e.g.:
+  - `linear-gradient(135deg, #14306B 0%, #0F1F47 55%, #0A1530 100%)` (mirror of the left, so the seam blends).
+- Tone down the mesh blobs so they read as subtle ambient light, not bright spotlights on black:
+  - Reduce opacities (e.g. indigo `0.7 → 0.35`, violet `0.6 → 0.3`, amber `0.4 → 0.2`).
+  - Lower grid overlay opacity from `0.06` to `0.04`.
+- Keep the white glass login card, the animations, and all form logic unchanged.
 
-3. **Unassign**:
-   - Removing a department does NOT auto-remove categories (categories may be shared across departments or assigned manually). Keep current behavior.
+### Result
 
-4. **Create & Assign new department**:
-   - A brand new department has no category mappings yet, so no auto-assign needed beyond current behavior.
+Both halves share the same deep-navy palette; the right side feels like a continuation of the left rather than a separate black panel, while the white card still pops as the focal point.
 
-5. **Contractors / Categories tabs**: unchanged.
+### Out of scope
 
-## Technical notes
-- Implement by passing an `onAssigned(ids: string[])` callback from `ProjectAssignments` parent into the departments `AssignmentSection`, or handle inline in `toggle`/`bulkAssign` when `kind === "departments"` by querying `department_categories` directly with `supabase`.
-- Use upsert with `onConflict: "project_id,category_id"` (or pre-filter against currently-assigned category ids from a fresh fetch) to avoid duplicate-key errors when some categories are already assigned.
-- If the Categories tab is currently mounted, its local `assigned` Set needs refresh. Simplest: lift a small refresh signal (a `categoriesVersion` counter in `ProjectAssignments`) that bumps after department auto-assign, and have the categories `AssignmentSection` re-`load()` when it changes.
-
-## Out of scope
-- No change to how departments/categories are mapped in the Departments master screen.
-- No change to Daily Entry — it already reads from `project_categories`, so it will automatically reflect the new rows.
+- No changes to the left panel, the login form, auth flow, or any other route.
+- No new assets or dependencies.
