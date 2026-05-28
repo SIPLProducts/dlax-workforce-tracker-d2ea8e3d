@@ -467,3 +467,4 @@ echo
 warn "AWS Security Group: open inbound tcp 80, $APP_PORT, $SUPABASE_API_PORT, $STUDIO_PORT. Postgres (5432) stays bound to 127.0.0.1."
 warn "Supabase Studio on :$STUDIO_PORT is publicly reachable — protected only by basic auth. Recommend restricting :$STUDIO_PORT in your SG to admin IPs only."
 warn "Change the admin password after first login."
+warn "App login uses User ID (e.g. '$ADMIN_LOGIN_ID'), NOT the email address. Users created in Studio must have profiles.login_id set to the value typed on the login page."
