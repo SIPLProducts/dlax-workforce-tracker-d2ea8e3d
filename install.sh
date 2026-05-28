@@ -454,9 +454,9 @@ ok "nginx configured"
 # =============================================================================
 echo
 printf '%s========================  DLAX is up  ========================%s\n' "$G" "$N"
-printf '  App URL          : http://%s/\n' "$SERVER_IP"
-printf '  Supabase API     : http://%s/supabase/\n' "$SERVER_IP"
-printf '  Supabase Studio  : http://%s/studio/   (user: admin  pass: %s)\n' "$SERVER_IP" "$DASH_PASS"
+printf '  App URL          : http://%s/   (or http://%s/)\n' "$HOST_APP" "$SERVER_IP"
+printf '  Supabase API     : http://%s   (legacy: http://%s/supabase/)\n' "$HOST_API" "$SERVER_IP"
+printf '  Supabase Studio  : http://%s   (legacy: http://%s/studio/)   (user: admin  pass: %s)\n' "$HOST_STUDIO" "$SERVER_IP" "$DASH_PASS"
 printf '  App admin login  : %s   /   %s\n' "$ADMIN_LOGIN_ID" "$ADMIN_PASSWORD"
 printf '  Frontend         : %s\n' "$FRONTEND"
 printf '  Backend          : %s\n' "$BACKEND"
