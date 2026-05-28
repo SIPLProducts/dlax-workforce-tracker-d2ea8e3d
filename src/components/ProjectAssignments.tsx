@@ -51,7 +51,50 @@ const KIND_CONFIG: Record<Kind, {
   },
 };
 
-function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind }) {
+// Auto-assign categories mapped to the given department ids into project_categories.
+// Returns the number of new category rows inserted.
+async function autoAssignCategoriesForDepartments(
+  projectId: string,
+  departmentIds: string[],
+): Promise<number> {
+  if (!projectId || departmentIds.length === 0) return 0;
+
+  const { data: maps } = await supabase
+    .from("department_categories")
+    .select("category_id")
+    .in("department_id", departmentIds);
+  const mappedCatIds = Array.from(new Set((maps || []).map((m: any) => m.category_id))).filter(Boolean);
+  if (mappedCatIds.length === 0) return 0;
+
+  const { data: existing } = await supabase
+    .from("project_categories")
+    .select("category_id")
+    .eq("project_id", projectId)
+    .in("category_id", mappedCatIds);
+  const existingSet = new Set((existing || []).map((r: any) => r.category_id));
+  const toInsert = mappedCatIds.filter((id) => !existingSet.has(id));
+  if (toInsert.length === 0) return 0;
+
+  const rows = toInsert.map((cid) => ({ project_id: projectId, category_id: cid }));
+  const { error } = await supabase.from("project_categories").insert(rows as any);
+  if (error) {
+    toast.error(`Auto-assign categories failed: ${error.message}`);
+    return 0;
+  }
+  return toInsert.length;
+}
+
+function AssignmentSection({
+  projectId,
+  kind,
+  refreshKey,
+  onCategoriesChanged,
+}: {
+  projectId: string;
+  kind: Kind;
+  refreshKey: number;
+  onCategoriesChanged: () => void;
+}) {
   const cfg = KIND_CONFIG[kind];
   const { canEdit } = usePermissions();
   const canCreate = canEdit(cfg.createPermScreen);
@@ -76,7 +119,7 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
     if (!projectId) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, refreshKey]);
 
   const toggle = async (id: string, checked: boolean) => {
     if (!canAssign) { toast.error("You don't have edit permission on Projects."); return; }
@@ -85,6 +128,13 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
       const { error } = await supabase.from(cfg.joinTable as any).insert({ project_id: projectId, [cfg.joinFk]: id } as any);
       if (error) { toast.error(error.message); setBusy(false); return; }
       setAssigned((s) => new Set(s).add(id));
+      if (kind === "departments") {
+        const n = await autoAssignCategoriesForDepartments(projectId, [id]);
+        if (n > 0) {
+          toast.success(`Also auto-assigned ${n} categor${n === 1 ? "y" : "ies"}`);
+          onCategoriesChanged();
+        }
+      }
     } else {
       const { error } = await supabase.from(cfg.joinTable as any).delete().eq("project_id", projectId).eq(cfg.joinFk, id);
       if (error) { toast.error(error.message); setBusy(false); return; }
@@ -123,9 +173,20 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
     const rows = availableItems.map((i) => ({ project_id: projectId, [cfg.joinFk]: i.id }));
     const { error } = await supabase.from(cfg.joinTable as any).insert(rows as any);
     if (error) { toast.error(error.message); setBusy(false); return; }
-    setAssigned((s) => { const n = new Set(s); availableItems.forEach((i) => n.add(i.id)); return n; });
+    const insertedIds = availableItems.map((i) => i.id);
+    setAssigned((s) => { const n = new Set(s); insertedIds.forEach((id) => n.add(id)); return n; });
+    if (kind === "departments") {
+      const n = await autoAssignCategoriesForDepartments(projectId, insertedIds);
+      if (n > 0) {
+        toast.success(`Assigned ${rows.length} departments + ${n} categor${n === 1 ? "y" : "ies"}`);
+        onCategoriesChanged();
+      } else {
+        toast.success(`Assigned ${rows.length} ${cfg.title.toLowerCase()}`);
+      }
+    } else {
+      toast.success(`Assigned ${rows.length} ${cfg.title.toLowerCase()}`);
+    }
     setBusy(false);
-    toast.success(`Assigned ${rows.length} ${cfg.title.toLowerCase()}`);
   };
 
   return (
@@ -203,9 +264,12 @@ function AssignmentSection({ projectId, kind }: { projectId: string; kind: Kind 
 }
 
 export function ProjectAssignments({ projectId }: { projectId: string }) {
+  const [categoriesVersion, setCategoriesVersion] = useState(0);
+
   if (!projectId) {
     return <Card><CardContent className="p-6 text-center text-muted-foreground">Save the project first to manage assignments.</CardContent></Card>;
   }
+  const bumpCategories = () => setCategoriesVersion((v) => v + 1);
   return (
     <Tabs defaultValue="contractors" className="w-full">
       <TabsList className="grid w-full grid-cols-3">
@@ -213,9 +277,15 @@ export function ProjectAssignments({ projectId }: { projectId: string }) {
         <TabsTrigger value="departments">Departments</TabsTrigger>
         <TabsTrigger value="categories">Categories</TabsTrigger>
       </TabsList>
-      <TabsContent value="contractors" className="mt-4"><AssignmentSection projectId={projectId} kind="contractors" /></TabsContent>
-      <TabsContent value="departments" className="mt-4"><AssignmentSection projectId={projectId} kind="departments" /></TabsContent>
-      <TabsContent value="categories" className="mt-4"><AssignmentSection projectId={projectId} kind="categories" /></TabsContent>
+      <TabsContent value="contractors" className="mt-4">
+        <AssignmentSection projectId={projectId} kind="contractors" refreshKey={0} onCategoriesChanged={bumpCategories} />
+      </TabsContent>
+      <TabsContent value="departments" className="mt-4">
+        <AssignmentSection projectId={projectId} kind="departments" refreshKey={0} onCategoriesChanged={bumpCategories} />
+      </TabsContent>
+      <TabsContent value="categories" className="mt-4">
+        <AssignmentSection projectId={projectId} kind="categories" refreshKey={categoriesVersion} onCategoriesChanged={bumpCategories} />
+      </TabsContent>
     </Tabs>
   );
 }
