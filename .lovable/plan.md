@@ -1,44 +1,22 @@
-The incognito test proves this is not a stale browser token anymore. The current error is a database permission issue on the self-hosted deployment: PostgREST is logged in, but the `authenticated` database role has not been granted table privileges for `user_custom_roles`.
+## Plan
 
-Plan:
+1. **Fix backend table access for master data**
+   - Add the missing Data API permissions for these existing public tables:
+     - `departments`
+     - `worker_categories`
+     - `department_categories`
+   - Keep access limited to logged-in users and service/backend code only.
+   - Do **not** make these tables public/anonymous.
 
-1. Add explicit Data API grants for the affected auth/role tables
-   - Grant `authenticated` access to `user_custom_roles`.
-   - Also grant the same required privileges to related tables used immediately after login: `user_roles`, `custom_roles`, `role_screen_permissions`, `profiles`, and `user_projects`.
-   - Grant `service_role` access too, so admin/server operations continue working.
+2. **Preserve current RLS rules**
+   - Admins and users with the relevant master permissions can manage records.
+   - Logged-in users can view departments/categories as currently intended.
+   - No change to roles, project access, or screen permissions.
 
-2. Keep RLS policies unchanged
-   - These grants only allow PostgREST to reach the tables.
-   - Existing RLS policies still decide which rows each user can actually read or manage.
+3. **Verify after approval**
+   - Re-check permissions exist for the three tables.
+   - Confirm the master screens can load newly created categories/departments instead of showing empty results.
 
-3. Apply the SQL on your self-hosted server
-   - Since the failing URL is `http://15.206.37.230:8000`, this needs to be applied to that server’s database, not only this Lovable Cloud preview backend.
-   - I will provide the exact SQL and Docker command to run against your deployed database.
+## Technical detail
 
-4. Verify login again
-   - Open incognito and log in again.
-   - Expected result: no `42501 permission denied for table user_custom_roles` response.
-
-SQL to apply:
-
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_custom_roles TO authenticated;
-GRANT ALL ON TABLE public.user_custom_roles TO service_role;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_roles TO authenticated;
-GRANT ALL ON TABLE public.user_roles TO service_role;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.custom_roles TO authenticated;
-GRANT ALL ON TABLE public.custom_roles TO service_role;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.role_screen_permissions TO authenticated;
-GRANT ALL ON TABLE public.role_screen_permissions TO service_role;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.profiles TO authenticated;
-GRANT ALL ON TABLE public.profiles TO service_role;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_projects TO authenticated;
-GRANT ALL ON TABLE public.user_projects TO service_role;
-```
-
-After approval, I’ll give you the exact copy-paste command for your server setup.
+The rows are present in the database, but the permission check returned no Data API grants for `departments`, `worker_categories`, and `department_categories`. That can allow direct database inserts to exist while the app cannot read them correctly through the frontend API. The fix is a small migration with explicit grants, not a UI rewrite.
