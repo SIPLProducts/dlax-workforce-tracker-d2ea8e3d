@@ -129,7 +129,7 @@ cids=$(docker ps -aq --filter "name=^dlax-" 2>/dev/null || true)
 for v in dlax-supabase_db-data dlax-supabase_storage-data; do
   docker volume rm -f "$v" >/dev/null 2>&1 || true
 done
-rm -rf "$FRONTEND" "$BACKEND" "$SRC/.output" "$SRC/dist" "$SRC/node_modules" "$SRC/.env" "$SUPA/.env" || true
+rm -rf "$FRONTEND" "$BACKEND" "$SRC/.output" "$SRC/dist" "$SRC/node_modules" "$SRC/.env" "$SUPA/.env" "$SUPA/volumes/api/kong.yml" || true
 rm -f /etc/nginx/sites-enabled/dlax /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/default || true
 mkdir -p "$FRONTEND" "$BACKEND"
 ok "wipe complete"
