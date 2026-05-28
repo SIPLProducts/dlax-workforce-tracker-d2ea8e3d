@@ -195,6 +195,17 @@ EOF
 chmod 600 "$SUPA/.env"
 ok "wrote supabase-stack/.env (back this up — losing it = losing access)"
 
+log "rendering kong.yml from template (substituting anon/service JWTs)"
+[ -f "$SUPA/volumes/api/kong.yml.template" ] || die "missing $SUPA/volumes/api/kong.yml.template"
+SUPABASE_ANON_KEY="$ANON" SUPABASE_SERVICE_KEY="$SRK" \
+  envsubst '${SUPABASE_ANON_KEY} ${SUPABASE_SERVICE_KEY}' \
+  < "$SUPA/volumes/api/kong.yml.template" \
+  > "$SUPA/volumes/api/kong.yml"
+if grep -q '\${SUPABASE_' "$SUPA/volumes/api/kong.yml"; then
+  die "kong.yml still has unsubstituted placeholders — envsubst failed"
+fi
+ok "kong.yml rendered"
+
 # =============================================================================
 # 4) Start Supabase
 # =============================================================================
