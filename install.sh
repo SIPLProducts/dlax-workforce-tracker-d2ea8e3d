@@ -25,9 +25,9 @@ DEPLOY="/root/DLAX"
 FRONTEND="$DEPLOY/client"
 BACKEND="$DEPLOY/backend"
 
-APP_PORT="${APP_PORT:-3000}"             # internal only
-SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"   # internal only
-STUDIO_PORT="${STUDIO_PORT:-8001}"       # internal only
+APP_PORT="${APP_PORT:-3000}"             # bound to 0.0.0.0 (public)
+SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"   # kong, bound to 0.0.0.0 (public)
+STUDIO_PORT="${STUDIO_PORT:-8001}"       # studio, bound to 0.0.0.0 (public)
 
 # Public IP auto-detect: IMDSv2 → ipify → LAN → loopback. SERVER_IP= env overrides.
 detect_ip() {
