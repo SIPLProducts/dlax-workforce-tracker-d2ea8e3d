@@ -9,6 +9,9 @@ PW_ESC="${PW//\'/\'\'}"
 psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER:-supabase_admin}" -d "$DB" <<SQL
 -- Roles ---------------------------------------------------------------------
 DO \$\$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='postgres') THEN
+    CREATE ROLE postgres LOGIN SUPERUSER CREATEDB CREATEROLE REPLICATION BYPASSRLS PASSWORD '${PW_ESC}';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN
     CREATE ROLE anon NOLOGIN NOINHERIT;
   END IF;
@@ -48,7 +51,8 @@ GRANT anon, authenticated, service_role TO authenticator;
 CREATE SCHEMA IF NOT EXISTS auth    AUTHORIZATION supabase_auth_admin;
 CREATE SCHEMA IF NOT EXISTS storage AUTHORIZATION supabase_storage_admin;
 
-GRANT ALL ON DATABASE postgres TO supabase_auth_admin, supabase_storage_admin;
+GRANT ALL ON DATABASE postgres TO postgres, supabase_auth_admin, supabase_storage_admin;
+GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA auth    TO supabase_auth_admin;
 GRANT ALL ON SCHEMA storage TO supabase_storage_admin;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
