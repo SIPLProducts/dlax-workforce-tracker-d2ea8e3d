@@ -1,77 +1,44 @@
-## What `JWSError JWSInvalidSignature` means
+The incognito test proves this is not a stale browser token anymore. The current error is a database permission issue on the self-hosted deployment: PostgREST is logged in, but the `authenticated` database role has not been granted table privileges for `user_custom_roles`.
 
-PostgREST received a JWT (your access token) but the HMAC signature did not verify against the `JWT_SECRET` that PostgREST is currently running with. Login itself "succeeded" because:
-- either GoTrue (auth) signed the token with a **different** secret than PostgREST is checking against, **or**
-- the browser is replaying an **old** access token from a previous install whose secret has been rotated.
+Plan:
 
-`install.sh` generates a brand-new random `JWT_SECRET` every run (line 152) and rebuilds `ANON_KEY` / `SERVICE_ROLE_KEY` from it. So any token issued by a previous install is permanently invalid after re-running the script.
+1. Add explicit Data API grants for the affected auth/role tables
+   - Grant `authenticated` access to `user_custom_roles`.
+   - Also grant the same required privileges to related tables used immediately after login: `user_roles`, `custom_roles`, `role_screen_permissions`, `profiles`, and `user_projects`.
+   - Grant `service_role` access too, so admin/server operations continue working.
 
-## Plan
+2. Keep RLS policies unchanged
+   - These grants only allow PostgREST to reach the tables.
+   - Existing RLS policies still decide which rows each user can actually read or manage.
 
-### Step 1 — Diagnose (read-only, run on the server)
+3. Apply the SQL on your self-hosted server
+   - Since the failing URL is `http://15.206.37.230:8000`, this needs to be applied to that server’s database, not only this Lovable Cloud preview backend.
+   - I will provide the exact SQL and Docker command to run against your deployed database.
 
-```bash
-SUPA=/home/ubuntu/dlax-workforce-tracker-d2ea8e3d-main/supabase-stack
+4. Verify login again
+   - Open incognito and log in again.
+   - Expected result: no `42501 permission denied for table user_custom_roles` response.
 
-# A) Secret in the generated .env (source of truth for this install)
-sudo grep -E '^(JWT_SECRET|ANON_KEY|SERVICE_ROLE_KEY)=' $SUPA/.env
+SQL to apply:
 
-# B) Secret actually loaded into each running container
-for c in dlax-auth dlax-rest dlax-kong dlax-storage dlax-realtime; do
-  echo "=== $c ==="
-  docker exec "$c" sh -c 'echo JWT=${PGRST_JWT_SECRET:-${GOTRUE_JWT_SECRET:-$JWT_SECRET}}' 2>/dev/null
-done
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_custom_roles TO authenticated;
+GRANT ALL ON TABLE public.user_custom_roles TO service_role;
 
-# C) Anon key baked into the served JS bundle
-sudo grep -oE 'eyJhbGciOi[A-Za-z0-9_.-]+' \
-  /var/www/dlax-frontend/assets/*.js | head -3
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_roles TO authenticated;
+GRANT ALL ON TABLE public.user_roles TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.custom_roles TO authenticated;
+GRANT ALL ON TABLE public.custom_roles TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.role_screen_permissions TO authenticated;
+GRANT ALL ON TABLE public.role_screen_permissions TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.profiles TO authenticated;
+GRANT ALL ON TABLE public.profiles TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_projects TO authenticated;
+GRANT ALL ON TABLE public.user_projects TO service_role;
 ```
 
-All three must agree:
-- `JWT_SECRET` in `.env` == `JWT_SECRET` in every container (especially `dlax-auth` and `dlax-rest`)
-- `ANON_KEY` in `.env` == the `eyJ...` strings embedded in `/var/www/dlax-frontend/assets/*.js`
-
-If `dlax-auth` and `dlax-rest` show **different** `JWT_SECRET` values → containers were not recreated together (rare after `docker compose down -v`, but possible if only one was restarted later).
-
-If the bundle's `eyJ...` doesn't match `.env`'s `ANON_KEY` → the frontend was built against an older `.env` and `bun run build` never re-ran.
-
-### Step 2 — Fix
-
-**Case A — secrets are consistent (most common):** The browser is replaying a stale token from a previous install. Fix on the client:
-1. Open `http://15.206.37.230/login` in a **fresh incognito window** (or DevTools → Application → Storage → "Clear site data" → reload).
-2. Log in again. The new token is signed with the current `JWT_SECRET` and PostgREST will accept it.
-
-**Case B — `dlax-auth` and `dlax-rest` have different secrets:** Recreate the stack so every container picks up `$SUPA/.env`:
-```bash
-cd $SUPA
-sudo docker compose down
-sudo docker compose up -d
-```
-Then clear browser storage as in Case A and log in again.
-
-**Case C — bundle's anon key ≠ `.env` ANON_KEY:** Rebuild the frontend. Simplest path is a full re-run:
-```bash
-cd /home/ubuntu/dlax-workforce-tracker-d2ea8e3d-main
-git pull --rebase
-sudo SERVER_IP=15.206.37.230 ADMIN_LOGIN_ID=admin ADMIN_PASSWORD='admin123456' ./install.sh
-```
-Then incognito + log in.
-
-### Step 3 — Verify
-
-After fix, from the server:
-```bash
-ANON=$(sudo grep ^ANON_KEY= $SUPA/.env | cut -d= -f2)
-curl -s -o /dev/null -w "%{http_code}\n" \
-  -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
-  http://127.0.0.1:8000/rest/v1/profiles?select=user_id\&limit=1
-```
-Expect `200` (or `200`/`empty array`), not `401`/`403`.
-
-In the browser, after a fresh login, the network tab should show requests to `/rest/v1/...` returning `200`, not PGRST301.
-
-## No code changes are required for this issue.
-
-The 403 you fixed earlier needed migration GRANTs. This new error is purely a key/token-mismatch operational issue on the self-hosted stack, not a bug in the app code. If Step 1 shows Case A (which it almost certainly will, given `install.sh` was just re-run), the only action is clearing browser storage.
-
-If after running Step 1 the output shows a mismatch I haven't anticipated, paste it and I'll adjust the plan before any code or script change.
+After approval, I’ll give you the exact copy-paste command for your server setup.
