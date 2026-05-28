@@ -8,9 +8,9 @@
 #   sudo ADMIN_PASSWORD='YourPass#2026' ./install.sh
 #
 # After it finishes (only inbound tcp/80 required in your AWS security group):
-#   App      : http://<SERVER_IP>/
-#   Supabase : http://<SERVER_IP>/supabase/
-#   Studio   : http://<SERVER_IP>/studio/
+#   App      : http://app.<SERVER_IP>.nip.io/   (or http://<SERVER_IP>/)
+#   Supabase : http://api.<SERVER_IP>.nip.io
+#   Studio   : http://studio.<SERVER_IP>.nip.io
 # =============================================================================
 set -Eeuo pipefail
 
@@ -20,16 +20,36 @@ SUPA="$SRC/supabase-stack"
 
 # Final deployment directory (frontend + backend live here, NOT in the repo)
 DEPLOY="/root/DLAX"
-FRONTEND="$DEPLOY/frontend"
+# NOTE: must be /root/DLAX/client — the generated dist/server/wrangler.json
+# has assets.directory="../client", resolved relative to BACKEND cwd.
+FRONTEND="$DEPLOY/client"
 BACKEND="$DEPLOY/backend"
 
 APP_PORT="${APP_PORT:-3000}"             # internal only
 SUPABASE_API_PORT="${SUPABASE_API_PORT:-8000}"   # internal only
 STUDIO_PORT="${STUDIO_PORT:-8001}"       # internal only
 
-SERVER_IP="${SERVER_IP:-$(curl -fsS --max-time 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)}"
-[ -z "$SERVER_IP" ] && SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-[ -z "$SERVER_IP" ] && SERVER_IP="127.0.0.1"
+# Public IP auto-detect: IMDSv2 → ipify → LAN → loopback. SERVER_IP= env overrides.
+detect_ip() {
+  local ip token
+  token=$(curl -fsS --max-time 2 -X PUT \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+    http://169.254.169.254/latest/api/token 2>/dev/null || true)
+  if [ -n "$token" ]; then
+    ip=$(curl -fsS --max-time 2 -H "X-aws-ec2-metadata-token: $token" \
+      http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)
+    [ -n "$ip" ] && { echo "$ip"; return; }
+  fi
+  ip=$(curl -fsS --max-time 3 https://api.ipify.org 2>/dev/null || true)
+  [ -n "$ip" ] && { echo "$ip"; return; }
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  [ -n "$ip" ] && { echo "$ip"; return; }
+  echo "127.0.0.1"
+}
+SERVER_IP="${SERVER_IP:-$(detect_ip)}"
+HOST_APP="app.${SERVER_IP}.nip.io"
+HOST_API="api.${SERVER_IP}.nip.io"
+HOST_STUDIO="studio.${SERVER_IP}.nip.io"
 
 ADMIN_LOGIN_ID="${ADMIN_LOGIN_ID:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-ChangeMe123!}"
@@ -151,10 +171,10 @@ SERVICE_ROLE_KEY=$SRK
 DASHBOARD_USERNAME=admin
 DASHBOARD_PASSWORD=$DASH_PASS
 
-SITE_URL=http://$SERVER_IP/
-ADDITIONAL_REDIRECT_URLS=http://$SERVER_IP/
-API_EXTERNAL_URL=http://$SERVER_IP/supabase
-SUPABASE_PUBLIC_URL=http://$SERVER_IP/supabase
+SITE_URL=http://$HOST_APP/
+ADDITIONAL_REDIRECT_URLS=http://$HOST_APP/,http://$SERVER_IP/
+API_EXTERNAL_URL=http://$HOST_API
+SUPABASE_PUBLIC_URL=http://$HOST_API
 
 KONG_HTTP_PORT=$SUPABASE_API_PORT
 STUDIO_PORT=$STUDIO_PORT
@@ -259,7 +279,7 @@ ok "admin user created"
 # =============================================================================
 log "writing app .env"
 cat > "$SRC/.env" <<EOF
-VITE_SUPABASE_URL=http://$SERVER_IP/supabase
+VITE_SUPABASE_URL=http://$HOST_API
 VITE_SUPABASE_PUBLISHABLE_KEY=$ANON
 VITE_SUPABASE_PROJECT_ID=local
 
@@ -365,6 +385,62 @@ server {
     proxy_set_header Connection "upgrade";
   }
 }
+
+# Hostname vhost — app (same upstream as default)
+server {
+  listen 80;
+  server_name $HOST_APP;
+  client_max_body_size 50m;
+  root $FRONTEND;
+  index index.html;
+  location / { try_files \$uri @ssr; }
+  location @ssr {
+    proxy_pass http://127.0.0.1:$APP_PORT;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 300s;
+  }
+}
+
+# Hostname vhost — Supabase API (Kong), root → root, no path rewrite
+server {
+  listen 80;
+  server_name $HOST_API;
+  client_max_body_size 50m;
+  location / {
+    proxy_pass http://127.0.0.1:$SUPABASE_API_PORT;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 300s;
+  }
+}
+
+# Hostname vhost — Supabase Studio
+server {
+  listen 80;
+  server_name $HOST_STUDIO;
+  client_max_body_size 50m;
+  location / {
+    proxy_pass http://127.0.0.1:$STUDIO_PORT;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 300s;
+  }
+}
 NGINX
 ln -sf /etc/nginx/sites-available/dlax /etc/nginx/sites-enabled/dlax
 rm -f /etc/nginx/sites-enabled/default
@@ -378,9 +454,9 @@ ok "nginx configured"
 # =============================================================================
 echo
 printf '%s========================  DLAX is up  ========================%s\n' "$G" "$N"
-printf '  App URL          : http://%s/\n' "$SERVER_IP"
-printf '  Supabase API     : http://%s/supabase/\n' "$SERVER_IP"
-printf '  Supabase Studio  : http://%s/studio/   (user: admin  pass: %s)\n' "$SERVER_IP" "$DASH_PASS"
+printf '  App URL          : http://%s/   (or http://%s/)\n' "$HOST_APP" "$SERVER_IP"
+printf '  Supabase API     : http://%s   (legacy: http://%s/supabase/)\n' "$HOST_API" "$SERVER_IP"
+printf '  Supabase Studio  : http://%s   (legacy: http://%s/studio/)   (user: admin  pass: %s)\n' "$HOST_STUDIO" "$SERVER_IP" "$DASH_PASS"
 printf '  App admin login  : %s   /   %s\n' "$ADMIN_LOGIN_ID" "$ADMIN_PASSWORD"
 printf '  Frontend         : %s\n' "$FRONTEND"
 printf '  Backend          : %s\n' "$BACKEND"
