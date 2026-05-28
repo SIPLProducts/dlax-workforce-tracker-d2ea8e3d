@@ -73,8 +73,8 @@ log "installing system deps"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y >/dev/null
 apt-get install -y --no-install-recommends \
-  curl ca-certificates gnupg lsb-release jq openssl rsync nginx >/dev/null
-ok "apt deps ready (incl. nginx)"
+  curl ca-certificates gnupg lsb-release jq openssl rsync nginx gettext-base >/dev/null
+ok "apt deps ready (incl. nginx, envsubst)"
 
 if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
   log "installing Docker Engine + compose"
