@@ -1,46 +1,52 @@
-## Plan: Expose services directly on ports 8000/8001/3000
+## Problem
 
-AWS SG now allows inbound 80, 3000, 8000, 8001. Switch from nginx hostname vhosts (nip.io) to direct `IP:PORT` access.
+Login is calling `http://api.15.206.37.230.nip.io/rest/v1/rpc/get_email_for_login_id`. That hostname is baked into the **deployed frontend bundle** from a previous install run. Vite inlines `VITE_SUPABASE_URL` at build time, so the only way to change it is a rebuild + redeploy.
 
-### Changes to `install.sh`
+Current `install.sh` (already in the repo) is correct — it writes:
+```
+VITE_SUPABASE_URL=http://$SERVER_IP:$SUPABASE_API_PORT      # → http://15.206.37.230:8000
+SITE_URL=http://$SERVER_IP:$APP_PORT/
+API_EXTERNAL_URL / SUPABASE_PUBLIC_URL=http://$SERVER_IP:8000
+```
+and binds kong (8000) + studio (8001) to `0.0.0.0`. So no script changes are strictly required — the deployed artifacts are just stale.
 
-1. **Bind containers to 0.0.0.0 instead of 127.0.0.1**
-   - In `supabase-stack/docker-compose.yml`, change port mappings:
-     - kong: `"${KONG_HTTP_PORT}:8000/tcp"` (drop `127.0.0.1:`)
-     - studio: `"${STUDIO_PORT}:3000/tcp"` (drop `127.0.0.1:`)
-     - db: keep `127.0.0.1:5432` (DB stays internal)
-   - In `install.sh`, start wrangler with `--ip 0.0.0.0` so the app worker on :3000 is reachable externally.
+## Plan
 
-2. **Update env URLs to use direct `IP:PORT`**
-   - `supabase-stack/.env`:
-     - `SITE_URL=http://$SERVER_IP:3000/`
-     - `ADDITIONAL_REDIRECT_URLS=http://$SERVER_IP:3000/,http://$SERVER_IP/`
-     - `API_EXTERNAL_URL=http://$SERVER_IP:8000`
-     - `SUPABASE_PUBLIC_URL=http://$SERVER_IP:8000`
-   - App `.env`:
-     - `VITE_SUPABASE_URL=http://$SERVER_IP:8000`
+### 1. Small `install.sh` hardenings (so the rebuild is clean)
 
-3. **Simplify nginx to a single default vhost on :80**
-   - Drop `app.<ip>.nip.io` / `api.<ip>.nip.io` / `studio.<ip>.nip.io` server blocks.
-   - Keep one `listen 80 default_server` that proxies to the app worker on `127.0.0.1:3000` and serves static `dist/client`.
-   - Keep legacy `/supabase/` and `/studio/` path-based fallbacks (harmless).
+- Add an explicit `rm -rf "$SRC/dist"` to the wipe step so an old `dist/client/` with the cached nip.io URL can never be re-rsynced.
+- Echo the resolved `SERVER_IP` and the final `VITE_SUPABASE_URL` before `bun run build`, so any future stale build is obvious in the install log.
+- Add a post-build sanity check: `grep -r "nip.io" "$FRONTEND" && die "stale nip.io URL leaked into bundle"`.
 
-4. **Update summary printout** to list direct URLs:
-   ```
-   App      : http://<IP>/        or  http://<IP>:3000/
-   Supabase : http://<IP>:8000
-   Studio   : http://<IP>:8001   (user: admin / pass: <generated>)
-   ```
-   Update the security warning to note ports 80/3000/8000/8001 are public-facing and Studio is protected only by basic auth — recommend restricting SG to admin IP for 8001, or keep Studio behind nginx `/studio/` only.
+No URL/port/nginx/compose logic changes — those are already correct.
 
-### Files touched
-- `install.sh` — wrangler `--ip 0.0.0.0`, env URLs, nginx config simplified, summary
-- `supabase-stack/docker-compose.yml` — kong + studio bind `0.0.0.0`
+### 2. Re-run the installer on the server (this is the actual fix)
 
-### Re-deploy
 ```bash
-sudo ./install.sh
+cd /home/ubuntu/dlax-workforce-tracker-d2ea8e3d-main
+sudo SERVER_IP=15.206.37.230 ADMIN_PASSWORD='YourPass#2026' ./install.sh
 ```
 
-### Security note for user
-Exposing Studio (8001) on a public IP means anyone who can reach the EC2 can hit the Studio UI. It has basic auth (admin / generated password) but no rate limiting. Recommended: restrict port 8001 in the AWS SG to your office/home IP only.
+After it finishes, the resulting URLs will be:
+
+```text
+App      : http://15.206.37.230/        (also http://15.206.37.230:3000/)
+Supabase : http://15.206.37.230:8000
+Studio   : http://15.206.37.230:8001
+```
+
+### 3. Verify
+
+- `pm2 logs dlax` — backend started on `0.0.0.0:3000`.
+- `curl -I http://15.206.37.230:8000/auth/v1/health` → `200`.
+- In the browser DevTools Network tab on the login page, the auth call must go to `http://15.206.37.230:8000/...`, **not** any `nip.io` host. If it still shows nip.io, it's a browser/SW cache — hard-refresh (Ctrl+Shift+R) or open in a private window.
+
+### 4. Notes / caveats
+
+- Page is loaded over `http://` so the app calling `http://...:8000` is fine (no mixed-content). If you later put the app behind HTTPS, the Supabase URL must also become HTTPS — `http://IP:8000` will be blocked by the browser.
+- AWS SG must allow inbound TCP on 80, 3000, 8000, 8001 (you said these are open).
+- Studio on `:8001` is only protected by basic auth — recommend restricting that port in the SG to your admin IP.
+
+## Files touched
+
+- `install.sh` — add `rm -rf dist`, echo resolved URLs, add post-build `grep nip.io` guard. No other changes.
