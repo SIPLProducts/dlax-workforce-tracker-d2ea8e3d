@@ -317,12 +317,12 @@ chmod 600 "$BACKEND/.dev.vars"
 ok "worker bundle ready: $BACKEND/index.js"
 
 # =============================================================================
-# 8) PM2 — run worker via wrangler/workerd (bound to 127.0.0.1)
+# 8) PM2 — run worker via wrangler/workerd (bound to 0.0.0.0)
 # =============================================================================
-log "starting backend under PM2 (wrangler dev → 127.0.0.1:$APP_PORT)"
+log "starting backend under PM2 (wrangler dev → 0.0.0.0:$APP_PORT)"
 pm2 delete dlax >/dev/null 2>&1 || true
 pm2 start wrangler --name dlax --cwd "$BACKEND" --update-env -- \
-  dev --local --ip 127.0.0.1 --port "$APP_PORT" --no-bundle --config wrangler.json
+  dev --local --ip 0.0.0.0 --port "$APP_PORT" --no-bundle --config wrangler.json
 pm2 save >/dev/null
 pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 
