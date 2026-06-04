@@ -352,6 +352,22 @@ function ContractorsPage() {
         }
       />
 
+      {/* Project selector */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="space-y-1">
+              <Label>Project *</Label>
+              <ProjectCombobox value={projectId} onChange={setProjectId} projects={projects} placeholder="Select a project" className="w-[280px]" />
+            </div>
+            {!projectId && (
+              <p className="text-sm text-muted-foreground pb-2">Select a project to view and manage its contractors.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {projectId && <>
       {/* Dashboard Filters */}
       <Card>
         <CardContent className="pt-6">
