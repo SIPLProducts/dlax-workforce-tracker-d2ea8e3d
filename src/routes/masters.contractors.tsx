@@ -159,11 +159,6 @@ function ContractorsPage() {
     setContractorId("all");
   };
 
-  const activeProject = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
-  const activeProjectLabel = activeProject
-    ? `${activeProject.code ? `${activeProject.code} — ` : ""}${activeProject.name}`
-    : "";
-
   const handleSave = async () => {
     if (!requireEdit()) return;
     if (!form.company_name.trim()) { toast.error("Company name is required"); return; }
@@ -299,10 +294,6 @@ function ContractorsPage() {
       const text = await file.text();
       const rows = parseCsv(text);
       if (rows.length < 2) { toast.error("CSV is empty"); return; }
-      const projLabel = activeProjectLabel || "the selected project";
-      if (!confirm(`Import ${rows.length - 1} contractor row(s) into project "${projLabel}"?`)) {
-        return;
-      }
       const header = rows[0].map((h) => h.trim().toLowerCase());
       const records = rows.slice(1).map((r) => {
         const obj: any = {};
@@ -396,7 +387,7 @@ function ContractorsPage() {
             <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
               <DialogTrigger asChild><Button disabled={!projectId}><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>{editing ? "Edit Contractor" : `Add Contractor${activeProjectLabel ? ` — ${activeProjectLabel}` : ""}`}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div><Label>Contractor Code</Label><Input value={form.contractor_code} onChange={(e) => setForm({ ...form, contractor_code: e.target.value })} placeholder="e.g. C-001" /></div>
                   <div><Label>Company Name *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>

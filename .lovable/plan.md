@@ -1,38 +1,36 @@
 ## Root cause
 
-The contractors were never deleted. A bulk CSV upload of 54 rows was committed at `2026-06-04 10:42:22+00` against project **BHELSTPP** (not UNITVSKP). The Contractors page remembers the last-selected project in `localStorage`, so if BHELSTPP was active when Upload was clicked, every row was attached to BHELSTPP. UNITVSKP only ever received the single `Lucky Roy / SC9127` row.
+The error is occurring because the Contractors form always tries to create a new contractor record first.
 
-The two `UNITVSKP`-coded projects are **legitimately different** (names `MD(KAK)` and `UNITVSKP`) — they will be kept as-is. The dropdown just needs to show the name clearly so they can be told apart.
+`TL001` already exists in the contractor master list, so the database blocks creating another contractor with the same contractor code before the app gets a chance to assign it to the selected project.
 
-## What to change
+## Plan
 
-### 1. Show project name (not just code) in the dropdown
-On `src/routes/masters.contractors.tsx`, render each option as `<name> — <code>` (e.g. `MD(KAK) — UNITVSKP` vs `UNITVSKP — UNITVSKP`) so two projects sharing a code are visually distinct.
+1. **Update the contractor create flow**
+   - When the user clicks **Create**, first check whether a contractor with the same contractor code already exists.
+   - If it exists, do not create a duplicate contractor master record.
+   - Instead, assign the existing contractor to the currently selected project.
 
-### 2. Confirmation prompt before CSV upload
-In `handleUpload`, after parsing the CSV and before inserting, show a confirm dialog:
+2. **Add project-level duplicate validation**
+   - Before assigning, check whether that contractor is already assigned to the selected project.
+   - If already assigned, show a friendly message like:
+     - `Contractor TL001 is already assigned to this project.`
+   - Do not insert a duplicate project assignment.
 
-> Import **N** contractors into project **"<name> — <code>"**?
+3. **Keep cross-project assignment allowed**
+   - If contractor `TL001` exists under another project but not the current project, the app will add the project assignment successfully.
+   - The same contractor can appear under multiple projects.
 
-This prevents a stale `localStorage` selection from silently sending rows to the wrong project.
+4. **Clean up the earlier database fix attempt**
+   - The previous migration tried to drop a constraint, but the active blocker is actually a standalone unique index on `contractors.contractor_code`.
+   - I will leave the global contractor-code uniqueness in place because the requirement is to assign the same contractor to different projects, not create duplicate contractor master records.
 
-### 3. Show destination project on the Add Contractor dialog
-Append the active project name to the dialog title (e.g. `Add Contractor — MD(KAK) (UNITVSKP)`) so manual single-row entry has the same safeguard.
+5. **Improve error messages**
+   - Replace raw database errors like `duplicate key value violates unique constraint` with user-friendly messages in the Contractors screen.
 
-### 4. Optional one-off data fix
-If you confirm, copy the 54 BHELSTPP `project_contractors` rows into the correct UNITVSKP project (your choice of `MD(KAK)` or `UNITVSKP`). Same `contractor_id`s, new project assignment — masters stay intact and BHELSTPP keeps its rows.
+## Technical details
 
-## Out of scope
-
-- No deletion or merging of the two UNITVSKP projects — they are different projects.
-- No schema changes. Existing unique index `project_contractors(project_id, contractor_id)` and the `enforce_unique_contractor_code_per_project` trigger already behave correctly.
-
-## Files touched
-
-- `src/routes/masters.contractors.tsx` — dropdown label, upload confirm, dialog title.
-- (Optional) one data-fix insert to copy BHELSTPP assignments into the chosen UNITVSKP project.
-
-## Question before I implement
-
-1. Do you want me to **copy** the 54 BHELSTPP contractor assignments into UNITVSKP as well, or leave the data alone and you'll re-upload under the correct project?
-2. If copying — which target: `MD(KAK)` (id `45f25dbd…`) or `UNITVSKP` (id `febad4f1…`)?
+- File to update: `src/routes/masters.contractors.tsx`
+- No schema change is required for the main fix.
+- Existing database rule `UNIQUE (project_id, contractor_id)` already protects against assigning the same contractor record twice to the same project.
+- The create logic will become: find existing contractor by code → check project assignment → assign or create as needed.
