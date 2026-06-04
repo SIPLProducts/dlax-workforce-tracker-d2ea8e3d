@@ -1,30 +1,25 @@
-## Problem
+## Plan
 
-On `Projects`, `Departments`, and `Categories` master screens, the `Code / Name / Group …` column headers appear floating in the middle of the table when the page scrolls. The `<thead>` cells are `sticky` with offsets `top-[112px] md:top-[144px]`, but the actual bottom edge of the `PageHeader` (which is itself `sticky top-14`) sits around ~120px. The mismatch leaves a gap where rows scroll through behind the area where the header should be, so the headers appear to "land" mid-table instead of locking flush under the PageHeader bar.
+Update the Projects, Departments, and Categories screens to match the working Contractors screen table behavior.
 
-## Fix
+### What will change
+- Remove the sticky header styling from the table headers in:
+  - Projects
+  - Departments
+  - Categories
+- Keep the normal `<TableHeader>` structure, exactly like the Contractors table.
+- Do not change table columns, data, filters, buttons, cards, or business logic.
 
-Update the sticky offset on each masters table's `<TableHeader>` so the header row sticks directly below the PageHeader with no gap.
+### Expected result
+- Headers will stay at the top of their table normally.
+- Rows will no longer scroll behind or appear above the headers.
+- Projects, Departments, and Categories will visually behave like Contractors.
 
-Change in all three files:
-
-- `src/routes/masters.projects.tsx` (line 324)
-- `src/routes/masters.departments.tsx` (line 202)
-- `src/routes/masters.categories.tsx` (line 114)
-
-Replace:
-```
-[&_th]:sticky [&_th]:top-[112px] md:[&_th]:top-[144px] [&_th]:z-[5] [&_th]:bg-card
-```
-with offsets that match the real PageHeader bottom:
-```
-[&_th]:sticky [&_th]:top-[110px] md:[&_th]:top-[126px] [&_th]:z-[5] [&_th]:bg-card [&_th]:shadow-[0_1px_0_0_hsl(var(--border))]
-```
-
-- `top-14` (56px) TopBar + PageHeader (`py-3` mobile ≈ 54px, `py-4` desktop ≈ 70px) ⇒ thead sticks at 110px mobile / 126px desktop, flush under PageHeader.
-- Adds a 1px bottom shadow on the sticky `th` so the boundary between header and first row reads cleanly while scrolling.
-
-## Out of scope
-
-- No changes to columns, data, filters, PageHeader component, or any other route.
-- No change to table structure or row rendering.
+### Technical details
+- Replace the current sticky header class:
+  - `sticky`
+  - `top-[110px]`
+  - `md:top-[126px]`
+  - `z-[5]`
+  - sticky background/shadow classes
+- Use plain `<TableHeader>` in the affected screens.
