@@ -295,120 +295,103 @@ function ContractorsPage() {
       const rows = parseCsv(text);
       if (rows.length < 2) { toast.error("CSV is empty"); return; }
       const header = rows[0].map((h) => h.trim().toLowerCase());
-      const records = rows.slice(1).map((r) => {
+
+      const emptyRowNos: number[] = [];
+      const dupInCsv: { row: number; code: string }[] = [];
+      const seenCodes = new Map<string, number>(); // code -> first csv row no
+      const records: { row: number; data: any }[] = [];
+
+      rows.slice(1).forEach((r, i) => {
+        const rowNo = i + 2; // header is row 1
         const obj: any = {};
         CSV_COLUMNS.forEach((col) => {
           const idx = header.indexOf(col);
           if (idx >= 0) obj[col] = r[idx]?.trim() || null;
         });
-        return obj;
-      }).filter((r) => r.company_name);
-      if (records.length === 0) { toast.error("No valid rows (company_name required)"); return; }
-      // Skip rows already mapped to THIS project (by company_name OR contractor_code)
-      const existingNames = new Set(items.map((c) => (c.company_name || "").trim().toLowerCase()).filter(Boolean));
-      const existingCodes = new Set(items.map((c) => (c.contractor_code || "").trim().toLowerCase()).filter(Boolean));
-      const fresh = records.filter((r) => {
-        const name = (r.company_name || "").trim().toLowerCase();
-        const code = (r.contractor_code || "").trim().toLowerCase();
-        if (name && existingNames.has(name)) return false;
-        if (code && existingCodes.has(code)) return false;
-        return true;
+        const code = (obj.contractor_code || "").trim();
+        const name = (obj.company_name || "").trim();
+        if (!code && !name) { emptyRowNos.push(rowNo); return; }
+        if (code) {
+          const key = code.toLowerCase();
+          if (seenCodes.has(key)) { dupInCsv.push({ row: rowNo, code }); return; }
+          seenCodes.set(key, rowNo);
+        }
+        // Ensure a usable company_name (DB requires NOT NULL)
+        if (!name) obj.company_name = code;
+        records.push({ row: rowNo, data: obj });
       });
-      const skipped = records.length - fresh.length;
-      if (fresh.length === 0) { toast.info(`All ${records.length} rows already mapped to this project — nothing imported`); return; }
 
-      // Look up any existing master contractors (by code OR name) to reuse instead of duplicating master rows
-      const names = Array.from(new Set(fresh.map((r) => r.company_name).filter(Boolean)));
-      const codes = Array.from(new Set(fresh.map((r) => r.contractor_code).filter(Boolean)));
-      const byName = new Map<string, string>();
-      const byCode = new Map<string, string>();
-
-      if (codes.length > 0) {
-        const { data: byCodeRows, error: codeErr } = await supabase
-          .from("contractors")
-          .select("id, company_name, contractor_code")
-          .in("contractor_code", codes);
-        if (codeErr) { toast.error(`Lookup failed: ${codeErr.message}`); return; }
-        (byCodeRows || []).forEach((m: any) => {
-          if (m.contractor_code) byCode.set(m.contractor_code.trim().toLowerCase(), m.id);
-          if (m.company_name) byName.set(m.company_name.trim().toLowerCase(), m.id);
-        });
-      }
-      if (names.length > 0) {
-        const { data: byNameRows, error: nameErr } = await supabase
-          .from("contractors")
-          .select("id, company_name, contractor_code")
-          .in("company_name", names);
-        if (nameErr) { toast.error(`Lookup failed: ${nameErr.message}`); return; }
-        (byNameRows || []).forEach((m: any) => {
-          if (m.contractor_code) byCode.set(m.contractor_code.trim().toLowerCase(), m.id);
-          if (m.company_name) byName.set(m.company_name.trim().toLowerCase(), m.id);
-        });
+      if (records.length === 0) {
+        toast.error("No valid rows found in CSV");
+        return;
       }
 
-      const idsToMap: string[] = [];
+      // Project-scoped dedupe: match against contractors already on THIS project.
+      const existingByCode = new Map<string, string>(); // code -> contractor_id
+      const existingByName = new Map<string, string>();
+      items.forEach((c) => {
+        const code = (c.contractor_code || "").trim().toLowerCase();
+        const name = (c.company_name || "").trim().toLowerCase();
+        if (code) existingByCode.set(code, c.id);
+        if (name) existingByName.set(name, c.id);
+      });
+
+      const toUpdate: { id: string; data: any }[] = [];
       const toCreate: any[] = [];
-      let reused = 0;
-      for (const r of fresh) {
-        const n = (r.company_name || "").trim().toLowerCase();
-        const c = (r.contractor_code || "").trim().toLowerCase();
-        const existingId = (c && byCode.get(c)) || (n && byName.get(n));
-        if (existingId) { idsToMap.push(existingId); reused++; }
-        else toCreate.push(r);
+      for (const { data } of records) {
+        const code = (data.contractor_code || "").trim().toLowerCase();
+        const name = (data.company_name || "").trim().toLowerCase();
+        const existingId = (code && existingByCode.get(code)) || (name && existingByName.get(name));
+        if (existingId) toUpdate.push({ id: existingId, data });
+        else toCreate.push(data);
       }
 
-      const failedCodes: string[] = [];
-      if (toCreate.length > 0) {
-        const { data: inserted, error } = await supabase.from("contractors").insert(toCreate).select("id");
-        if (!error) {
-          (inserted || []).forEach((row: any) => idsToMap.push(row.id));
-        } else {
-          // Fall back to per-row insert, recovering existing rows on 23505
-          for (const row of toCreate) {
-            const { data: ins, error: e } = await supabase.from("contractors").insert(row).select("id").single();
-            if (!e && ins) { idsToMap.push(ins.id); continue; }
-            if (e && (e as any).code === "23505") {
-              let foundId: string | null = null;
-              if (row.contractor_code) {
-                const { data: found } = await supabase
-                  .from("contractors").select("id")
-                  .ilike("contractor_code", row.contractor_code).maybeSingle();
-                if (found?.id) foundId = found.id;
-              }
-              if (!foundId && row.company_name) {
-                const { data: found } = await supabase
-                  .from("contractors").select("id")
-                  .ilike("company_name", row.company_name).maybeSingle();
-                if (found?.id) foundId = found.id;
-              }
-              if (foundId) { idsToMap.push(foundId); reused++; }
-              else failedCodes.push(row.contractor_code || row.company_name);
-            } else {
-              failedCodes.push(row.contractor_code || row.company_name);
-            }
-          }
+      const failed: string[] = [];
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      // Per-row insert so one bad row doesn't abort the whole upload
+      for (const row of toCreate) {
+        const { data: ins, error: insErr } = await supabase
+          .from("contractors").insert(row).select("id").single();
+        if (insErr || !ins) {
+          failed.push(row.contractor_code || row.company_name || "(unnamed)");
+          continue;
         }
-      }
-
-      let assignedSkipped = 0;
-      if (idsToMap.length > 0) {
-        const uniqueIds = Array.from(new Set(idsToMap));
-        for (const cid of uniqueIds) {
-          const { error: e2 } = await supabase.from("project_contractors").insert({ project_id: projectId, contractor_id: cid });
-          if (e2 && (e2 as any).code === "23505") { assignedSkipped++; continue; }
-          if (e2) { toast.error(`Assignment failed: ${e2.message}`); break; }
+        const { error: linkErr } = await supabase
+          .from("project_contractors")
+          .insert({ project_id: projectId, contractor_id: ins.id });
+        if (linkErr && (linkErr as any).code !== "23505") {
+          failed.push(row.contractor_code || row.company_name || "(unnamed)");
+          continue;
         }
+        createdCount++;
       }
 
-      const importedNew = Math.max(idsToMap.length - reused, 0);
-      const parts: string[] = [`Imported ${importedNew} new`];
-      if (reused) parts.push(`reused ${reused} existing`);
-      if (skipped) parts.push(`skipped ${skipped} already in project`);
-      if (assignedSkipped) parts.push(`${assignedSkipped} already assigned`);
+      for (const { id, data } of toUpdate) {
+        const { error: upErr } = await supabase
+          .from("contractors").update(data).eq("id", id);
+        if (upErr) { failed.push(data.contractor_code || data.company_name || "(unnamed)"); continue; }
+        updatedCount++;
+      }
+
+      const parts: string[] = [];
+      parts.push(`Imported ${createdCount} new`);
+      if (updatedCount) parts.push(`updated ${updatedCount} existing`);
+      const skippedTotal = emptyRowNos.length + dupInCsv.length;
+      if (skippedTotal) parts.push(`skipped ${skippedTotal} CSV row(s)`);
       toast.success(parts.join(", "));
-      if (failedCodes.length) {
-        const preview = failedCodes.slice(0, 5).join(", ");
-        toast.error(`Could not import ${failedCodes.length} row(s): ${preview}${failedCodes.length > 5 ? "…" : ""}`);
+
+      if (emptyRowNos.length) {
+        toast.warning(`Empty rows skipped: line ${emptyRowNos.slice(0, 10).join(", ")}${emptyRowNos.length > 10 ? "…" : ""}`);
+      }
+      if (dupInCsv.length) {
+        const preview = dupInCsv.slice(0, 5).map((d) => `line ${d.row} (${d.code})`).join(", ");
+        toast.warning(`Duplicate codes inside CSV skipped: ${preview}${dupInCsv.length > 5 ? "…" : ""}`);
+      }
+      if (failed.length) {
+        const preview = failed.slice(0, 5).join(", ");
+        toast.error(`Could not import ${failed.length} row(s): ${preview}${failed.length > 5 ? "…" : ""}`);
       }
       await load();
     } catch (err: any) {
@@ -417,6 +400,7 @@ function ContractorsPage() {
       e.target.value = "";
     }
   };
+
 
   return (
     <div className="space-y-6">
