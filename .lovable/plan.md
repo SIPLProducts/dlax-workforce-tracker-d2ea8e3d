@@ -1,18 +1,25 @@
-## Plan
+## Problem
 
-Delete all contractor data for **BHELSTPP** and **IIPEVSKP** so the user can re-upload cleanly. The upload bug fix from the previous turn (project-scoped codes, in-CSV duplicate detection, per-row insert with toast warnings) is already in place — no code changes needed.
+On `/masters/assignments` → Contractors tab:
 
-### Steps
+- **Assigned** list correctly shows only contractors mapped to the selected project (via `project_contractors`).
+- **Available** list currently *hides* any contractor mapped to another project. So if a contractor was assigned elsewhere, or moved between projects, it never reappears here and can't be re-assigned.
 
-1. **Safety check first.** Query `daily_manpower` and `worker_attendance` for any rows tied to contractors on these two projects. If found, stop and ask the user whether to also delete those (deleting contractors will cascade and remove the daily attendance records via the existing `ON DELETE CASCADE` foreign keys). We will not silently destroy attendance history.
+The user wants Available to show every contractor that is **not currently assigned to the selected project**, including contractors mapped to other projects, so they can be (re-)assigned.
 
-2. **If safe (no attendance rows) or after user confirmation:**
-   - Delete from `project_contractors` where `project_id IN (BHELSTPP, IIPEVSKP)`.
-   - Delete the contractor master rows (`contractors`) that were linked **only** to those two projects and to no other project. Contractors still mapped to another project are left untouched.
+## Change
 
-3. **Verify** with a count query that both projects show 0 contractors, then tell the user to re-upload the two CSVs.
+In `src/components/ProjectAssignments.tsx`, inside `AssignmentSection.load()`:
 
-### Out of scope
-- No schema changes.
-- No changes to upload code, RLS, or any other functionality.
-- No deletion of contractors that belong to other projects.
+- Remove the contractor-specific `excluded` set that filters out contractors already mapped to other projects.
+- Available list becomes: every contractor master row whose id is **not** in `assignedHere`.
+- Assigned list is unchanged (still scoped to current project's `project_contractors`).
+- Toggle on/off behavior unchanged — removing a contractor deletes its `project_contractors` row, so it immediately reappears in Available.
+
+Departments and Categories tabs already use this "available = everything not assigned here" rule, so no change there.
+
+## Out of scope
+
+- No DB schema, RLS, or migration changes.
+- No changes to Contractors master page, CSV upload, departments, or categories.
+- Per-project uniqueness of `contractor_code` is still enforced by the existing DB trigger.
