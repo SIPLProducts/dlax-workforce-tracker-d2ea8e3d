@@ -1,36 +1,54 @@
 ## Root cause
 
-The error is occurring because the Contractors form always tries to create a new contractor record first.
+The contractor master table has a **global** unique index on `contractor_code`:
+`contractors_contractor_code_unique` (case-sensitive, applies across all projects).
 
-`TL001` already exists in the contractor master list, so the database blocks creating another contractor with the same contractor code before the app gets a chance to assign it to the selected project.
+The CSV upload (`handleUpload` in `src/routes/masters.contractors.tsx`) tries to reuse existing master contractors before inserting new ones, but the lookup is unreliable:
+
+1. The lookup query combines `company_name.in.(...)` and `contractor_code.in.(...)` inside a single PostgREST `.or()` string. Names that contain commas, parentheses, or quotes (very common — e.g. "ABC Constructions, Pvt Ltd") break the `in.()` parser and the whole branch silently returns no matches.
+2. The query has no error check — when it fails or returns partial data, code proceeds with an empty "reuse" map.
+3. Code matching is **case-sensitive**, so `TL001` vs `tl001` is treated as new even though the DB unique index will still reject it.
+4. Result: the CSV row's code already exists in the master table (e.g. uploaded earlier under BHELSTPP), the lookup misses it, the bulk `insert` hits `contractors_contractor_code_unique`, and the whole batch aborts with the raw DB message shown in the screenshot.
+
+This is why uploading any CSV containing previously-seen contractor codes (very normal when the same workforce moves between projects) fails for IIPEVSKP.
 
 ## Plan
 
-1. **Update the contractor create flow**
-   - When the user clicks **Create**, first check whether a contractor with the same contractor code already exists.
-   - If it exists, do not create a duplicate contractor master record.
-   - Instead, assign the existing contractor to the currently selected project.
+Edit only `src/routes/masters.contractors.tsx` — `handleUpload`. No schema or trigger changes.
 
-2. **Add project-level duplicate validation**
-   - Before assigning, check whether that contractor is already assigned to the selected project.
-   - If already assigned, show a friendly message like:
-     - `Contractor TL001 is already assigned to this project.`
-   - Do not insert a duplicate project assignment.
+1. **Robust existing-master lookup**
+   - Replace the fragile `.or()` string with two safe `.in()` queries:
+     - one on `contractor_code` for all non-empty CSV codes
+     - one on `company_name` for all CSV names
+   - Check `error` on each query and surface a friendly toast if either fails.
+   - Build `byCode` / `byName` maps using **lowercased** keys so casing differences in the CSV don't cause false misses.
 
-3. **Keep cross-project assignment allowed**
-   - If contractor `TL001` exists under another project but not the current project, the app will add the project assignment successfully.
-   - The same contractor can appear under multiple projects.
+2. **Reuse before insert**
+   - For each fresh CSV row, prefer match by `contractor_code` (lowercased), fall back to `company_name` (lowercased).
+   - Only rows with no match go into `toCreate`.
 
-4. **Clean up the earlier database fix attempt**
-   - The previous migration tried to drop a constraint, but the active blocker is actually a standalone unique index on `contractors.contractor_code`.
-   - I will leave the global contractor-code uniqueness in place because the requirement is to assign the same contractor to different projects, not create duplicate contractor master records.
+3. **Insert new contractors safely**
+   - Insert `toCreate` rows one batch at a time. If the batch fails with `23505` on `contractors_contractor_code_unique`, fall back to a per-row insert loop:
+     - On per-row `23505`, re-query that code, pick up the existing master id, and add it to `idsToMap` instead of erroring.
+   - This guarantees the upload completes even if another user added the same code between the lookup and the insert (or if the lookup missed it for any reason).
 
-5. **Improve error messages**
-   - Replace raw database errors like `duplicate key value violates unique constraint` with user-friendly messages in the Contractors screen.
+4. **Project assignment step (unchanged behaviour, friendlier error)**
+   - Insert `project_contractors` rows for all resolved contractor ids.
+   - The existing `UNIQUE (project_id, contractor_id)` already prevents in-project duplicates; on `23505` here, silently skip (already assigned) rather than abort the whole upload.
 
-## Technical details
+5. **User-facing messages**
+   - Replace raw DB text like `duplicate key value violates unique constraint "contractors_contractor_code_unique"` with:
+     - `Imported X contractors (reused Y existing, skipped Z duplicates).`
+     - On hard failure: `Some rows could not be imported: <code1>, <code2>` (truncated).
 
-- File to update: `src/routes/masters.contractors.tsx`
-- No schema change is required for the main fix.
-- Existing database rule `UNIQUE (project_id, contractor_id)` already protects against assigning the same contractor record twice to the same project.
-- The create logic will become: find existing contractor by code → check project assignment → assign or create as needed.
+## Out of scope
+
+- No change to the global `contractors_contractor_code_unique` index — codes remain globally unique by design.
+- No change to single-row "Add Contractor" `handleSave` (already handles this case).
+- No change to the CSV template or column set.
+
+## Technical notes
+
+- File: `src/routes/masters.contractors.tsx`
+- Function changed: `handleUpload` only (lines ~288–365)
+- New behaviour requires no DB migration, no new RLS, no new RPC.
