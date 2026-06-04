@@ -18,6 +18,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { ProjectCombobox, type ProjectOption } from "@/components/ProjectCombobox";
+
+const LS_PROJECT_KEY = "masters_contractors_project_id";
 
 export const Route = createFileRoute("/masters/contractors")({
   component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
@@ -43,6 +46,8 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
 }
 
 function ContractorsPage() {
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [projectId, setProjectId] = useState<string>("");
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -63,18 +68,38 @@ function ContractorsPage() {
     return true;
   };
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { loadManpower(); }, [dateFrom, dateTo, contractorId]);
+  useEffect(() => { loadProjects(); }, []);
+  useEffect(() => { if (projectId) load(); else setItems([]); }, [projectId]);
+  useEffect(() => { if (projectId) loadManpower(); }, [dateFrom, dateTo, contractorId, projectId]);
+
+  const loadProjects = async () => {
+    const { data } = await supabase.from("projects").select("id,name,code").order("name");
+    const list = (data || []) as ProjectOption[];
+    setProjects(list);
+    const stored = typeof window !== "undefined" ? localStorage.getItem(LS_PROJECT_KEY) : null;
+    if (stored && list.some((p) => p.id === stored)) setProjectId(stored);
+    else if (list.length === 1) setProjectId(list[0].id);
+  };
+
+  useEffect(() => {
+    if (projectId && typeof window !== "undefined") localStorage.setItem(LS_PROJECT_KEY, projectId);
+  }, [projectId]);
 
   const load = async () => {
-    const { data } = await supabase.from("contractors").select("*").order("company_name");
-    setItems(data || []);
+    const { data } = await supabase
+      .from("project_contractors")
+      .select("contractor:contractors(*)")
+      .eq("project_id", projectId);
+    const rows = (data || []).map((r: any) => r.contractor).filter(Boolean);
+    rows.sort((a: any, b: any) => (a.company_name || "").localeCompare(b.company_name || ""));
+    setItems(rows);
   };
 
   const loadManpower = async () => {
     let q = supabase
       .from("daily_manpower")
       .select("entry_date, headcount, contractor_id")
+      .eq("project_id", projectId)
       .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
       .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
     if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
@@ -137,13 +162,19 @@ function ContractorsPage() {
   const handleSave = async () => {
     if (!requireEdit()) return;
     if (!form.company_name.trim()) { toast.error("Company name is required"); return; }
+    if (!editing && !projectId) { toast.error("Select a project first"); return; }
     try {
       if (editing) {
         const { error } = await supabase.from("contractors").update(form).eq("id", editing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("contractors").insert(form);
+        const { data, error } = await supabase.from("contractors").insert(form).select("id").single();
         if (error) throw error;
+        const newId = (data as any)?.id;
+        if (newId) {
+          const { error: e2 } = await supabase.from("project_contractors").insert({ project_id: projectId, contractor_id: newId });
+          if (e2) throw e2;
+        }
       }
       toast.success(editing ? "Updated" : "Created");
       setOpen(false); setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); load();
@@ -203,6 +234,7 @@ function ContractorsPage() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!requireEdit()) { e.target.value = ""; return; }
+    if (!projectId) { toast.error("Select a project first"); e.target.value = ""; return; }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -219,7 +251,7 @@ function ContractorsPage() {
         return obj;
       }).filter((r) => r.company_name);
       if (records.length === 0) { toast.error("No valid rows (company_name required)"); return; }
-      // Skip duplicates already in DB (by company_name OR contractor_code, case-insensitive)
+      // Skip rows already mapped to THIS project (by company_name OR contractor_code)
       const existingNames = new Set(items.map((c) => (c.company_name || "").trim().toLowerCase()).filter(Boolean));
       const existingCodes = new Set(items.map((c) => (c.contractor_code || "").trim().toLowerCase()).filter(Boolean));
       const fresh = records.filter((r) => {
@@ -230,9 +262,47 @@ function ContractorsPage() {
         return true;
       });
       const skipped = records.length - fresh.length;
-      if (fresh.length === 0) { toast.info(`All ${records.length} rows already exist — nothing imported`); return; }
-      const { error } = await supabase.from("contractors").insert(fresh);
-      if (error) throw error;
+      if (fresh.length === 0) { toast.info(`All ${records.length} rows already mapped to this project — nothing imported`); return; }
+
+      // Look up any existing master contractors (by name or code) to reuse instead of duplicating master rows
+      const names = fresh.map((r) => r.company_name).filter(Boolean);
+      const codes = fresh.map((r) => r.contractor_code).filter(Boolean);
+      const { data: existingMasters } = await supabase
+        .from("contractors")
+        .select("id, company_name, contractor_code")
+        .or([
+          names.length ? `company_name.in.(${names.map((n: string) => `"${n.replace(/"/g, '\\"')}"`).join(",")})` : "",
+          codes.length ? `contractor_code.in.(${codes.map((c: string) => `"${c.replace(/"/g, '\\"')}"`).join(",")})` : "",
+        ].filter(Boolean).join(","));
+      const byName = new Map<string, string>();
+      const byCode = new Map<string, string>();
+      (existingMasters || []).forEach((m: any) => {
+        if (m.company_name) byName.set(m.company_name.trim().toLowerCase(), m.id);
+        if (m.contractor_code) byCode.set(m.contractor_code.trim().toLowerCase(), m.id);
+      });
+
+      const idsToMap: string[] = [];
+      const toCreate: any[] = [];
+      for (const r of fresh) {
+        const n = (r.company_name || "").trim().toLowerCase();
+        const c = (r.contractor_code || "").trim().toLowerCase();
+        const existingId = byName.get(n) || byCode.get(c);
+        if (existingId) idsToMap.push(existingId);
+        else toCreate.push(r);
+      }
+
+      if (toCreate.length > 0) {
+        const { data: inserted, error } = await supabase.from("contractors").insert(toCreate).select("id");
+        if (error) throw error;
+        (inserted || []).forEach((row: any) => idsToMap.push(row.id));
+      }
+
+      if (idsToMap.length > 0) {
+        const mapRows = idsToMap.map((cid) => ({ project_id: projectId, contractor_id: cid }));
+        const { error: e2 } = await supabase.from("project_contractors").insert(mapRows);
+        if (e2) throw e2;
+      }
+
       toast.success(`Imported ${fresh.length} contractors${skipped ? ` (skipped ${skipped} duplicates)` : ""}`);
       await load();
     } catch (err: any) {
@@ -262,7 +332,7 @@ function ContractorsPage() {
             </Button>
             <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
             <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
-              <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
+              <DialogTrigger asChild><Button disabled={!projectId}><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
                 <div className="space-y-4">
@@ -282,6 +352,22 @@ function ContractorsPage() {
         }
       />
 
+      {/* Project selector */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="space-y-1">
+              <Label>Project *</Label>
+              <ProjectCombobox value={projectId} onChange={setProjectId} projects={projects} placeholder="Select a project" className="w-[280px]" />
+            </div>
+            {!projectId && (
+              <p className="text-sm text-muted-foreground pb-2">Select a project to view and manage its contractors.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {projectId && <>
       {/* Dashboard Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -427,6 +513,7 @@ function ContractorsPage() {
           </Table>
         </CardContent>
       </Card>
+      </>}
     </div>
   );
 }
