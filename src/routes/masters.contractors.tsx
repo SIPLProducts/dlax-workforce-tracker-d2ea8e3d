@@ -173,7 +173,11 @@ function ContractorsPage() {
         const newId = (data as any)?.id;
         if (newId) {
           const { error: e2 } = await supabase.from("project_contractors").insert({ project_id: projectId, contractor_id: newId });
-          if (e2) throw e2;
+          if (e2) {
+            // Roll back the orphan master row so it doesn't linger unmapped.
+            await supabase.from("contractors").delete().eq("id", newId);
+            throw e2;
+          }
         }
       }
       toast.success(editing ? "Updated" : "Created");
