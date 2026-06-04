@@ -1,40 +1,88 @@
-## Diagnosis
+## Root cause
 
-Verified in DB:
-- `contractors` has 1 row: **Gunti Venkataswamy** (created 2026-06-04 07:09).
-- `project_contractors` is **empty** — no project mapping exists for that contractor.
-- That is why the Contractors page shows 0 for BHELSTPP (it joins via `project_contractors`), while the Project Assignments page lists Gunti as "Available" for **every** project (the Assignments tab queries the full `contractors` master and lets you assign it to any project).
+The Contractors page list query is:
 
-So two distinct issues:
+```ts
+supabase.from("project_contractors").select("contractor:contractors(*)").eq("project_id", projectId)
+```
 
-1. **Orphan contractor**: Gunti Venkataswamy was inserted into the master but the `project_contractors` mapping never landed (likely the user created it via the Assignments tab's "Add & Assign" against a different selected project, or the mapping insert was lost). Result: no project owns it.
-2. **Wrong sharing model**: `ProjectAssignments` (Contractors tab) lists every master contractor as "Available" for every project, by design of a shared master + many-to-many. The product requirement is that a contractor belongs to **one** project and must not appear under others.
+This returns **HTTP 400** from PostgREST:
+
+> Could not find a relationship between 'project_contractors' and 'contractors' in the schema cache
+
+Verified in DB: `project_contractors` has **no foreign key constraints at all** (only PK + UNIQUE(project_id, contractor_id)). Without a FK, PostgREST refuses to embed the related `contractors(*)` row, the request 400s, `items` stays empty, and the page shows "No contractors found" — even though the master rows exist.
+
+The same missing FK also explains why some orphan mapping rows could be created against non-existent IDs in the past, and is the safer fix than a UI workaround.
 
 ## Fix
 
-### 1. Repair the orphan row
-Map the existing Gunti Venkataswamy contractor to BHELSTPP so it stops appearing as "Available" everywhere and starts showing up correctly on the Contractors page for BHELSTPP.
+### 1. Migration — add the missing foreign keys
 
-```text
-INSERT INTO project_contractors (project_id, contractor_id)
-VALUES ('69e5f2ca-eb38-4688-b447-289fe6e4e7d9',  -- BHELSTPP
-        'd81269c7-c06f-4941-84f0-e0c63c59eb27'); -- Gunti Venkataswamy
+Add FKs to `public.project_contractors` so PostgREST can embed and the DB enforces referential integrity. Use `ON DELETE CASCADE` so deleting a contractor or project cleans up its mappings automatically (matches current UX: deleting a contractor on the master page should drop its project link).
+
+```sql
+ALTER TABLE public.project_contractors
+  ADD CONSTRAINT project_contractors_contractor_id_fkey
+  FOREIGN KEY (contractor_id) REFERENCES public.contractors(id) ON DELETE CASCADE;
+
+ALTER TABLE public.project_contractors
+  ADD CONSTRAINT project_contractors_project_id_fkey
+  FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE;
+
+NOTIFY pgrst, 'reload schema';
 ```
 
-### 2. Make contractors project-exclusive in the Assignments UI
+After this, the existing list query starts returning rows correctly — no frontend change needed.
 
-Edit `src/components/ProjectAssignments.tsx` (Contractors tab only — departments/categories stay shared):
+### 2. Repair the two orphan contractor rows for the user
 
-- When `kind === "contractors"`, load the **set of contractor ids already mapped to ANY project** and exclude them from the "Available" list (except the ones already assigned to the current project, which stay in "Assigned").
-- This way a contractor created/assigned to Project A no longer shows up as Available for Project B.
-- "Add & Assign" already creates a fresh master and maps it to the current project — that continues to work and the new row immediately drops out of Available for every other project.
-- Unassigning a contractor from a project (the `X` button) keeps current behavior: the row becomes Available again, ready to be assigned elsewhere.
+Both contractors exist in `contractors` but are not (correctly) mapped to the BHELSTPP project the user is working in. The user's selected project (per screenshot + network log) is `45eaa690-13ad-4fa7-934e-58196f2ab4e3` ("BHELSTPP — BHELSTPP").
 
-Departments and Categories continue to behave as shared masters (no change to those tabs).
+- **Gunti Venkataswamy** (`d81269c7-c06f-4941-84f0-e0c63c59eb27`) is currently mapped to `69e5f2ca…` (the other "BHELSTPP — ED (KSK)" project, from a prior repair). Re-point it to `45eaa690…`.
+- **Vemula Yedukondalu** (`3b6ee1ca-b0e4-43f5-bb40-a444165f5679`) has no mapping at all. Insert it.
 
-### 3. No change to `masters.contractors.tsx`
-The Contractors page already auto-inserts the `project_contractors` mapping on create and filters its list via the join. The orphan row was a one-off; the code path is correct.
+```sql
+UPDATE public.project_contractors
+   SET project_id = '45eaa690-13ad-4fa7-934e-58196f2ab4e3'
+ WHERE contractor_id = 'd81269c7-c06f-4941-84f0-e0c63c59eb27';
+
+INSERT INTO public.project_contractors (project_id, contractor_id)
+VALUES ('45eaa690-13ad-4fa7-934e-58196f2ab4e3',
+        '3b6ee1ca-b0e4-43f5-bb40-a444165f5679')
+ON CONFLICT DO NOTHING;
+```
+
+(The `UPDATE` goes in the same migration after the FK is added.)
+
+### 3. Harden create flow — avoid future orphan masters
+
+In `src/routes/masters.contractors.tsx` `handleSave`, if the `project_contractors` insert fails, the contractor master row is already inserted — leaving an orphan that never appears in any project list. Wrap with a compensating delete so the master row is removed on mapping failure, and re-throw the original error so the toast shows it:
+
+```ts
+const { data, error } = await supabase.from("contractors").insert(form).select("id").single();
+if (error) throw error;
+const newId = (data as any)?.id;
+if (newId) {
+  const { error: e2 } = await supabase
+    .from("project_contractors")
+    .insert({ project_id: projectId, contractor_id: newId });
+  if (e2) {
+    await supabase.from("contractors").delete().eq("id", newId); // rollback orphan
+    throw e2;
+  }
+}
+```
+
+No other behavior changes.
 
 ## Out of scope
-- No schema changes. Keeping `project_contractors` as the mapping table is enough; the exclusivity is enforced in the UI query. (If you later want hard exclusivity at the DB level, we can add a `UNIQUE (contractor_id)` constraint on `project_contractors` — say the word and I'll do it in a follow-up.)
-- No changes to RLS, daily entry, reports, or approvals.
+
+- Duplicate `projects` rows (there are two BHELSTPP entries and several other duplicates by code/name). Not touched here — separate cleanup.
+- No RLS, schema, or other tab changes.
+- No change to `ProjectAssignments.tsx` (the project-exclusivity filter we added previously stays as-is).
+
+## Verification after apply
+
+1. Reload `/masters/contractors`, select "BHELSTPP — BHELSTPP". Both Gunti and Vemula appear in the list and counters.
+2. Add a new contractor — it appears immediately under that project, and not under others.
+3. Switch to another project — list is empty (no leakage).
