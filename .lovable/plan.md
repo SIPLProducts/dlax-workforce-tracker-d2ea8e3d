@@ -1,23 +1,30 @@
-## Fix Login Right Panel Background
+## Problem
 
-The right side of the login screen currently uses pure black (`#0A0A1A`) with indigo/violet mesh blobs, which clashes against the navy gradient on the left (`#0A1530 → #14306B`). The seam between the two panels is very visible.
+On `Projects`, `Departments`, and `Categories` master screens, the `Code / Name / Group …` column headers appear floating in the middle of the table when the page scrolls. The `<thead>` cells are `sticky` with offsets `top-[112px] md:top-[144px]`, but the actual bottom edge of the `PageHeader` (which is itself `sticky top-14`) sits around ~120px. The mismatch leaves a gap where rows scroll through behind the area where the header should be, so the headers appear to "land" mid-table instead of locking flush under the PageHeader bar.
 
-### Change
+## Fix
 
-In `src/routes/login.tsx`, on the right login panel container:
+Update the sticky offset on each masters table's `<TableHeader>` so the header row sticks directly below the PageHeader with no gap.
 
-- Replace `bg-[#0A0A1A]` with a navy gradient that continues from where the left panel ends, e.g.:
-  - `linear-gradient(135deg, #14306B 0%, #0F1F47 55%, #0A1530 100%)` (mirror of the left, so the seam blends).
-- Tone down the mesh blobs so they read as subtle ambient light, not bright spotlights on black:
-  - Reduce opacities (e.g. indigo `0.7 → 0.35`, violet `0.6 → 0.3`, amber `0.4 → 0.2`).
-  - Lower grid overlay opacity from `0.06` to `0.04`.
-- Keep the white glass login card, the animations, and all form logic unchanged.
+Change in all three files:
 
-### Result
+- `src/routes/masters.projects.tsx` (line 324)
+- `src/routes/masters.departments.tsx` (line 202)
+- `src/routes/masters.categories.tsx` (line 114)
 
-Both halves share the same deep-navy palette; the right side feels like a continuation of the left rather than a separate black panel, while the white card still pops as the focal point.
+Replace:
+```
+[&_th]:sticky [&_th]:top-[112px] md:[&_th]:top-[144px] [&_th]:z-[5] [&_th]:bg-card
+```
+with offsets that match the real PageHeader bottom:
+```
+[&_th]:sticky [&_th]:top-[110px] md:[&_th]:top-[126px] [&_th]:z-[5] [&_th]:bg-card [&_th]:shadow-[0_1px_0_0_hsl(var(--border))]
+```
 
-### Out of scope
+- `top-14` (56px) TopBar + PageHeader (`py-3` mobile ≈ 54px, `py-4` desktop ≈ 70px) ⇒ thead sticks at 110px mobile / 126px desktop, flush under PageHeader.
+- Adds a 1px bottom shadow on the sticky `th` so the boundary between header and first row reads cleanly while scrolling.
 
-- No changes to the left panel, the login form, auth flow, or any other route.
-- No new assets or dependencies.
+## Out of scope
+
+- No changes to columns, data, filters, PageHeader component, or any other route.
+- No change to table structure or row rendering.
