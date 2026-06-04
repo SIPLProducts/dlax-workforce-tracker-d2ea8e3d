@@ -159,6 +159,11 @@ function ContractorsPage() {
     setContractorId("all");
   };
 
+  const activeProject = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
+  const activeProjectLabel = activeProject
+    ? `${activeProject.code ? `${activeProject.code} — ` : ""}${activeProject.name}`
+    : "";
+
   const handleSave = async () => {
     if (!requireEdit()) return;
     if (!form.company_name.trim()) { toast.error("Company name is required"); return; }
