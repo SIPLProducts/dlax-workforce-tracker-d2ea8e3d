@@ -18,6 +18,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { ProjectCombobox, type ProjectOption } from "@/components/ProjectCombobox";
+
+const LS_PROJECT_KEY = "masters_contractors_project_id";
 
 export const Route = createFileRoute("/masters/contractors")({
   component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
