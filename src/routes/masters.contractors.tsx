@@ -68,18 +68,38 @@ function ContractorsPage() {
     return true;
   };
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { loadManpower(); }, [dateFrom, dateTo, contractorId]);
+  useEffect(() => { loadProjects(); }, []);
+  useEffect(() => { if (projectId) load(); else setItems([]); }, [projectId]);
+  useEffect(() => { if (projectId) loadManpower(); }, [dateFrom, dateTo, contractorId, projectId]);
+
+  const loadProjects = async () => {
+    const { data } = await supabase.from("projects").select("id,name,code").order("name");
+    const list = (data || []) as ProjectOption[];
+    setProjects(list);
+    const stored = typeof window !== "undefined" ? localStorage.getItem(LS_PROJECT_KEY) : null;
+    if (stored && list.some((p) => p.id === stored)) setProjectId(stored);
+    else if (list.length === 1) setProjectId(list[0].id);
+  };
+
+  useEffect(() => {
+    if (projectId && typeof window !== "undefined") localStorage.setItem(LS_PROJECT_KEY, projectId);
+  }, [projectId]);
 
   const load = async () => {
-    const { data } = await supabase.from("contractors").select("*").order("company_name");
-    setItems(data || []);
+    const { data } = await supabase
+      .from("project_contractors")
+      .select("contractor:contractors(*)")
+      .eq("project_id", projectId);
+    const rows = (data || []).map((r: any) => r.contractor).filter(Boolean);
+    rows.sort((a: any, b: any) => (a.company_name || "").localeCompare(b.company_name || ""));
+    setItems(rows);
   };
 
   const loadManpower = async () => {
     let q = supabase
       .from("daily_manpower")
       .select("entry_date, headcount, contractor_id")
+      .eq("project_id", projectId)
       .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
       .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
     if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
