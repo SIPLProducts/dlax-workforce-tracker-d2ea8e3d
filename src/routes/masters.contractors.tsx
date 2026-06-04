@@ -299,6 +299,10 @@ function ContractorsPage() {
       const text = await file.text();
       const rows = parseCsv(text);
       if (rows.length < 2) { toast.error("CSV is empty"); return; }
+      const projLabel = activeProjectLabel || "the selected project";
+      if (!confirm(`Import ${rows.length - 1} contractor row(s) into project "${projLabel}"?`)) {
+        return;
+      }
       const header = rows[0].map((h) => h.trim().toLowerCase());
       const records = rows.slice(1).map((r) => {
         const obj: any = {};
