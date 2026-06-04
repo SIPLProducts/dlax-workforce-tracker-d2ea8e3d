@@ -46,6 +46,8 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
 }
 
 function ContractorsPage() {
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [projectId, setProjectId] = useState<string>("");
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
