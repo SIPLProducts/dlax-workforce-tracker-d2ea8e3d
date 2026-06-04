@@ -234,6 +234,7 @@ function ContractorsPage() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!requireEdit()) { e.target.value = ""; return; }
+    if (!projectId) { toast.error("Select a project first"); e.target.value = ""; return; }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -250,7 +251,7 @@ function ContractorsPage() {
         return obj;
       }).filter((r) => r.company_name);
       if (records.length === 0) { toast.error("No valid rows (company_name required)"); return; }
-      // Skip duplicates already in DB (by company_name OR contractor_code, case-insensitive)
+      // Skip rows already mapped to THIS project (by company_name OR contractor_code)
       const existingNames = new Set(items.map((c) => (c.company_name || "").trim().toLowerCase()).filter(Boolean));
       const existingCodes = new Set(items.map((c) => (c.contractor_code || "").trim().toLowerCase()).filter(Boolean));
       const fresh = records.filter((r) => {
@@ -261,9 +262,47 @@ function ContractorsPage() {
         return true;
       });
       const skipped = records.length - fresh.length;
-      if (fresh.length === 0) { toast.info(`All ${records.length} rows already exist — nothing imported`); return; }
-      const { error } = await supabase.from("contractors").insert(fresh);
-      if (error) throw error;
+      if (fresh.length === 0) { toast.info(`All ${records.length} rows already mapped to this project — nothing imported`); return; }
+
+      // Look up any existing master contractors (by name or code) to reuse instead of duplicating master rows
+      const names = fresh.map((r) => r.company_name).filter(Boolean);
+      const codes = fresh.map((r) => r.contractor_code).filter(Boolean);
+      const { data: existingMasters } = await supabase
+        .from("contractors")
+        .select("id, company_name, contractor_code")
+        .or([
+          names.length ? `company_name.in.(${names.map((n: string) => `"${n.replace(/"/g, '\\"')}"`).join(",")})` : "",
+          codes.length ? `contractor_code.in.(${codes.map((c: string) => `"${c.replace(/"/g, '\\"')}"`).join(",")})` : "",
+        ].filter(Boolean).join(","));
+      const byName = new Map<string, string>();
+      const byCode = new Map<string, string>();
+      (existingMasters || []).forEach((m: any) => {
+        if (m.company_name) byName.set(m.company_name.trim().toLowerCase(), m.id);
+        if (m.contractor_code) byCode.set(m.contractor_code.trim().toLowerCase(), m.id);
+      });
+
+      const idsToMap: string[] = [];
+      const toCreate: any[] = [];
+      for (const r of fresh) {
+        const n = (r.company_name || "").trim().toLowerCase();
+        const c = (r.contractor_code || "").trim().toLowerCase();
+        const existingId = byName.get(n) || byCode.get(c);
+        if (existingId) idsToMap.push(existingId);
+        else toCreate.push(r);
+      }
+
+      if (toCreate.length > 0) {
+        const { data: inserted, error } = await supabase.from("contractors").insert(toCreate).select("id");
+        if (error) throw error;
+        (inserted || []).forEach((row: any) => idsToMap.push(row.id));
+      }
+
+      if (idsToMap.length > 0) {
+        const mapRows = idsToMap.map((cid) => ({ project_id: projectId, contractor_id: cid }));
+        const { error: e2 } = await supabase.from("project_contractors").insert(mapRows);
+        if (e2) throw e2;
+      }
+
       toast.success(`Imported ${fresh.length} contractors${skipped ? ` (skipped ${skipped} duplicates)` : ""}`);
       await load();
     } catch (err: any) {
