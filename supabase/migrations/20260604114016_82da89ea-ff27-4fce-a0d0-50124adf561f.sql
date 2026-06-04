@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.contractors_contractor_code_unique;
