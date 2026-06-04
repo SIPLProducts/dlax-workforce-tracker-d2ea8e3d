@@ -396,7 +396,7 @@ function ContractorsPage() {
             <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
               <DialogTrigger asChild><Button disabled={!projectId}><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{editing ? "Edit Contractor" : `Add Contractor${activeProjectLabel ? ` — ${activeProjectLabel}` : ""}`}</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div><Label>Contractor Code</Label><Input value={form.contractor_code} onChange={(e) => setForm({ ...form, contractor_code: e.target.value })} placeholder="e.g. C-001" /></div>
                   <div><Label>Company Name *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
