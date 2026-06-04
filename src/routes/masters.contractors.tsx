@@ -168,14 +168,63 @@ function ContractorsPage() {
         const { error } = await supabase.from("contractors").update(form).eq("id", editing.id);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("contractors").insert(form).select("id").single();
-        if (error) throw error;
-        const newId = (data as any)?.id;
-        if (newId) {
-          const { error: e2 } = await supabase.from("project_contractors").insert({ project_id: projectId, contractor_id: newId });
+        const code = (form.contractor_code || "").trim();
+        const name = (form.company_name || "").trim();
+        let contractorId: string | null = null;
+
+        // 1) Try to find an existing contractor by code (preferred), then by name
+        if (code) {
+          const { data: existingByCode } = await supabase
+            .from("contractors")
+            .select("id")
+            .ilike("contractor_code", code)
+            .limit(1)
+            .maybeSingle();
+          if (existingByCode) contractorId = (existingByCode as any).id;
+        }
+        if (!contractorId && name) {
+          const { data: existingByName } = await supabase
+            .from("contractors")
+            .select("id")
+            .ilike("company_name", name)
+            .limit(1)
+            .maybeSingle();
+          if (existingByName) contractorId = (existingByName as any).id;
+        }
+
+        // 2) If found, check if already assigned to this project
+        if (contractorId) {
+          const { data: existingMap } = await supabase
+            .from("project_contractors")
+            .select("id")
+            .eq("project_id", projectId)
+            .eq("contractor_id", contractorId)
+            .maybeSingle();
+          if (existingMap) {
+            toast.error(`Contractor ${code || name} is already assigned to this project.`);
+            return;
+          }
+        } else {
+          // 3) Create new contractor master row
+          const { data, error } = await supabase.from("contractors").insert(form).select("id").single();
+          if (error) {
+            if ((error as any).code === "23505") {
+              toast.error(`Contractor code "${code}" already exists. Please use a different code.`);
+              return;
+            }
+            throw error;
+          }
+          contractorId = (data as any)?.id;
+        }
+
+        // 4) Assign contractor to the current project
+        if (contractorId) {
+          const { error: e2 } = await supabase.from("project_contractors").insert({ project_id: projectId, contractor_id: contractorId });
           if (e2) {
-            // Roll back the orphan master row so it doesn't linger unmapped.
-            await supabase.from("contractors").delete().eq("id", newId);
+            if ((e2 as any).code === "23505") {
+              toast.error(`Contractor ${code || name} is already assigned to this project.`);
+              return;
+            }
             throw e2;
           }
         }
