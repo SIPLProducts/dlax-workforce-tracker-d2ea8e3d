@@ -1,29 +1,36 @@
 ## Root cause
 
-The newly created contractor **Lucky Roy** (`8f17ffc7-5d61-4f97-9e76-3046b4e17138`) exists in `contractors` but has **no row in `project_contractors`** — so the list query on `/masters/contractors` (which joins via `project_contractors` filtered by project) returns nothing for UNITVSKP. This is the same orphan-master pattern we hit previously, before the create-flow rollback was added.
+The error is occurring because the Contractors form always tries to create a new contractor record first.
 
-The list query itself is fine now (FKs were added in the prior migration). The only fix needed is to insert the missing mapping row.
+`TL001` already exists in the contractor master list, so the database blocks creating another contractor with the same contractor code before the app gets a chance to assign it to the selected project.
 
-The user's selected project is "UNITVSKP — UNITVSKP" → `febad4f1-cb28-4d68-b587-edd932615af7` (there is also a duplicate `UNITVSKP — MD(KAK)` at `45f25dbd…`, which is out of scope).
+## Plan
 
-## Fix
+1. **Update the contractor create flow**
+   - When the user clicks **Create**, first check whether a contractor with the same contractor code already exists.
+   - If it exists, do not create a duplicate contractor master record.
+   - Instead, assign the existing contractor to the currently selected project.
 
-Run a single data insert to map Lucky Roy to UNITVSKP:
+2. **Add project-level duplicate validation**
+   - Before assigning, check whether that contractor is already assigned to the selected project.
+   - If already assigned, show a friendly message like:
+     - `Contractor TL001 is already assigned to this project.`
+   - Do not insert a duplicate project assignment.
 
-```sql
-INSERT INTO public.project_contractors (project_id, contractor_id)
-VALUES ('febad4f1-cb28-4d68-b587-edd932615af7',
-        '8f17ffc7-5d61-4f97-9e76-3046b4e17138')
-ON CONFLICT DO NOTHING;
-```
+3. **Keep cross-project assignment allowed**
+   - If contractor `TL001` exists under another project but not the current project, the app will add the project assignment successfully.
+   - The same contractor can appear under multiple projects.
 
-No code changes. The `handleSave` rollback added previously already prevents new orphans going forward; this row was created before that fix and just needs repair.
+4. **Clean up the earlier database fix attempt**
+   - The previous migration tried to drop a constraint, but the active blocker is actually a standalone unique index on `contractors.contractor_code`.
+   - I will leave the global contractor-code uniqueness in place because the requirement is to assign the same contractor to different projects, not create duplicate contractor master records.
 
-## Verification
+5. **Improve error messages**
+   - Replace raw database errors like `duplicate key value violates unique constraint` with user-friendly messages in the Contractors screen.
 
-Reload `/masters/contractors` with UNITVSKP — UNITVSKP selected. Lucky Roy appears in the list, counters update, and the contractor is not visible under any other project.
+## Technical details
 
-## Out of scope
-
-- Duplicate UNITVSKP project rows — separate cleanup.
-- No schema, RLS, or component changes.
+- File to update: `src/routes/masters.contractors.tsx`
+- No schema change is required for the main fix.
+- Existing database rule `UNIQUE (project_id, contractor_id)` already protects against assigning the same contractor record twice to the same project.
+- The create logic will become: find existing contractor by code → check project assignment → assign or create as needed.
