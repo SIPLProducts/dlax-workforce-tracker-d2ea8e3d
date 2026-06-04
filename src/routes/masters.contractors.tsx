@@ -162,13 +162,19 @@ function ContractorsPage() {
   const handleSave = async () => {
     if (!requireEdit()) return;
     if (!form.company_name.trim()) { toast.error("Company name is required"); return; }
+    if (!editing && !projectId) { toast.error("Select a project first"); return; }
     try {
       if (editing) {
         const { error } = await supabase.from("contractors").update(form).eq("id", editing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("contractors").insert(form);
+        const { data, error } = await supabase.from("contractors").insert(form).select("id").single();
         if (error) throw error;
+        const newId = (data as any)?.id;
+        if (newId) {
+          const { error: e2 } = await supabase.from("project_contractors").insert({ project_id: projectId, contractor_id: newId });
+          if (e2) throw e2;
+        }
       }
       toast.success(editing ? "Updated" : "Created");
       setOpen(false); setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); load();
