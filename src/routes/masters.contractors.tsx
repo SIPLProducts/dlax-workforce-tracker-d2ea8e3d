@@ -513,6 +513,7 @@ function ContractorsPage() {
           </Table>
         </CardContent>
       </Card>
+      </>}
     </div>
   );
 }
