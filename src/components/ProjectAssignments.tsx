@@ -111,8 +111,23 @@ function AssignmentSection({
       supabase.from(cfg.masterTable as any).select("*").order(kind === "contractors" ? "company_name" : "name"),
       supabase.from(cfg.joinTable as any).select(cfg.joinFk).eq("project_id", projectId),
     ]);
-    setAll((masters || []).map((r: any) => ({ id: r.id, label: cfg.masterLabel(r) })));
-    setAssigned(new Set((joins || []).map((j: any) => j[cfg.joinFk])));
+    const assignedHere = new Set((joins || []).map((j: any) => j[cfg.joinFk]));
+
+    // Contractors are project-exclusive: hide any contractor already mapped to another project.
+    let excluded = new Set<string>();
+    if (kind === "contractors") {
+      const { data: otherJoins } = await supabase
+        .from(cfg.joinTable as any)
+        .select(`${cfg.joinFk}, project_id`)
+        .neq("project_id", projectId);
+      excluded = new Set((otherJoins || []).map((j: any) => j[cfg.joinFk]));
+    }
+
+    const visible = (masters || [])
+      .filter((r: any) => assignedHere.has(r.id) || !excluded.has(r.id))
+      .map((r: any) => ({ id: r.id, label: cfg.masterLabel(r) }));
+    setAll(visible);
+    setAssigned(assignedHere);
   };
 
   useEffect(() => {
