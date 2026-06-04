@@ -332,7 +332,7 @@ function ContractorsPage() {
             </Button>
             <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
             <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
-              <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
+              <DialogTrigger asChild><Button disabled={!projectId}><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
                 <div className="space-y-4">
