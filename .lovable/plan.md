@@ -1,49 +1,40 @@
-## Goal
-Make `/masters/contractors` project-scoped: pick a project at the top, and the entire screen (list, search, dashboard KPIs, charts, create) operates only on contractors mapped to that project via the existing `project_contractors` join table.
+## Diagnosis
 
-## Changes (single file: `src/routes/masters.contractors.tsx`)
+Verified in DB:
+- `contractors` has 1 row: **Gunti Venkataswamy** (created 2026-06-04 07:09).
+- `project_contractors` is **empty** — no project mapping exists for that contractor.
+- That is why the Contractors page shows 0 for BHELSTPP (it joins via `project_contractors`), while the Project Assignments page lists Gunti as "Available" for **every** project (the Assignments tab queries the full `contractors` master and lets you assign it to any project).
 
-1. **Project selector (top of page)**
-   - Add a `Project` dropdown in the PageHeader area (next to Template/Upload/Export/Add buttons, or just below).
-   - Source: `projects` table, filtered to projects the current user has access to (admins see all; others scoped via `user_projects` — same pattern as Daily Entry already uses).
-   - Persist the last-selected project in `localStorage` so the screen remembers it across navigations.
-   - If the user has access to only one project, auto-select it. If none, show an empty-state message.
+So two distinct issues:
 
-2. **List filtered by project**
-   - Replace `supabase.from("contractors").select("*")` with a query that joins through `project_contractors`:
-     ```
-     supabase.from("project_contractors")
-       .select("contractor:contractors(*)")
-       .eq("project_id", selectedProjectId)
-     ```
-   - Map to the existing `items` shape so the table, search, and existing render code stay unchanged.
-   - Reload whenever the selected project changes.
+1. **Orphan contractor**: Gunti Venkataswamy was inserted into the master but the `project_contractors` mapping never landed (likely the user created it via the Assignments tab's "Add & Assign" against a different selected project, or the mapping insert was lost). Result: no project owns it.
+2. **Wrong sharing model**: `ProjectAssignments` (Contractors tab) lists every master contractor as "Available" for every project, by design of a shared master + many-to-many. The product requirement is that a contractor belongs to **one** project and must not appear under others.
 
-3. **Create / Add Contractor auto-maps to the selected project**
-   - In `handleSave` (insert branch): after inserting into `contractors`, immediately insert `{ project_id: selectedProjectId, contractor_id: newId }` into `project_contractors`.
-   - Edit and Delete behavior unchanged (still operate on the master `contractors` row).
-   - Disable the "Add Contractor" button when no project is selected.
+## Fix
 
-4. **CSV Upload auto-maps imported rows to the selected project**
-   - After the bulk insert into `contractors`, also bulk-insert the new ids into `project_contractors` for the selected project.
-   - Duplicate-skip logic now considers contractors already mapped to *this project* (not global), so the same master contractor can exist in multiple projects without conflict.
+### 1. Repair the orphan row
+Map the existing Gunti Venkataswamy contractor to BHELSTPP so it stops appearing as "Available" everywhere and starts showing up correctly on the Contractors page for BHELSTPP.
 
-5. **Dashboard filters & KPIs become project-scoped**
-   - The existing `loadManpower` already queries `daily_manpower`. Add `.eq("project_id", selectedProjectId)` so KPIs, the Worker Trend chart, and Top Contractors reflect the selected project only.
-   - The "Contractor" filter dropdown inside the dashboard card now lists only contractors mapped to the selected project (same `items` array).
-   - "Contractors by Nature of Work" chart uses the filtered `items` (already does).
+```text
+INSERT INTO project_contractors (project_id, contractor_id)
+VALUES ('69e5f2ca-eb38-4688-b447-289fe6e4e7d9',  -- BHELSTPP
+        'd81269c7-c06f-4941-84f0-e0c63c59eb27'); -- Gunti Venkataswamy
+```
 
-6. **Empty / no-project state**
-   - When no project is selected, show a clear inline message ("Select a project to view its contractors") and hide the list/dashboard cards.
+### 2. Make contractors project-exclusive in the Assignments UI
+
+Edit `src/components/ProjectAssignments.tsx` (Contractors tab only — departments/categories stay shared):
+
+- When `kind === "contractors"`, load the **set of contractor ids already mapped to ANY project** and exclude them from the "Available" list (except the ones already assigned to the current project, which stay in "Assigned").
+- This way a contractor created/assigned to Project A no longer shows up as Available for Project B.
+- "Add & Assign" already creates a fresh master and maps it to the current project — that continues to work and the new row immediately drops out of Available for every other project.
+- Unassigning a contractor from a project (the `X` button) keeps current behavior: the row becomes Available again, ready to be assigned elsewhere.
+
+Departments and Categories continue to behave as shared masters (no change to those tabs).
+
+### 3. No change to `masters.contractors.tsx`
+The Contractors page already auto-inserts the `project_contractors` mapping on create and filters its list via the join. The orphan row was a one-off; the code path is correct.
 
 ## Out of scope
-- No schema changes — `project_contractors` already exists with the right shape and policies.
-- No changes to `/masters/assignments` (bulk project-mapping there continues to work).
-- No changes to Departments, Categories, or other master screens.
-- No "remove from project without deleting" action — Delete still deletes the master contractor record.
-
-## Verification
-- Switch projects → list and KPIs update.
-- Add a contractor while Project A is selected → it appears only under Project A, not Project B.
-- Upload CSV under Project A → all imported contractors are mapped to Project A only.
-- Non-admin user with access to only Project A sees only Project A in the dropdown.
+- No schema changes. Keeping `project_contractors` as the mapping table is enough; the exclusivity is enforced in the UI query. (If you later want hard exclusivity at the DB level, we can add a `UNIQUE (contractor_id)` constraint on `project_contractors` — say the word and I'll do it in a follow-up.)
+- No changes to RLS, daily entry, reports, or approvals.
