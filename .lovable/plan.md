@@ -1,128 +1,82 @@
-## Diagnosis
+## Issue
 
-Yes — this is a database permission issue in your self-hosted backend.
+Self-hosted PostgREST returns `42501 permission denied` for `public.user_projects` (and will for every other table) because the `authenticated` and `anon` roles have no table-level `GRANT`s on the `public` schema. RLS alone is not enough.
 
-The login reaches the app, but after sign-in the frontend queries `public.user_roles` to load the logged-in user’s roles. PostgREST/Data API is returning:
-
-```json
-{
-  "code": "42501",
-  "message": "permission denied for table user_roles"
-}
-```
-
-That means the SQL role `authenticated` does not have table-level `SELECT` permission on `public.user_roles`. RLS policies alone are not enough; self-hosted PostgREST also needs explicit `GRANT`s.
+We already fixed `user_roles`. Instead of patching one table at a time, apply grants across all current and future tables in `public`.
 
 ## Migration to apply
 
-Create and apply a new SQL migration in your self-hosted project, for example:
+Create `supabase/migrations/20260605000200_fix_public_schema_data_api_grants.sql` with:
 
 ```sql
--- Fix Data API access for user_roles on self-hosted PostgREST
-
+-- Ensure roles can use the public schema
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
-GRANT SELECT ON TABLE public.user_roles TO authenticated;
-GRANT ALL ON TABLE public.user_roles TO service_role;
+-- Grant table privileges on every existing base table in public
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT c.relname AS tname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+  LOOP
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', r.tname);
+    EXECUTE format('GRANT ALL ON public.%I TO service_role', r.tname);
+  END LOOP;
+END $$;
 
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+-- Sequences (needed for INSERTs that use serial/identity)
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
 
-DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
-CREATE POLICY "Users can view their own roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (user_id = auth.uid());
+-- Functions (RPCs like get_email_for_login_id, has_role, approve_sheet, etc.)
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
 
-DROP POLICY IF EXISTS "Admins can view all user roles" ON public.user_roles;
-CREATE POLICY "Admins can view all user roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+-- Future objects created in public inherit the same grants automatically
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON SEQUENCES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
 
-DROP POLICY IF EXISTS "Admins can manage user roles" ON public.user_roles;
-CREATE POLICY "Admins can manage user roles"
-ON public.user_roles
-FOR ALL
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'::public.app_role))
-WITH CHECK (public.has_role(auth.uid(), 'admin'::public.app_role));
+-- Make sure PostgREST's login role can assume the API roles
+GRANT anon, authenticated, service_role TO authenticator;
 ```
 
-## If your installer migration folder is used
+Notes on scope:
+- `anon` intentionally gets **no** table SELECT — every RLS policy in this app scopes to `auth.uid()`, so anonymous reads should stay blocked. Login itself uses the `get_email_for_login_id` RPC, which is covered by the function grant above.
+- RLS is unchanged. Tables that don't yet have policies remain locked from the client; `service_role` (edge code) still works because it bypasses RLS.
 
-Add it as a new file under your local migrations folder, for example:
+## How to apply on the self-hosted server
 
 ```bash
-supabase/migrations/20260605000100_fix_user_roles_data_api_grants.sql
+docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  < 20260605000200_fix_public_schema_data_api_grants.sql
+
+# Reload PostgREST schema cache
+docker kill -s SIGUSR1 dlax-rest 2>/dev/null || docker restart dlax-rest
 ```
 
-Then rerun your installer/migration command.
-
-## Direct psql apply option
-
-If you are applying directly on the server:
-
-```bash
-cat > /tmp/fix_user_roles_grants.sql <<'SQL'
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-
-GRANT SELECT ON TABLE public.user_roles TO authenticated;
-GRANT ALL ON TABLE public.user_roles TO service_role;
-
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
-CREATE POLICY "Users can view their own roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (user_id = auth.uid());
-
-DROP POLICY IF EXISTS "Admins can view all user roles" ON public.user_roles;
-CREATE POLICY "Admins can view all user roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'::public.app_role));
-
-DROP POLICY IF EXISTS "Admins can manage user roles" ON public.user_roles;
-CREATE POLICY "Admins can manage user roles"
-ON public.user_roles
-FOR ALL
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'::public.app_role))
-WITH CHECK (public.has_role(auth.uid(), 'admin'::public.app_role));
-SQL
-
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/fix_user_roles_grants.sql
-```
-
-If you connect inside the DB container instead, use your existing self-hosted command style, but the SQL above is the important part.
-
-## Verification query
-
-After applying, run:
+## Verification
 
 ```sql
-SELECT
-  has_table_privilege('authenticated', 'public.user_roles', 'SELECT') AS authenticated_can_select,
-  has_table_privilege('service_role', 'public.user_roles', 'SELECT') AS service_role_can_select;
+SELECT table_name,
+       has_table_privilege('authenticated', 'public.'||table_name, 'SELECT') AS auth_select
+FROM information_schema.tables
+WHERE table_schema='public' AND table_type='BASE TABLE'
+ORDER BY table_name;
 ```
+All rows should show `auth_select = t`. Then clear browser storage and log in again.
 
-Expected result:
+## Deliverable
 
-```text
-authenticated_can_select | service_role_can_select
--------------------------+------------------------
-t                       | t
-```
-
-## After applying
-
-1. Reload/restart PostgREST or rerun your installer’s schema-cache reload step.
-2. Clear browser site storage or open a private window.
-3. Try login again.
-
-If you still get `permission denied`, the next thing to check is whether the self-hosted PostgREST container is connecting with the correct `authenticator` role and has `GRANT authenticated TO authenticator;`.
+On approval I will:
+1. Write the SQL file to `supabase/migrations/20260605000200_fix_public_schema_data_api_grants.sql`
+2. Also save a copy to `/mnt/documents/` so you can download and run it on the self-hosted DB.
