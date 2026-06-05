@@ -1,64 +1,38 @@
 ## Issue
 
-Self-hosted PostgREST returns `42501 permission denied` for `public.user_projects` (and will for every other table) because the `authenticated` and `anon` roles have no table-level `GRANT`s on the `public` schema. RLS alone is not enough.
+Self-hosted Postgres returns `42501 permission denied for schema auth` when saving a daily entry sheet.
 
-We already fixed `user_roles`. Instead of patching one table at a time, apply grants across all current and future tables in `public`.
+The save inserts into `public.daily_manpower`. RLS policies and the `set_daily_manpower_initial_status` trigger evaluate `auth.uid()` (and indirectly `auth.role()` / `auth.jwt()`) **as the calling role** (`authenticated`) — not as a SECURITY DEFINER. On hosted Supabase the `authenticated` and `anon` roles already have `USAGE` on `schema auth` and `EXECUTE` on these helpers; on your self-hosted DB those grants are missing, so every RLS check that touches `auth.uid()` fails with this error.
+
+This is the same class of issue as the earlier `public` GRANT fix, but for the `auth` schema's helper functions (NOT its tables — we must NOT grant access to `auth.users`, etc.).
 
 ## Migration to apply
 
-Create `supabase/migrations/20260605000200_fix_public_schema_data_api_grants.sql` with:
+Create `supabase/migrations/20260605000400_grant_auth_helpers_to_api_roles.sql`:
 
 ```sql
--- Ensure roles can use the public schema
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+-- Let API roles resolve objects in the auth schema (needed to call auth.uid() etc.)
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 
--- Grant table privileges on every existing base table in public
-DO $$
-DECLARE r record;
-BEGIN
-  FOR r IN
-    SELECT c.relname AS tname
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relkind = 'r'
-  LOOP
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', r.tname);
-    EXECUTE format('GRANT ALL ON public.%I TO service_role', r.tname);
-  END LOOP;
-END $$;
+-- Execute the JWT helper functions used by RLS policies and triggers
+GRANT EXECUTE ON FUNCTION auth.uid()  TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION auth.jwt()  TO anon, authenticated, service_role;
 
--- Sequences (needed for INSERTs that use serial/identity)
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
-
--- Functions (RPCs like get_email_for_login_id, has_role, approve_sheet, etc.)
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
-
--- Future objects created in public inherit the same grants automatically
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT ALL ON TABLES TO service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT ALL ON SEQUENCES TO service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
+-- Future helper functions added to the auth schema inherit EXECUTE
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth
   GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
-
--- Make sure PostgREST's login role can assume the API roles
-GRANT anon, authenticated, service_role TO authenticator;
 ```
 
-Notes on scope:
-- `anon` intentionally gets **no** table SELECT — every RLS policy in this app scopes to `auth.uid()`, so anonymous reads should stay blocked. Login itself uses the `get_email_for_login_id` RPC, which is covered by the function grant above.
-- RLS is unchanged. Tables that don't yet have policies remain locked from the client; `service_role` (edge code) still works because it bypasses RLS.
+Notes:
+- We do **not** grant any table privileges on `auth.*`. `auth.users` and friends stay locked. Only the helper functions become callable, which is what hosted Supabase already does by default.
+- Nothing in `public` changes; RLS rules are unchanged.
 
 ## How to apply on the self-hosted server
 
 ```bash
 docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-  < 20260605000200_fix_public_schema_data_api_grants.sql
+  < 20260605000400_grant_auth_helpers_to_api_roles.sql
 
 # Reload PostgREST schema cache
 docker kill -s SIGUSR1 dlax-rest 2>/dev/null || docker restart dlax-rest
@@ -67,16 +41,15 @@ docker kill -s SIGUSR1 dlax-rest 2>/dev/null || docker restart dlax-rest
 ## Verification
 
 ```sql
-SELECT table_name,
-       has_table_privilege('authenticated', 'public.'||table_name, 'SELECT') AS auth_select
-FROM information_schema.tables
-WHERE table_schema='public' AND table_type='BASE TABLE'
-ORDER BY table_name;
+SELECT has_schema_privilege('authenticated', 'auth', 'USAGE')         AS auth_usage,
+       has_function_privilege('authenticated', 'auth.uid()', 'EXECUTE') AS uid_exec,
+       has_function_privilege('authenticated', 'auth.role()', 'EXECUTE') AS role_exec,
+       has_function_privilege('authenticated', 'auth.jwt()', 'EXECUTE')  AS jwt_exec;
 ```
-All rows should show `auth_select = t`. Then clear browser storage and log in again.
+All four should be `t`. Then retry saving a daily entry sheet — the `42501` should be gone.
 
 ## Deliverable
 
 On approval I will:
-1. Write the SQL file to `supabase/migrations/20260605000200_fix_public_schema_data_api_grants.sql`
-2. Also save a copy to `/mnt/documents/` so you can download and run it on the self-hosted DB.
+1. Write the SQL to `supabase/migrations/20260605000400_grant_auth_helpers_to_api_roles.sql` (also runs against Lovable Cloud through the migration tool).
+2. Save a copy to `/mnt/documents/` for you to download and run on the self-hosted DB.
