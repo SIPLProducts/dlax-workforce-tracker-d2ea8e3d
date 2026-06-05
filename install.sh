@@ -403,8 +403,12 @@ done
 # =============================================================================
 log "verifying JWT_SECRET consistency across auth + postgrest"
 ENV_JWT_PREFIX=$(printf '%s' "$JWT" | cut -c1-8)
-AUTH_JWT=$(docker exec dlax-auth printenv GOTRUE_JWT_SECRET 2>/dev/null || echo "")
-REST_JWT=$(docker exec dlax-rest printenv PGRST_JWT_SECRET 2>/dev/null || echo "")
+read_container_env() {
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1" 2>/dev/null \
+    | sed -n "s/^$2=//p" | head -n1
+}
+AUTH_JWT=$(read_container_env dlax-auth GOTRUE_JWT_SECRET)
+REST_JWT=$(read_container_env dlax-rest PGRST_JWT_SECRET)
 AUTH_JWT_PREFIX=$(printf '%s' "$AUTH_JWT" | cut -c1-8)
 REST_JWT_PREFIX=$(printf '%s' "$REST_JWT" | cut -c1-8)
 log "  .env JWT_SECRET prefix       => [$ENV_JWT_PREFIX...]"
@@ -415,11 +419,12 @@ if [ "$AUTH_JWT" != "$JWT" ] || [ "$REST_JWT" != "$JWT" ]; then
   warn "JWT_SECRET mismatch — restarting auth + rest with current .env"
   ( cd "$SUPA" && docker compose up -d --force-recreate auth rest >/dev/null 2>&1 || true )
   sleep 4
-  AUTH_JWT=$(docker exec dlax-auth printenv GOTRUE_JWT_SECRET 2>/dev/null || echo "")
-  REST_JWT=$(docker exec dlax-rest printenv PGRST_JWT_SECRET 2>/dev/null || echo "")
+  AUTH_JWT=$(read_container_env dlax-auth GOTRUE_JWT_SECRET)
+  REST_JWT=$(read_container_env dlax-rest PGRST_JWT_SECRET)
   [ "$AUTH_JWT" = "$JWT" ] && [ "$REST_JWT" = "$JWT" ] \
     || die "JWT_SECRET still differs between .env, dlax-auth, and dlax-rest — login will fail with JWSInvalidSignature"
 fi
+
 ok "JWT_SECRET consistent across .env, auth, rest"
 
 # Sign a fresh authenticated JWT and verify PostgREST accepts it
