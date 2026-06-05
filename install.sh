@@ -265,6 +265,51 @@ else
   warn "no migrations directory"
 fi
 
+# =============================================================================
+# 5b) Data API grants — self-hosted Supabase has no implicit grants on public
+# =============================================================================
+log "granting Data API privileges on public schema"
+docker exec --user postgres "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL' >/dev/null
+-- Schema usage
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+-- Default privileges for future objects created by postgres
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
+
+-- Backfill grants on existing base tables in public
+DO $$
+DECLARE t record;
+BEGIN
+  FOR t IN SELECT c.relname FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE c.relkind = 'r' AND n.nspname = 'public'
+  LOOP
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', t.relname);
+    EXECUTE format('GRANT ALL ON public.%I TO service_role', t.relname);
+  END LOOP;
+END $$;
+
+-- Sequences + functions (anon needs EXECUTE on get_email_for_login_id RPC)
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+SQL
+ok "Data API grants applied"
+
+# Sanity check — fail fast if user_roles still isn't reachable as authenticated
+HAS_PRIV=$(docker exec --user postgres "$DB_CONTAINER" \
+  psql -tAU postgres -d postgres -c \
+  "SELECT has_table_privilege('authenticated','public.user_roles','SELECT');" | tr -d '[:space:]')
+[ "$HAS_PRIV" = "t" ] || die "grant verification failed: authenticated lacks SELECT on public.user_roles"
+ok "verified: authenticated can SELECT public.user_roles"
+
+
 # Tell PostgREST to reload its schema cache so freshly created functions
 # (e.g. public.get_email_for_login_id) become visible via /rest/v1/rpc/...
 log "reloading PostgREST schema cache"
