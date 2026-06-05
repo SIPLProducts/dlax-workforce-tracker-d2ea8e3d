@@ -418,22 +418,46 @@ SUPABASE_SERVICE_ROLE_KEY=$SRK
 EOF
 chmod 600 "$BACKEND/.dev.vars"
 
-# Nitro's cloudflare-module preset may emit the worker as index.mjs depending
-# on version — normalize to index.js so the existing wrangler launch works.
-if [ ! -f "$BACKEND/index.js" ] && [ -f "$BACKEND/index.mjs" ]; then
-  mv "$BACKEND/index.mjs" "$BACKEND/index.js"
-fi
-[ -f "$BACKEND/index.js" ]      || die "missing $BACKEND/index.js (worker bundle) — check that the nitro plugin ran during build"
+# Reconcile wrangler.json `main` with the actual emitted entry file.
+# Nitro's cloudflare-module preset may emit index.js or index.mjs depending on
+# version. Trust whichever file exists and rewrite wrangler.json to match —
+# do NOT rename the file, because the worker imports sibling chunks by extension.
 [ -f "$BACKEND/wrangler.json" ] || die "missing $BACKEND/wrangler.json"
-ok "worker bundle ready: $BACKEND/index.js"
+ENTRY=""
+for cand in index.js index.mjs; do
+  [ -f "$BACKEND/$cand" ] && { ENTRY="$cand"; break; }
+done
+[ -n "$ENTRY" ] || die "missing worker entry (index.js / index.mjs) in $BACKEND — nitro plugin likely did not run"
+log "worker entry: $ENTRY — syncing wrangler.json main field"
+TMP_WJ=$(mktemp)
+jq --arg m "$ENTRY" '.main = $m' "$BACKEND/wrangler.json" > "$TMP_WJ" \
+  && mv "$TMP_WJ" "$BACKEND/wrangler.json"
+ok "worker bundle ready: $BACKEND/$ENTRY"
 
 # =============================================================================
 # 8) PM2 — run worker via wrangler/workerd (bound to 0.0.0.0)
 # =============================================================================
 log "starting backend under PM2 (wrangler dev → 0.0.0.0:$APP_PORT)"
 pm2 delete dlax >/dev/null 2>&1 || true
+# --no-bundle / no_bundle is already set inside wrangler.json — don't duplicate
+# it on the CLI. Let the config file be the single source of truth.
 pm2 start wrangler --name dlax --cwd "$BACKEND" --update-env -- \
-  dev --local --ip 0.0.0.0 --port "$APP_PORT" --no-bundle --config wrangler.json
+  dev --local --ip 0.0.0.0 --port "$APP_PORT" --config wrangler.json
+
+log "waiting for backend to listen on 127.0.0.1:$APP_PORT"
+READY=0
+for i in $(seq 1 45); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$APP_PORT/" 2>/dev/null || echo 000)
+  case "$code" in 2*|3*|4*) READY=1; break ;; esac
+  sleep 2
+done
+if [ "$READY" != "1" ]; then
+  warn "backend never responded on :$APP_PORT — recent PM2 error logs:"
+  pm2 logs dlax --lines 80 --nostream --err || true
+  die "wrangler worker failed to start — see logs above"
+fi
+ok "backend responding on :$APP_PORT"
+
 pm2 save >/dev/null
 pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 
