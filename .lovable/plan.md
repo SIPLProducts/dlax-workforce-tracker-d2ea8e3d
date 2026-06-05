@@ -1,26 +1,36 @@
-## Problem
-The installer applies migrations, then attempts to grant Data API permissions to `authenticated`, but verification still returns `false` for `public.user_roles`. In self-hosted stacks this usually happens because the database role used by PostgREST is not the same role name the script is granting to, or because the role does not inherit the privileges.
+## Diagnosis
+
+`PGRST301 JWSInvalidSignature` means PostgREST rejected the JWT because the signature does not match its configured `PGRST_JWT_SECRET`. In this stack both `gotrue` and `postgrest` read `${JWT_SECRET}` from `supabase-stack/.env`, so a mismatch can come from only a few sources:
+
+1. **Stale browser session (most likely)** — A previous `install.sh` run minted a different `JWT_SECRET`. The Supabase JS client persisted that old session token in `localStorage`. On the new install the secret changed, so any request carrying the old bearer token fails with `JWSInvalidSignature`. The "login successful" alert may even be coming from a code path that swallows the error.
+2. **Running containers out of sync with `.env`** — If `docker compose up -d` was run before `.env` was rewritten, or only some services were restarted, gotrue and postgrest can end up holding different `JWT_SECRET` values.
+3. **`.env` race during build** — App `.env` written with the new `ANON`, but supabase stack still serving old secret.
 
 ## Plan
-1. Update `install.sh` Data API grant block to resolve the actual API roles before granting:
-   - Detect available roles among `authenticated`, `supabase_auth_admin`, and any PostgREST configured roles where applicable.
-   - Keep grants for `authenticated` when it exists.
-   - Add a fallback explicit grant to the effective role used by the local API if different.
 
-2. Make the verification check match real app behavior:
-   - Verify both direct grant visibility and effective privilege using `SET ROLE authenticated` when possible.
-   - If direct `has_table_privilege('authenticated', ...)` is false but the effective API role can read through the API role mapping, log a warning instead of failing.
-   - Print actionable diagnostics: role existence, inherit flag, owner, and current ACL for `public.user_roles`.
+1. **Add a runtime JWT consistency probe to `install.sh`** (after stack is up, before grants check):
+   - Read `JWT_SECRET` env from inside the `auth` (gotrue) container and the `rest` (postgrest) container.
+   - Compare both to the value in `supabase-stack/.env`.
+   - If any differ, restart the affected service(s) and re-check. If still mismatched, `die` with a clear message.
+   - Log a short prefix (first 8 chars) of each so the operator can visually confirm without leaking the full secret.
 
-3. Add a targeted migration-safe grant for the root cause table:
-   - Add/ensure explicit `GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_roles TO authenticated;`
-   - Add/ensure `GRANT ALL ON public.user_roles TO service_role;`
-   - Do not grant `anon` access to `user_roles`.
+2. **Add a self-test that signs a token and calls PostgREST**:
+   - Mint a fresh test JWT in-shell using the `JWT_SECRET` from `.env` (reusing the existing `mint_jwt` helper).
+   - `curl` `http://127.0.0.1:$SUPABASE_API_PORT/rest/v1/user_roles?select=id&limit=1` with `apikey: $ANON` and `Authorization: Bearer <test_jwt>`.
+   - Expect HTTP 200 (empty array is fine). On 401 with `JWSInvalidSignature`, surface a precise error pointing at the secret mismatch.
 
-4. Keep the change scoped to deployment/install behavior only:
-   - No frontend auth flow changes.
-   - No RLS policy widening.
-   - No public/anonymous access to role data.
+3. **Help the deployed-app user clear the stale session** (no app code logic changes):
+   - On the login page, when a `PGRST301 / JWSInvalidSignature` is detected during the post-login bootstrap query, call `supabase.auth.signOut()` and `localStorage.clear()` for Supabase keys, then prompt the user to sign in again. This converts the dead-end "alert success then bounce" into a clean recovery.
+
+4. **Document the recovery for the operator** in the installer output:
+   - After successful verification, print a one-line note: "If browsers show JWSInvalidSignature, the user has a stale session from a prior install — clear site storage or use a private window."
+
+## Scope
+
+- Backend installer: `install.sh` only (diagnostic probe + self-test + operator hint).
+- Frontend: a minimal, defensive sign-out on `PGRST301` during login bootstrap — no business logic or RLS changes.
+- No database migrations, no policy changes, no key rotation.
 
 ## Expected result
-Running `install.sh` should no longer stop at the grant verification step, and the deployed login should stop hitting `permission denied for table user_roles` once the backend stack is restarted/reloaded.
+
+After re-running `install.sh`, the installer fails fast with a precise message if `JWT_SECRET` is inconsistent across services, and a curl probe confirms PostgREST accepts a token signed by the current secret. End users who hit the error in the browser get auto-signed-out and prompted to log in again instead of bouncing silently.

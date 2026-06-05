@@ -399,6 +399,49 @@ for i in $(seq 1 30); do
 done
 
 # =============================================================================
+# 6b) JWT consistency probe — auth + postgrest MUST share JWT_SECRET
+# =============================================================================
+log "verifying JWT_SECRET consistency across auth + postgrest"
+ENV_JWT_PREFIX=$(printf '%s' "$JWT" | cut -c1-8)
+AUTH_JWT=$(docker exec dlax-auth printenv GOTRUE_JWT_SECRET 2>/dev/null || echo "")
+REST_JWT=$(docker exec dlax-rest printenv PGRST_JWT_SECRET 2>/dev/null || echo "")
+AUTH_JWT_PREFIX=$(printf '%s' "$AUTH_JWT" | cut -c1-8)
+REST_JWT_PREFIX=$(printf '%s' "$REST_JWT" | cut -c1-8)
+log "  .env JWT_SECRET prefix       => [$ENV_JWT_PREFIX...]"
+log "  dlax-auth GOTRUE_JWT_SECRET  => [$AUTH_JWT_PREFIX...]"
+log "  dlax-rest PGRST_JWT_SECRET   => [$REST_JWT_PREFIX...]"
+
+if [ "$AUTH_JWT" != "$JWT" ] || [ "$REST_JWT" != "$JWT" ]; then
+  warn "JWT_SECRET mismatch — restarting auth + rest with current .env"
+  ( cd "$SUPA" && docker compose up -d --force-recreate auth rest >/dev/null 2>&1 || true )
+  sleep 4
+  AUTH_JWT=$(docker exec dlax-auth printenv GOTRUE_JWT_SECRET 2>/dev/null || echo "")
+  REST_JWT=$(docker exec dlax-rest printenv PGRST_JWT_SECRET 2>/dev/null || echo "")
+  [ "$AUTH_JWT" = "$JWT" ] && [ "$REST_JWT" = "$JWT" ] \
+    || die "JWT_SECRET still differs between .env, dlax-auth, and dlax-rest — login will fail with JWSInvalidSignature"
+fi
+ok "JWT_SECRET consistent across .env, auth, rest"
+
+# Sign a fresh authenticated JWT and verify PostgREST accepts it
+TEST_JWT=$(mint_jwt authenticated "$JWT")
+PROBE=$(curl -s -o /tmp/dlax-rest-probe -w '%{http_code}' \
+  "http://127.0.0.1:$SUPABASE_API_PORT/rest/v1/user_roles?select=id&limit=1" \
+  -H "apikey: $ANON" -H "Authorization: Bearer $TEST_JWT" || echo 000)
+if [ "$PROBE" = "200" ]; then
+  ok "PostgREST self-test: accepted JWT signed with current JWT_SECRET (HTTP 200)"
+else
+  warn "PostgREST self-test returned HTTP $PROBE — body:"
+  cat /tmp/dlax-rest-probe 2>/dev/null || true
+  echo
+  if grep -q "JWSInvalidSignature" /tmp/dlax-rest-probe 2>/dev/null; then
+    die "PostgREST rejected a freshly-signed JWT — JWT_SECRET wiring is broken"
+  fi
+  warn "non-200 (likely RLS empty result) — continuing"
+fi
+rm -f /tmp/dlax-rest-probe
+
+
+# =============================================================================
 # 6) Seed admin user (auth user + profile + role) and verify login works
 # =============================================================================
 log "seeding admin user ($ADMIN_LOGIN_ID / $ADMIN_EMAIL)"
@@ -663,3 +706,5 @@ warn "AWS Security Group: open inbound tcp 80, $APP_PORT, $SUPABASE_API_PORT, $S
 warn "Supabase Studio on :$STUDIO_PORT is publicly reachable — protected only by basic auth. Recommend restricting :$STUDIO_PORT in your SG to admin IPs only."
 warn "Change the admin password after first login."
 warn "App login uses User ID (e.g. '$ADMIN_LOGIN_ID'), NOT the email address. Users created in Studio must have profiles.login_id set to the value typed on the login page."
+warn "If a browser shows 'JWSInvalidSignature' / PGRST301 after login, the user has a stale session from a previous install. Clear site storage for the domain or sign in from a private window."
+
