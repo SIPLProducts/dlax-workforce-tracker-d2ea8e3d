@@ -706,3 +706,5 @@ warn "AWS Security Group: open inbound tcp 80, $APP_PORT, $SUPABASE_API_PORT, $S
 warn "Supabase Studio on :$STUDIO_PORT is publicly reachable — protected only by basic auth. Recommend restricting :$STUDIO_PORT in your SG to admin IPs only."
 warn "Change the admin password after first login."
 warn "App login uses User ID (e.g. '$ADMIN_LOGIN_ID'), NOT the email address. Users created in Studio must have profiles.login_id set to the value typed on the login page."
+warn "If a browser shows 'JWSInvalidSignature' / PGRST301 after login, the user has a stale session from a previous install. Clear site storage for the domain or sign in from a private window."
+
