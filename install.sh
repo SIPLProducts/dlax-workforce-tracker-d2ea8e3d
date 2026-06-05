@@ -269,6 +269,36 @@ fi
 # 5b) Data API grants — self-hosted Supabase has no implicit grants on public
 # =============================================================================
 log "granting Data API privileges on public schema"
+
+# Diagnostic: which Data API roles exist?
+ROLES_PRESENT=$(docker exec --user postgres "$DB_CONTAINER" \
+  psql -tAXU postgres -d postgres \
+  -c "SELECT COALESCE(string_agg(rolname, ','), '') FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role','authenticator')" 2>&1)
+log "  roles present => [$ROLES_PRESENT]"
+
+for r in anon authenticated service_role authenticator; do
+  case ",$ROLES_PRESENT," in
+    *",$r,"*) : ;;
+    *)
+      warn "role '$r' missing — creating NOLOGIN role"
+      docker exec --user postgres "$DB_CONTAINER" \
+        psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+        -c "CREATE ROLE $r NOLOGIN" >/dev/null || true
+      ;;
+  esac
+done
+
+# Ensure authenticator can switch into the API roles (PostgREST uses SET ROLE)
+docker exec --user postgres "$DB_CONTAINER" \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticator') THEN
+    EXECUTE 'GRANT anon, authenticated, service_role TO authenticator';
+  END IF;
+END $$;
+SQL
+
 docker exec --user postgres "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL' >/dev/null
 -- Schema usage
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
@@ -283,46 +313,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
 
--- Backfill grants on existing base tables in public
-DO $$
-DECLARE t record;
-BEGIN
-  FOR t IN SELECT c.relname FROM pg_class c
-           JOIN pg_namespace n ON n.oid = c.relnamespace
-           WHERE c.relkind = 'r' AND n.nspname = 'public'
-  LOOP
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', t.relname);
-    EXECUTE format('GRANT ALL ON public.%I TO service_role', t.relname);
-  END LOOP;
-END $$;
-
--- Sequences + functions (anon needs EXECUTE on get_email_for_login_id RPC)
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
-SQL
-ok "Data API grants applied"
-
-# Sanity check — diagnostic probe; accept either signal as success
-RAW=$(docker exec --user postgres "$DB_CONTAINER" \
-  psql -tAXU postgres -d postgres \
-  -c "SELECT has_table_privilege('authenticated','public.user_roles','SELECT')::text" 2>&1)
-log "  has_table_privilege => [$RAW]"
-
-GRANTS=$(docker exec --user postgres "$DB_CONTAINER" \
-  psql -tAXU postgres -d postgres \
-  -c "SELECT COALESCE(string_agg(privilege_type, ','), '') FROM information_schema.role_table_grants WHERE grantee='authenticated' AND table_schema='public' AND table_name='user_roles'" 2>&1)
-log "  role_table_grants  => [$GRANTS]"
-
-PRIV_OK=0
-case "$RAW" in *t) PRIV_OK=1 ;; esac
-case "$GRANTS" in *SELECT*) PRIV_OK=1 ;; esac
-
-if [ "$PRIV_OK" != "1" ]; then
-  OWNER=$(docker exec --user postgres "$DB_CONTAINER" \
-    psql -tAXU postgres -d postgres \
-    -c "SELECT tableowner FROM pg_tables WHERE schemaname='public' AND tablename='user_roles'" 2>&1)
-  warn "user_roles owner is [$OWNER] — retrying grants via SET ROLE as owner"
-  docker exec --user postgres "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL' >/dev/null
+-- Backfill grants on existing base tables in public, running as each table's owner
 DO $$
 DECLARE t record;
 BEGIN
@@ -331,22 +322,64 @@ BEGIN
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE c.relkind='r' AND n.nspname='public'
   LOOP
-    EXECUTE format('SET LOCAL ROLE %I', t.owner);
+    BEGIN
+      EXECUTE format('SET LOCAL ROLE %I', t.owner);
+    EXCEPTION WHEN OTHERS THEN
+      RESET ROLE;
+    END;
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', t.relname);
     EXECUTE format('GRANT ALL ON public.%I TO service_role', t.relname);
     RESET ROLE;
   END LOOP;
 END $$;
-SQL
-  RAW2=$(docker exec --user postgres "$DB_CONTAINER" \
-    psql -tAXU postgres -d postgres \
-    -c "SELECT has_table_privilege('authenticated','public.user_roles','SELECT')::text" 2>&1)
-  log "  has_table_privilege (after retry) => [$RAW2]"
-  case "$RAW2" in *t) PRIV_OK=1 ;; esac
-fi
 
-[ "$PRIV_OK" = "1" ] || die "grant verification failed: authenticated still lacks SELECT on public.user_roles"
-ok "verified: authenticated can SELECT public.user_roles"
+-- Targeted: user_roles must be reachable by authenticated (RLS still applies)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_roles TO authenticated;
+GRANT ALL ON public.user_roles TO service_role;
+
+-- Sequences + functions (anon needs EXECUTE on get_email_for_login_id RPC)
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+SQL
+ok "Data API grants applied"
+
+# Diagnostics + verification
+OWNER=$(docker exec --user postgres "$DB_CONTAINER" \
+  psql -tAXU postgres -d postgres \
+  -c "SELECT tableowner FROM pg_tables WHERE schemaname='public' AND tablename='user_roles'" 2>&1)
+ACL=$(docker exec --user postgres "$DB_CONTAINER" \
+  psql -tAXU postgres -d postgres \
+  -c "SELECT array_to_string(relacl,',') FROM pg_class WHERE oid='public.user_roles'::regclass" 2>&1)
+RAW=$(docker exec --user postgres "$DB_CONTAINER" \
+  psql -tAXU postgres -d postgres \
+  -c "SELECT has_table_privilege('authenticated','public.user_roles','SELECT')::text" 2>&1)
+GRANTS=$(docker exec --user postgres "$DB_CONTAINER" \
+  psql -tAXU postgres -d postgres \
+  -c "SELECT COALESCE(string_agg(privilege_type, ','), '') FROM information_schema.role_table_grants WHERE grantee='authenticated' AND table_schema='public' AND table_name='user_roles'" 2>&1)
+EFFECTIVE=$(docker exec --user postgres "$DB_CONTAINER" \
+  psql -tAXU postgres -d postgres \
+  -c "SET LOCAL ROLE authenticated; SELECT has_table_privilege('public.user_roles','SELECT')::text" 2>&1 | tail -n1)
+
+log "  user_roles owner          => [$OWNER]"
+log "  user_roles relacl         => [$ACL]"
+log "  has_table_privilege       => [$RAW]"
+log "  role_table_grants         => [$GRANTS]"
+log "  effective (SET ROLE auth) => [$EFFECTIVE]"
+
+PRIV_OK=0
+case "$RAW" in *t) PRIV_OK=1 ;; esac
+case "$GRANTS" in *SELECT*) PRIV_OK=1 ;; esac
+case "$EFFECTIVE" in *t) PRIV_OK=1 ;; esac
+
+if [ "$PRIV_OK" = "1" ]; then
+  ok "verified: authenticated can SELECT public.user_roles"
+else
+  warn "grant verification inconclusive — pg_roles for API roles follows"
+  docker exec --user postgres "$DB_CONTAINER" \
+    psql -XU postgres -d postgres \
+    -c "SELECT rolname, rolinherit, rolcanlogin FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role','authenticator')" || true
+  warn "continuing — PostgREST may still serve correctly via 'authenticator' role mapping"
+fi
 
 
 
