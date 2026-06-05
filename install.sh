@@ -418,7 +418,12 @@ SUPABASE_SERVICE_ROLE_KEY=$SRK
 EOF
 chmod 600 "$BACKEND/.dev.vars"
 
-[ -f "$BACKEND/index.js" ] || die "missing $BACKEND/index.js (worker bundle)"
+# Nitro's cloudflare-module preset may emit the worker as index.mjs depending
+# on version — normalize to index.js so the existing wrangler launch works.
+if [ ! -f "$BACKEND/index.js" ] && [ -f "$BACKEND/index.mjs" ]; then
+  mv "$BACKEND/index.mjs" "$BACKEND/index.js"
+fi
+[ -f "$BACKEND/index.js" ]      || die "missing $BACKEND/index.js (worker bundle) — check that the nitro plugin ran during build"
 [ -f "$BACKEND/wrangler.json" ] || die "missing $BACKEND/wrangler.json"
 ok "worker bundle ready: $BACKEND/index.js"
 
