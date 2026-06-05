@@ -25,7 +25,25 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Purge any stale Supabase session on landing here. If a previous deploy
+  // signed the JWT with a different JWT_SECRET, the stored token will fail
+  // every PostgREST call with PGRST301 / JWSInvalidSignature. Clearing it
+  // before sign-in guarantees the next login uses a freshly issued token.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (!data?.user) {
+          await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        }
+      } catch {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      }
+    })();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault();
     setLoading(true);
     try {
