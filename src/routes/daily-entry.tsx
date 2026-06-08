@@ -843,11 +843,11 @@ function DailyEntryPage() {
               </colgroup>
               <thead className="bg-slate-100">
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 top-0 z-30 box-border">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] top-0 z-30 box-border">SC Code</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] top-0 z-30 box-border text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] top-0 z-30 box-border">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] top-0 z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-0 top-0 z-30 box-border">Sl.no</th>
+                  <th rowSpan={2} style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[48px] top-0 z-30 box-border">SC Code</th>
+                  <th rowSpan={2} style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[148px] top-0 z-30 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[368px] top-0 z-30 box-border">Contact No</th>
+                  <th rowSpan={2} style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[488px] top-0 z-40 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {displayGroups.map((g) => (
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-0 z-20", g.headerClass)}>{g.deptName}</th>
                   ))}
