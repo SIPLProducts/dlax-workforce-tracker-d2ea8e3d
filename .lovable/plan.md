@@ -1,24 +1,38 @@
-I checked sheet DE-000048 in the backend: the saved rows currently total 13. The mismatch shown in the screenshot is a UI/load issue, not because the saved sheet total is 39.
+## Problem
 
-Root cause to fix:
-- The Entry Sheet can still render old “Unassigned (saved earlier)” columns alongside the real current columns.
-- When those orphan columns appear, the total calculation counts them more than once, so the grid can show 39 even though Saved Entries correctly shows 13.
-- The loader is not reliably re-running when the department/category link assignments finish loading or change, so rows that should map into current columns can remain displayed as orphan columns.
+On the Approvals screen, clicking **View** correctly navigates to `/daily-entry?project=<id>&date=<date>`. The Daily Entry page picks up the `project` search param and calls `setProjectId(search.project)`. However, a second effect that loads the project list also runs on mount and contains:
 
-Plan:
-1. Update the Daily Entry load trigger
-   - Make `loadEntries()` depend on the actual displayed cell definitions, including department-category links.
-   - Avoid classifying saved rows as orphan rows before project assignment columns are ready.
+```ts
+if (data && data.length && !projectId) setProjectId(data[0].id);
+```
 
-2. Fix total calculations
-   - Count each displayed cell exactly once.
-   - Remove the extra orphan-cell summing in row totals, contractor totals, and grand totals.
-   - This will prevent inflated totals like 39 when the true saved total is 13.
+That async closure captured the initial empty `projectId`. When its `await` resolves (typically after the deep-link effect has already set the correct project), the stale check still sees `!projectId === true` and overwrites the selection with `data[0].id` — the first project in the list. Result: Daily Entry always opens the first assigned project instead of the one chosen in Approvals.
 
-3. Tighten orphan display behavior
-   - Only show “Unassigned (saved earlier)” when a saved row truly cannot be matched to any current department/category column.
-   - If the saved department/category name matches a current visible column, merge it into that current column and do not render a duplicate orphan column.
+## Fix
 
-4. Validate against the reported sheet
-   - Re-check DE-000048 after the code change so Entry Sheet total and Saved Entries total both show 13.
-   - Confirm fresh entries save and reload with the exact same entered counts.
+In `src/routes/daily-entry.tsx`, make the default-project fallback respect the deep-link search param so it cannot overwrite an explicitly requested project.
+
+Change the project-list loading effect (around lines 171–177) so it:
+- Only auto-selects `data[0].id` when there is no `search.project` in the URL.
+- Uses the functional form of `setProjectId` to avoid the stale-closure race (only set when the current value is still empty).
+
+```ts
+useEffect(() => {
+  (async () => {
+    const { data } = await supabase.from("projects").select("id,name,code").order("name");
+    setProjects(data || []);
+    if (data && data.length && !search.project) {
+      setProjectId((prev) => prev || data[0].id);
+    }
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+```
+
+No other logic changes; the deep-link effect at lines 180–191 already handles setting the project + date and switching to View mode.
+
+## Validation
+
+- From Approvals, click **View** on a sheet whose project is NOT first alphabetically → Daily Entry opens with that project preselected and the correct date in View mode.
+- Open `/daily-entry` directly (no params) → first project still auto-selects as before.
+- Switch projects manually inside Daily Entry → behavior unchanged.
