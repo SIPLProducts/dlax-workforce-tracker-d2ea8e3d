@@ -124,6 +124,11 @@ function DailyEntryPage() {
   const [orphanCells, setOrphanCells] = useState<Cell[]>([]);
   // IDs of saved daily_manpower rows that are orphan; Save preserves these.
   const orphanRowIdsRef = useRef<string[]>([]);
+  // IDs of saved daily_manpower rows whose (dept, cat) is no longer assigned
+  // but whose dept+category NAMES match a currently-assigned cell. Their
+  // headcount is folded into the matching live cell on load, and the original
+  // rows are deleted on the next Save to prevent double-counting.
+  const mergedOrphanIdsRef = useRef<string[]>([]);
 
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
