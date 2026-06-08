@@ -173,7 +173,8 @@ function ContractorsPage() {
         const name = (form.company_name || "").trim();
         let contractorId: string | null = null;
 
-        // 1) Try to find an existing contractor by code (preferred), then by name
+        // Identity key = SC Code. Only look up an existing contractor by code.
+        // Same-named contractors with different codes must remain distinct.
         if (code) {
           const { data: existingByCode } = await supabase
             .from("contractors")
@@ -183,17 +184,8 @@ function ContractorsPage() {
             .maybeSingle();
           if (existingByCode) contractorId = (existingByCode as any).id;
         }
-        if (!contractorId && name) {
-          const { data: existingByName } = await supabase
-            .from("contractors")
-            .select("id")
-            .ilike("company_name", name)
-            .limit(1)
-            .maybeSingle();
-          if (existingByName) contractorId = (existingByName as any).id;
-        }
 
-        // 2) If found, check if already assigned to this project
+        // If found by code, check if already assigned to this project
         if (contractorId) {
           const { data: existingMap } = await supabase
             .from("project_contractors")
@@ -206,7 +198,7 @@ function ContractorsPage() {
             return;
           }
         } else {
-          // 3) Create new contractor master row
+          // Create a new contractor master row (do NOT reuse by name)
           const { data, error } = await supabase.from("contractors").insert(form).select("id").single();
           if (error) {
             if ((error as any).code === "23505") {
@@ -218,7 +210,7 @@ function ContractorsPage() {
           contractorId = (data as any)?.id;
         }
 
-        // 4) Assign contractor to the current project
+        // Assign contractor to the current project
         if (contractorId) {
           const { error: e2 } = await supabase.from("project_contractors").insert({ project_id: projectId, contractor_id: contractorId });
           if (e2) {
@@ -230,6 +222,7 @@ function ContractorsPage() {
           }
         }
       }
+
       toast.success(editing ? "Updated" : "Created");
       setOpen(false); setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); load();
     } catch (err: any) { toast.error(err.message); }
@@ -331,25 +324,23 @@ function ContractorsPage() {
         return;
       }
 
-      // Project-scoped dedupe: match against contractors already on THIS project.
+      // Project-scoped dedupe by SC Code only. Same name with different
+      // code must create a new contractor row.
       const existingByCode = new Map<string, string>(); // code -> contractor_id
-      const existingByName = new Map<string, string>();
       items.forEach((c) => {
         const code = (c.contractor_code || "").trim().toLowerCase();
-        const name = (c.company_name || "").trim().toLowerCase();
         if (code) existingByCode.set(code, c.id);
-        if (name) existingByName.set(name, c.id);
       });
 
       const toUpdate: { id: string; data: any }[] = [];
       const toCreate: any[] = [];
       for (const { data } of records) {
         const code = (data.contractor_code || "").trim().toLowerCase();
-        const name = (data.company_name || "").trim().toLowerCase();
-        const existingId = (code && existingByCode.get(code)) || (name && existingByName.get(name));
+        const existingId = code ? existingByCode.get(code) : undefined;
         if (existingId) toUpdate.push({ id: existingId, data });
         else toCreate.push(data);
       }
+
 
       const failed: string[] = [];
       let createdCount = 0;
