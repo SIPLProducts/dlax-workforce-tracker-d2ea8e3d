@@ -1,28 +1,24 @@
-## Plan
+I checked sheet DE-000048 in the backend: the saved rows currently total 13. The mismatch shown in the screenshot is a UI/load issue, not because the saved sheet total is 39.
 
-1. **Fix the Daily Entry load logic**
-   - In `src/routes/daily-entry.tsx`, keep the user's currently assigned department/category columns as the source of truth.
-   - When saved rows are loaded, detect rows whose saved department/category pair is no longer displayed in the current Entry Sheet.
-   - If the old row has the same department name and category name as a current column, merge that saved value into the current visible column instead of rendering it again under **Unassigned (saved earlier)**.
-   - Only show **Unassigned (saved earlier)** for old rows that cannot be matched by name to any current column.
+Root cause to fix:
+- The Entry Sheet can still render old “Unassigned (saved earlier)” columns alongside the real current columns.
+- When those orphan columns appear, the total calculation counts them more than once, so the grid can show 39 even though Saved Entries correctly shows 13.
+- The loader is not reliably re-running when the department/category link assignments finish loading or change, so rows that should map into current columns can remain displayed as orphan columns.
 
-2. **Prevent double-counting after save**
-   - Track the IDs of old/orphan rows that were merged into current columns.
-   - On Save, after writing the current visible values, delete those merged duplicate old rows for the same sheet/date.
-   - This prevents the entered value from being added again on the next refresh.
+Plan:
+1. Update the Daily Entry load trigger
+   - Make `loadEntries()` depend on the actual displayed cell definitions, including department-category links.
+   - Avoid classifying saved rows as orphan rows before project assignment columns are ready.
 
-3. **Tighten orphan detection**
-   - Use the actual displayed column list (`allCells`) instead of a broad department × category cross-product.
-   - This avoids hidden saved rows being treated as valid when the pair is not actually shown in the table.
+2. Fix total calculations
+   - Count each displayed cell exactly once.
+   - Remove the extra orphan-cell summing in row totals, contractor totals, and grand totals.
+   - This will prevent inflated totals like 39 when the true saved total is 13.
 
-4. **Keep safety behavior for true unmatched historical data**
-   - If an old saved row cannot be matched to any current column by department/category name, keep the current read-only **Unassigned (saved earlier)** display so historical data is not silently lost.
+3. Tighten orphan display behavior
+   - Only show “Unassigned (saved earlier)” when a saved row truly cannot be matched to any current department/category column.
+   - If the saved department/category name matches a current visible column, merge it into that current column and do not render a duplicate orphan column.
 
-5. **Root-cause check result**
-   - I checked the backend data for sheet `DE-000048`: the currently saved rows total **13**, and the department/category masters do **not** currently show duplicate names.
-   - The inconsistent total is caused by the app’s existing orphan-row display/preserve logic, not by the current saved total for that sheet.
-
-## Expected result
-
-- If the user enters **13**, the Entry Sheet, Saved Entries list, refresh, and later View/Edit mode will continue showing **13**.
-- Old matching saved rows will no longer appear as extra duplicated columns or inflate totals.
+4. Validate against the reported sheet
+   - Re-check DE-000048 after the code change so Entry Sheet total and Saved Entries total both show 13.
+   - Confirm fresh entries save and reload with the exact same entered counts.

@@ -279,6 +279,10 @@ function DailyEntryPage() {
   }, [assignedDepts, assignedCats, deptCatLinks]);
 
   const allCells: Cell[] = useMemo(() => groups.flatMap((g) => g.cells), [groups]);
+  const displayedCellSignature = useMemo(
+    () => allCells.map((c) => `${c.key}:${c.deptName}:${c.catName}`).join("|"),
+    [allCells]
+  );
 
   // Display-only column set: assigned cells + orphan cells (saved earlier but
   // no longer assigned). Used for rendering and grand totals so the Entry
@@ -326,6 +330,7 @@ function DailyEntryPage() {
   // Load existing sheet for project+date
   const loadEntries = async () => {
     if (!projectId) return;
+    if (contractors.length > 0 && allCells.length === 0) return;
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
@@ -505,7 +510,7 @@ function DailyEntryPage() {
     }
   };
 
-  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, assignedDepts, assignedCats]);
+  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, displayedCellSignature]);
 
   // Load all sheets for the saved-entries table below
   const loadAllSheets = async () => {
@@ -553,7 +558,6 @@ function DailyEntryPage() {
   const rowTotal = (r: RowData) => {
     let s = 0;
     displayCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
-    orphanCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
     return s;
   };
 
@@ -565,11 +569,10 @@ function DailyEntryPage() {
       const r = rows[c.id]; if (!r) { m[c.id] = 0; return; }
       let s = 0;
       displayCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
-      orphanCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
       m[c.id] = s;
     });
     return m;
-  }, [rows, contractors, displayCells, orphanCells]);
+  }, [rows, contractors, displayCells]);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { total: 0 };
@@ -580,7 +583,7 @@ function DailyEntryPage() {
       t.total += rowTotals[c.id] || 0;
     });
     return t;
-  }, [rows, contractors, displayCells, orphanCells, rowTotals]);
+  }, [rows, contractors, displayCells, rowTotals]);
 
 
   const handleSave = async () => {
