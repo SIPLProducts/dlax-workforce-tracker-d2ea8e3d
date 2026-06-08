@@ -126,6 +126,9 @@ function DepartmentsPage() {
 
   const renderInlineForm = (key?: string) => (
     <TableRow key={key} className="border-b border-dashed border-primary/30 bg-primary/5">
+      <TableCell className="align-top py-3 font-mono text-xs text-muted-foreground">
+        {editing?.department_code || "Auto"}
+      </TableCell>
       <TableCell className="align-top py-3">
         <Input
           value={name}
@@ -181,6 +184,7 @@ function DepartmentsPage() {
       </TableCell>
     </TableRow>
   );
+
 
   return (
     <div className="space-y-6">
