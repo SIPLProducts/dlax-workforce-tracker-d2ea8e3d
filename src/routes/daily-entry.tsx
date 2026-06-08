@@ -124,6 +124,11 @@ function DailyEntryPage() {
   const [orphanCells, setOrphanCells] = useState<Cell[]>([]);
   // IDs of saved daily_manpower rows that are orphan; Save preserves these.
   const orphanRowIdsRef = useRef<string[]>([]);
+  // IDs of saved daily_manpower rows whose (dept, cat) is no longer assigned
+  // but whose dept+category NAMES match a currently-assigned cell. Their
+  // headcount is folded into the matching live cell on load, and the original
+  // rows are deleted on the next Save to prevent double-counting.
+  const mergedOrphanIdsRef = useRef<string[]>([]);
 
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
@@ -385,23 +390,28 @@ function DailyEntryPage() {
     const assignedCellKeys = new Set<string>();
     assignedDepts.forEach((d) => assignedCats.forEach((c) => assignedCellKeys.add(cellKey(d.id, c.id))));
     const orphanPairs = new Map<string, { deptId: string; catId: string }>();
-    const orphanIds: string[] = [];
+    const orphanIdsByPair = new Map<string, string[]>();
     (dm || []).forEach((rec: any) => {
       if (!rec.department_id || !rec.category_id) return;
       const ck = cellKey(rec.department_id, rec.category_id);
       if (assignedCellKeys.has(ck)) return;
-      // Also skip if a legacy-blob path produced this row but the parsed key
-      // maps to a real assigned cell — those are already represented above.
       orphanPairs.set(ck, { deptId: rec.department_id, catId: rec.category_id });
-      orphanIds.push(rec.id);
-      // Make sure the cell value is reflected on the row map (it already was
-      // by the !isLegacyBlob branch, but defensive merge in case).
+      const arr = orphanIdsByPair.get(ck) || [];
+      arr.push(rec.id);
+      orphanIdsByPair.set(ck, arr);
+      // Make sure the cell value is reflected on the row map (defensive — the
+      // !isLegacyBlob branch above already wrote it).
       const r = next[rec.contractor_id] || emptyRow();
       r.cells[ck] = r.cells[ck] || 0;
       next[rec.contractor_id] = r;
     });
-    orphanRowIdsRef.current = orphanIds;
 
+    // Resolve orphan dept/cat names so we can attempt a name-based merge into
+    // currently-assigned cells. This collapses duplicate-by-name masters or
+    // post-reassignment leftovers into a single column so View = Edit.
+    let mergedIds: string[] = [];
+    let preservedIds: string[] = [];
+    let remainingOrphanPairs = new Map(orphanPairs);
     if (orphanPairs.size > 0) {
       const deptIds = Array.from(new Set(Array.from(orphanPairs.values()).map((p) => p.deptId)));
       const catIds = Array.from(new Set(Array.from(orphanPairs.values()).map((p) => p.catId)));
@@ -411,17 +421,59 @@ function DailyEntryPage() {
       ]);
       const dn = new Map<string, string>((ds || []).map((d: any) => [d.id, d.name]));
       const cn = new Map<string, string>((cs || []).map((c: any) => [c.id, c.name]));
-      const cells: Cell[] = Array.from(orphanPairs.entries()).map(([key, p]) => ({
-        key,
-        deptId: p.deptId,
-        catId: p.catId,
-        deptName: dn.get(p.deptId) || "Unassigned",
-        catName: cn.get(p.catId) || "Unassigned",
-      })).sort((a, b) => (a.deptName + a.catName).localeCompare(b.deptName + b.catName));
-      setOrphanCells(cells);
+
+      // Build a lookup of currently-assigned cells keyed by lower(deptName)||lower(catName)
+      const liveCellByName = new Map<string, string>();
+      const deptNameById = new Map(assignedDepts.map((d) => [d.id, d.name] as const));
+      const catNameById = new Map(assignedCats.map((c) => [c.id, c.name] as const));
+      const assignedCatIdSet = new Set(assignedCats.map((c) => c.id));
+      deptCatLinks.forEach((l) => {
+        const dname = deptNameById.get(l.department_id);
+        const cname = catNameById.get(l.category_id);
+        if (!dname || !cname) return;
+        if (!assignedCatIdSet.has(l.category_id)) return;
+        const k = `${dname.trim().toLowerCase()}||${cname.trim().toLowerCase()}`;
+        if (!liveCellByName.has(k)) liveCellByName.set(k, cellKey(l.department_id, l.category_id));
+      });
+
+      Array.from(orphanPairs.entries()).forEach(([ck, p]) => {
+        const dname = dn.get(p.deptId);
+        const cname = cn.get(p.catId);
+        const ids = orphanIdsByPair.get(ck) || [];
+        if (!dname || !cname) { preservedIds.push(...ids); return; }
+        const liveKey = liveCellByName.get(`${dname.trim().toLowerCase()}||${cname.trim().toLowerCase()}`);
+        if (!liveKey) { preservedIds.push(...ids); return; }
+        // Fold the orphan headcount into the matching live cell on every row,
+        // then drop the orphan key so the row total is no longer double-counted.
+        Object.values(next).forEach((r) => {
+          const v = Number(r.cells[ck]) || 0;
+          if (v > 0) {
+            r.cells[liveKey] = (Number(r.cells[liveKey]) || 0) + v;
+          }
+          delete r.cells[ck];
+        });
+        mergedIds.push(...ids);
+        remainingOrphanPairs.delete(ck);
+      });
+
+      if (remainingOrphanPairs.size > 0) {
+        const cells: Cell[] = Array.from(remainingOrphanPairs.entries()).map(([key, p]) => ({
+          key,
+          deptId: p.deptId,
+          catId: p.catId,
+          deptName: dn.get(p.deptId) || "Unassigned",
+          catName: cn.get(p.catId) || "Unassigned",
+        })).sort((a, b) => (a.deptName + a.catName).localeCompare(b.deptName + b.catName));
+        setOrphanCells(cells);
+      } else {
+        setOrphanCells([]);
+      }
     } else {
       setOrphanCells([]);
     }
+    orphanRowIdsRef.current = preservedIds;
+    mergedOrphanIdsRef.current = mergedIds;
+
 
     setRows(next);
     setRowCount(nRows);
@@ -662,11 +714,27 @@ function DailyEntryPage() {
 
     const { error } = await supabase.from("daily_manpower").insert(inserts as any);
 
-    setSaving(false);
     if (error) {
+      setSaving(false);
       console.error("[daily-entry] insert failed", error);
       return toast.error(error.message);
     }
+
+    // Clean up orphan rows whose values were folded into matching live cells
+    // on load — otherwise reloading would double-count them.
+    if (mergedOrphanIdsRef.current.length > 0) {
+      const { error: cleanupErr } = await supabase
+        .from("daily_manpower")
+        .delete()
+        .in("id", mergedOrphanIdsRef.current);
+      if (cleanupErr) {
+        console.warn("[daily-entry] merged-orphan cleanup failed", cleanupErr);
+      } else {
+        mergedOrphanIdsRef.current = [];
+      }
+    }
+
+    setSaving(false);
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
