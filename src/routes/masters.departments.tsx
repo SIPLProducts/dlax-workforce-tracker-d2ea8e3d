@@ -151,7 +151,7 @@ function DepartmentsPage() {
                 onCheckedChange={() => toggleCategory(cat.id)}
                 className="h-4 w-4"
               />
-              <span>{cat.name}</span>
+              <span>{cat.category_code ? `${cat.category_code} — ${cat.name}` : cat.name}</span>
             </label>
           ))}
           {allCategories.length === 0 && (
