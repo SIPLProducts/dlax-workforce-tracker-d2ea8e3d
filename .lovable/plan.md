@@ -1,26 +1,28 @@
-## Problem
-In `src/routes/daily-entry.tsx`, the 5 frozen left columns use hardcoded `left-[0|48|148|368|488]px` offsets that assume widths of `48 / 100 / 220 / 120 / 160`. Those widths live only in `<colgroup>`, which browsers treat as a hint. Actual rendered widths drift with content, so when the user scrolls horizontally:
-- gaps open between two sticky columns and the scrolling non-sticky headers (e.g. "Struc Ste Wo") show through, or
-- sticky columns visually overlap each other.
+## Plan
 
-## Fix (single file: `src/routes/daily-entry.tsx`)
-Pure CSS — no data or behaviour changes.
+1. **Fix the Daily Entry load logic**
+   - In `src/routes/daily-entry.tsx`, keep the user's currently assigned department/category columns as the source of truth.
+   - When saved rows are loaded, detect rows whose saved department/category pair is no longer displayed in the current Entry Sheet.
+   - If the old row has the same department name and category name as a current column, merge that saved value into the current visible column instead of rendering it again under **Unassigned (saved earlier)**.
+   - Only show **Unassigned (saved earlier)** for old rows that cannot be matched by name to any current column.
 
-1. **Pin widths on every sticky cell.** Add `style={{ width:N, minWidth:N, maxWidth:N }}` on each sticky `<th>` (header rows) and `<td>` (body + tfoot TOTAL row) for the 5 frozen columns, matching the colgroup: 48 / 100 / 220 / 120 / 160. Keep `box-border` so the border doesn't expand the box.
-2. **Seal seams.** Add `bg-clip-padding` on sticky body cells so the background paints under the border, preventing 1px peek-through at column seams during scroll.
-3. **Layer the right divider.** Bump the `Work Place` sticky cell (header, body, tfoot) to `z-30`/`z-40` so its `border-r-2` always paints over any scrolled non-sticky cell crossing the boundary.
-4. **TOTAL row (tfoot).** Apply the same width pinning to its 5 sticky `<td>`s.
+2. **Prevent double-counting after save**
+   - Track the IDs of old/orphan rows that were merged into current columns.
+   - On Save, after writing the current visible values, delete those merged duplicate old rows for the same sheet/date.
+   - This prevents the entered value from being added again on the next refresh.
 
-## Width map
-```text
-Column         colgroup width   sticky left    pin to
-Sl.no              48              0           w/min/max = 48
-SC Code           100             48           w/min/max = 100
-Name              220            148           w/min/max = 220
-Contact No        120            368           w/min/max = 120
-Work Place        160            488           w/min/max = 160  (+ raised z)
-```
+3. **Tighten orphan detection**
+   - Use the actual displayed column list (`allCells`) instead of a broad department × category cross-product.
+   - This avoids hidden saved rows being treated as valid when the pair is not actually shown in the table.
 
-## Out of scope
-- No change to non-sticky right-side columns, totals logic, data fetching, or styling of department/category groups.
-- No change to vertical sticky header behaviour.
+4. **Keep safety behavior for true unmatched historical data**
+   - If an old saved row cannot be matched to any current column by department/category name, keep the current read-only **Unassigned (saved earlier)** display so historical data is not silently lost.
+
+5. **Root-cause check result**
+   - I checked the backend data for sheet `DE-000048`: the currently saved rows total **13**, and the department/category masters do **not** currently show duplicate names.
+   - The inconsistent total is caused by the app’s existing orphan-row display/preserve logic, not by the current saved total for that sheet.
+
+## Expected result
+
+- If the user enters **13**, the Entry Sheet, Saved Entries list, refresh, and later View/Edit mode will continue showing **13**.
+- Old matching saved rows will no longer appear as extra duplicated columns or inflate totals.
