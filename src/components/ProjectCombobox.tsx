@@ -97,7 +97,7 @@ export function ProjectCombobox({
                 </CommandItem>
               )}
               {projects.map((p) => {
-                const label = formatLabel(p);
+                const label = labelFor(p);
                 return (
                   <CommandItem
                     key={p.id}
