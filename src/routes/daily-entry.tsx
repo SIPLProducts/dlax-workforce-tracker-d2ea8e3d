@@ -172,8 +172,11 @@ function DailyEntryPage() {
     (async () => {
       const { data } = await supabase.from("projects").select("id,name,code").order("name");
       setProjects(data || []);
-      if (data && data.length && !projectId) setProjectId(data[0].id);
+      if (data && data.length && !search.project) {
+        setProjectId((prev) => prev || data[0].id);
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Deep-link support: when arriving with ?project=&date=, preselect them and force View mode.
