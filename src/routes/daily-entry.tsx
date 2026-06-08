@@ -714,11 +714,27 @@ function DailyEntryPage() {
 
     const { error } = await supabase.from("daily_manpower").insert(inserts as any);
 
-    setSaving(false);
     if (error) {
+      setSaving(false);
       console.error("[daily-entry] insert failed", error);
       return toast.error(error.message);
     }
+
+    // Clean up orphan rows whose values were folded into matching live cells
+    // on load — otherwise reloading would double-count them.
+    if (mergedOrphanIdsRef.current.length > 0) {
+      const { error: cleanupErr } = await supabase
+        .from("daily_manpower")
+        .delete()
+        .in("id", mergedOrphanIdsRef.current);
+      if (cleanupErr) {
+        console.warn("[daily-entry] merged-orphan cleanup failed", cleanupErr);
+      } else {
+        mergedOrphanIdsRef.current = [];
+      }
+    }
+
+    setSaving(false);
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
