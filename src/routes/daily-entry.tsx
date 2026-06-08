@@ -124,6 +124,7 @@ function DailyEntryPage() {
   const [orphanCells, setOrphanCells] = useState<Cell[]>([]);
   // IDs of saved daily_manpower rows that are orphan; Save preserves these.
   const orphanRowIdsRef = useRef<string[]>([]);
+  const loadSeqRef = useRef(0);
 
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
@@ -330,7 +331,13 @@ function DailyEntryPage() {
   // Load existing sheet for project+date
   const loadEntries = async () => {
     if (!projectId) return;
-    if (contractors.length > 0 && allCells.length === 0) return;
+    const loadSeq = ++loadSeqRef.current;
+    if (contractors.length > 0 && allCells.length === 0) {
+      setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
+      setOrphanCells([]);
+      orphanRowIdsRef.current = [];
+      return;
+    }
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
@@ -346,6 +353,7 @@ function DailyEntryPage() {
       supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
       supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
     ]);
+    if (loadSeq !== loadSeqRef.current) return;
     setLoading(false);
 
     const next: Record<string, RowData> = {};
