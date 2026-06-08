@@ -872,11 +872,11 @@ function DailyEntryPage() {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
-                      <td className="border text-center sticky left-0 bg-background z-20 box-border">{idx + 1}</td>
-                      <td className="border px-2 text-center sticky left-[48px] bg-background z-20 box-border truncate" title={c.contractor_code || ""}>{c.contractor_code || "—"}</td>
-                      <td className="border px-2 sticky left-[148px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
-                      <td className="border px-2 text-center sticky left-[368px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
-                      <td className="border px-2 sticky left-[488px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
+                      <td style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border text-center sticky left-0 bg-background bg-clip-padding z-20 box-border">{idx + 1}</td>
+                      <td style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border px-2 text-center sticky left-[48px] bg-background bg-clip-padding z-20 box-border truncate" title={c.contractor_code || ""}>{c.contractor_code || "—"}</td>
+                      <td style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border px-2 sticky left-[148px] bg-background bg-clip-padding z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
+                      <td style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border px-2 text-center sticky left-[368px] bg-background bg-clip-padding z-20 box-border truncate">{c.contact_number || ""}</td>
+                      <td style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border px-2 sticky left-[488px] bg-background bg-clip-padding z-30 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
                       {displayGroups.map((g) => g.cells.map((col) => {
                         const isOrphan = orphanKeySet.has(col.key);
                         const val = r.cells[col.key] || 0;
