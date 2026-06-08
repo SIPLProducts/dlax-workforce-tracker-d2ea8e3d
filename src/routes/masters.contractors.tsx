@@ -162,6 +162,7 @@ function ContractorsPage() {
   const handleSave = async () => {
     if (!requireEdit()) return;
     if (!form.company_name.trim()) { toast.error("Company name is required"); return; }
+    if (form.contact_number && !/^\d{10}$/.test(form.contact_number)) { toast.error("Contact Number must be exactly 10 digits"); return; }
     if (!editing && !projectId) { toast.error("Select a project first"); return; }
     try {
       if (editing) {
@@ -308,6 +309,10 @@ function ContractorsPage() {
           const idx = header.indexOf(col);
           if (idx >= 0) obj[col] = r[idx]?.trim() || null;
         });
+        if (obj.contact_number) {
+          const digits = String(obj.contact_number).replace(/\D/g, "").slice(0, 10);
+          obj.contact_number = digits.length === 10 ? digits : null;
+        }
         const code = (obj.contractor_code || "").trim();
         const name = (obj.company_name || "").trim();
         if (!code && !name) { emptyRowNos.push(rowNo); return; }
@@ -430,7 +435,7 @@ function ContractorsPage() {
                   <div><Label>Company Name *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
                   <div><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
                   <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-                  <div><Label>Contact Number</Label><Input value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value })} placeholder="Mobile number" /></div>
+                  <div><Label>Contact Number</Label><Input value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value.replace(/\D/g, "").slice(0, 10) })} inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" /></div>
                   <div><Label>Work Place / Location</Label><Input value={form.work_place} onChange={(e) => setForm({ ...form, work_place: e.target.value })} placeholder="e.g. Block E1, F1" /></div>
                   <div><Label>Nature of Work</Label><Input value={form.nature_of_work} onChange={(e) => setForm({ ...form, nature_of_work: e.target.value })} placeholder="e.g. Civil, Electrical, Plumbing" /></div>
                   <div><Label>License Number</Label><Input value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} /></div>
