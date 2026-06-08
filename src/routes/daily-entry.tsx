@@ -336,6 +336,7 @@ function DailyEntryPage() {
       setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
       setOrphanCells([]);
       orphanRowIdsRef.current = [];
+      setLoading(false);
       return;
     }
     setLoading(true);
