@@ -6,9 +6,174 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, X, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, X, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
+
+type ContractorForm = {
+  contractor_code: string;
+  company_name: string;
+  contact_person: string;
+  phone: string;
+  contact_number: string;
+  license_number: string;
+  work_place: string;
+  nature_of_work: string;
+};
+
+const EMPTY_CONTRACTOR_FORM: ContractorForm = {
+  contractor_code: "",
+  company_name: "",
+  contact_person: "",
+  phone: "",
+  contact_number: "",
+  license_number: "",
+  work_place: "",
+  nature_of_work: "",
+};
+
+function NewContractorDialog({
+  projectId,
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  projectId: string;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onCreated: () => void;
+}) {
+  const [form, setForm] = useState<ContractorForm>(EMPTY_CONTRACTOR_FORM);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { if (!open) setForm(EMPTY_CONTRACTOR_FORM); }, [open]);
+
+  const set = <K extends keyof ContractorForm>(k: K, v: ContractorForm[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    const name = form.company_name.trim();
+    const code = form.contractor_code.trim();
+    if (!name) { toast.error("Company name is required"); return; }
+    if (form.contact_number && !/^\d{10}$/.test(form.contact_number)) {
+      toast.error("Contact Number must be exactly 10 digits"); return;
+    }
+    if (!projectId) { toast.error("Select a project first"); return; }
+    setBusy(true);
+    try {
+      let contractorId: string | null = null;
+
+      if (code) {
+        const { data: existingByCode } = await supabase
+          .from("contractors")
+          .select("id")
+          .ilike("contractor_code", code)
+          .limit(1)
+          .maybeSingle();
+        if (existingByCode) contractorId = (existingByCode as any).id;
+      }
+
+      if (contractorId) {
+        const { data: existingMap } = await supabase
+          .from("project_contractors")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("contractor_id", contractorId)
+          .maybeSingle();
+        if (existingMap) {
+          toast.error(`Contractor ${code || name} is already assigned to this project.`);
+          setBusy(false); return;
+        }
+      } else {
+        const { data, error } = await supabase.from("contractors").insert(form).select("id").single();
+        if (error) {
+          if ((error as any).code === "23505") {
+            toast.error(`Contractor code "${code}" already exists. Please use a different code.`);
+            setBusy(false); return;
+          }
+          throw error;
+        }
+        contractorId = (data as any)?.id;
+      }
+
+      if (contractorId) {
+        const { error: e2 } = await supabase
+          .from("project_contractors")
+          .insert({ project_id: projectId, contractor_id: contractorId });
+        if (e2) {
+          if ((e2 as any).code === "23505") {
+            toast.error(`Contractor ${code || name} is already assigned to this project.`);
+            setBusy(false); return;
+          }
+          throw e2;
+        }
+      }
+
+      toast.success(`Created and assigned: ${name}`);
+      onOpenChange(false);
+      onCreated();
+    } catch (err: any) {
+      toast.error(err.message || "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>New Contractor</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label>SC Code</Label>
+            <Input value={form.contractor_code} onChange={(e) => set("contractor_code", e.target.value)} placeholder="e.g. C-001" />
+          </div>
+          <div className="space-y-1">
+            <Label>Company Name *</Label>
+            <Input value={form.company_name} onChange={(e) => set("company_name", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Contact Person</Label>
+            <Input value={form.contact_person} onChange={(e) => set("contact_person", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Phone</Label>
+            <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Contact Number</Label>
+            <Input
+              value={form.contact_number}
+              onChange={(e) => set("contact_number", e.target.value.replace(/\D/g, "").slice(0, 10))}
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="10-digit mobile number"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>License Number</Label>
+            <Input value={form.license_number} onChange={(e) => set("license_number", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Work Place</Label>
+            <Input value={form.work_place} onChange={(e) => set("work_place", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Nature of Work</Label>
+            <Input value={form.nature_of_work} onChange={(e) => set("nature_of_work", e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={handleSave} disabled={busy || !form.company_name.trim()}>Save &amp; Assign</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 type Item = { id: string; label: string };
 type Kind = "contractors" | "departments" | "categories";
@@ -206,9 +371,24 @@ function AssignmentSection({
     setBusy(false);
   };
 
+  const [newContractorOpen, setNewContractorOpen] = useState(false);
+
   return (
 
     <div className="space-y-4">
+      {kind === "contractors" && canCreate && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setNewContractorOpen(true)}>
+            <UserPlus className="mr-1 h-4 w-4" />New Contractor (full details)
+          </Button>
+          <NewContractorDialog
+            projectId={projectId}
+            open={newContractorOpen}
+            onOpenChange={setNewContractorOpen}
+            onCreated={load}
+          />
+        </div>
+      )}
       {canCreate && (
         <div className="flex gap-2 items-end">
           <div className="flex-1">
