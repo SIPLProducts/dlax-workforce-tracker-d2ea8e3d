@@ -371,9 +371,24 @@ function AssignmentSection({
     setBusy(false);
   };
 
+  const [newContractorOpen, setNewContractorOpen] = useState(false);
+
   return (
 
     <div className="space-y-4">
+      {kind === "contractors" && canCreate && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setNewContractorOpen(true)}>
+            <UserPlus className="mr-1 h-4 w-4" />New Contractor (full details)
+          </Button>
+          <NewContractorDialog
+            projectId={projectId}
+            open={newContractorOpen}
+            onOpenChange={setNewContractorOpen}
+            onCreated={load}
+          />
+        </div>
+      )}
       {canCreate && (
         <div className="flex gap-2 items-end">
           <div className="flex-1">
