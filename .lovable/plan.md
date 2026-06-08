@@ -1,36 +1,40 @@
-## Problem
+## Goal
 
-In `masters.contractors.tsx` (`handleSave`, lines ~177-219), when adding a contractor:
-1. It first looks up an existing contractor by **SC Code** (good).
-2. If not found by code, it **falls back to matching by company name** across ALL projects.
-3. If a contractor with the same name exists (from another project), it reuses that row and just links it to the new project — so the second project shows the first contractor's details (phone, contact #, contact person, license, etc.).
+On `/masters/assignments` (Contractors tab), add a **"+ New Contractor"** button that opens a dialog with the **full contractor master form** (SC Code, Company Name, Contact Person, Phone, Contact Number, License Number, Work Place, Nature of Work). On save, the new contractor is created and auto-assigned to the currently selected project.
 
-This breaks the user's intent of having distinct contractor records per project when SC Codes differ.
+The existing inline "Create new contractor" single-field row + "Add & Assign" button stays exactly as is — this is purely additive.
 
-## Fix
+## Where
 
-Treat **SC Code as the unique identity key** for matching, not company name.
+`src/components/ProjectAssignments.tsx` → `AssignmentSection` component, contractors kind only.
 
-In `handleSave` (Add flow):
-- If `contractor_code` is provided:
-  - Look up by `contractor_code` only.
-  - If found → check project link; assign to project if not already linked.
-  - If not found → create a **new** contractor row (even if another contractor with the same company name exists).
-- If `contractor_code` is empty:
-  - Keep current name-based lookup (back-compat for legacy entries without codes), OR require the code — recommended to **require a non-empty SC Code** since the whole differentiation depends on it.
+## UI
 
-Drop the `existingByName` fallback entirely.
+- Add a small `Button` ("+ New Contractor", outline/secondary) above the search box, only when `kind === "contractors"` and `canCreate` is true.
+- Clicking it opens a shadcn `Dialog` with the same fields as the Contractors master Add dialog:
+  - SC Code (`contractor_code`)
+  - Company Name (required)
+  - Contact Person
+  - Phone
+  - Contact Number (validated: optional, but if entered must be exactly 10 digits, numeric-only with sanitizing onChange — matching existing rule in `masters.contractors.tsx`)
+  - License Number
+  - Work Place
+  - Nature of Work
+- Buttons: Cancel, Save & Assign.
 
-### CSV import (lines ~334-352)
+## Save logic (mirror `handleSave` add-flow from `masters.contractors.tsx`)
 
-Apply the same rule: project-scoped dedupe key is **contractor_code only**. Remove the `existingByName` map fallback so two rows with the same name but different codes create two contractor rows.
+1. Validate `company_name` non-empty and `contact_number` format if provided.
+2. If `contractor_code` is provided, look up existing contractor by code (case-insensitive).
+   - If found → check `project_contractors`; if already linked, error "already assigned". Otherwise, insert link row only.
+   - If not found → `insert` into `contractors`, then insert into `project_contractors`.
+3. If no code → insert new contractor row, then assign.
+4. On 23505 unique-code conflict, show friendly error.
+5. On success: toast, close dialog, reset form, call `load()` so the new contractor appears in Assigned.
 
 ## Out of scope
 
-- No DB schema changes. The existing `enforce_unique_contractor_code_per_project` trigger already enforces code uniqueness per project.
-- Edit flow unchanged.
-- Other masters screens unchanged.
-
-## Open question
-
-Should SC Code become **mandatory** on the Add Contractor form? Without it, two contractors with the same name and no code are indistinguishable. Recommend: yes, require it.
+- No changes to the existing inline name-only quick-add row.
+- No changes to Departments / Categories tabs.
+- No schema changes.
+- No changes to `masters.contractors.tsx`.
