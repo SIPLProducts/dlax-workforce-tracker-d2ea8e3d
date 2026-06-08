@@ -338,6 +338,7 @@ function DailyEntryPage() {
   const loadEntries = async () => {
     if (!projectId) return;
     const loadSeq = ++loadSeqRef.current;
+    if (!contractorsReady || !assignmentsReady) return;
     if (contractors.length > 0 && allCells.length === 0) {
       setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
       setOrphanCells([]);
@@ -525,7 +526,7 @@ function DailyEntryPage() {
     }
   };
 
-  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, displayedCellSignature]);
+  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, contractorsReady, assignmentsReady, displayedCellSignature]);
 
   // Load all sheets for the saved-entries table below
   const loadAllSheets = async () => {
