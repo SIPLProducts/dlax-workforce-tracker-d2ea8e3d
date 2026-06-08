@@ -843,11 +843,11 @@ function DailyEntryPage() {
               </colgroup>
               <thead className="bg-slate-100">
                 <tr>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-0 top-0 z-30 box-border">Sl.no</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[48px] top-0 z-30 box-border">SC Code</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[148px] top-0 z-30 box-border text-left">Name of the Contractor</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[368px] top-0 z-30 box-border">Contact No</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 sticky left-[488px] top-0 z-30 box-border border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-0 top-0 z-30 box-border">Sl.no</th>
+                  <th rowSpan={2} style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[48px] top-0 z-30 box-border">SC Code</th>
+                  <th rowSpan={2} style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[148px] top-0 z-30 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[368px] top-0 z-30 box-border">Contact No</th>
+                  <th rowSpan={2} style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[488px] top-0 z-40 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {displayGroups.map((g) => (
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-0 z-20", g.headerClass)}>{g.deptName}</th>
                   ))}
@@ -872,11 +872,11 @@ function DailyEntryPage() {
                   const r = rows[c.id] || emptyRow();
                   return (
                     <tr key={c.id} className="hover:bg-muted/30">
-                      <td className="border text-center sticky left-0 bg-background z-20 box-border">{idx + 1}</td>
-                      <td className="border px-2 text-center sticky left-[48px] bg-background z-20 box-border truncate" title={c.contractor_code || ""}>{c.contractor_code || "—"}</td>
-                      <td className="border px-2 sticky left-[148px] bg-background z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
-                      <td className="border px-2 text-center sticky left-[368px] bg-background z-20 box-border truncate">{c.contact_number || ""}</td>
-                      <td className="border px-2 sticky left-[488px] bg-background z-20 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
+                      <td style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border text-center sticky left-0 bg-background bg-clip-padding z-20 box-border">{idx + 1}</td>
+                      <td style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border px-2 text-center sticky left-[48px] bg-background bg-clip-padding z-20 box-border truncate" title={c.contractor_code || ""}>{c.contractor_code || "—"}</td>
+                      <td style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border px-2 sticky left-[148px] bg-background bg-clip-padding z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
+                      <td style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border px-2 text-center sticky left-[368px] bg-background bg-clip-padding z-20 box-border truncate">{c.contact_number || ""}</td>
+                      <td style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border px-2 sticky left-[488px] bg-background bg-clip-padding z-30 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
                       {displayGroups.map((g) => g.cells.map((col) => {
                         const isOrphan = orphanKeySet.has(col.key);
                         const val = r.cells[col.key] || 0;
@@ -917,11 +917,11 @@ function DailyEntryPage() {
               {contractors.length > 0 && displayCells.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
-                    <td className="border text-center sticky left-0 bg-yellow-100 z-20 box-border">TOTAL</td>
-                    <td className="border sticky left-[48px] bg-yellow-100 z-20 box-border"></td>
-                    <td className="border sticky left-[148px] bg-yellow-100 z-20 box-border"></td>
-                    <td className="border sticky left-[368px] bg-yellow-100 z-20 box-border"></td>
-                    <td className="border sticky left-[488px] bg-yellow-100 z-20 box-border border-r-2 border-r-slate-300"></td>
+                    <td style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border text-center sticky left-0 bg-yellow-100 bg-clip-padding z-20 box-border">TOTAL</td>
+                    <td style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border sticky left-[48px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
+                    <td style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border sticky left-[148px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
+                    <td style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border sticky left-[368px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
+                    <td style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border sticky left-[488px] bg-yellow-100 bg-clip-padding z-30 box-border border-r-2 border-r-slate-300"></td>
                     {displayCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
