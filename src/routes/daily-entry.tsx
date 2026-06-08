@@ -101,9 +101,11 @@ function DailyEntryPage() {
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null; contractor_code: string | null }[]>([]);
+  const [contractorsReady, setContractorsReady] = useState(false);
   const [assignedDepts, setAssignedDepts] = useState<{ id: string; name: string }[]>([]);
   const [assignedCats, setAssignedCats] = useState<{ id: string; name: string; display_order: number }[]>([]);
   const [deptCatLinks, setDeptCatLinks] = useState<{ department_id: string; category_id: string }[]>([]);
+  const [assignmentsReady, setAssignmentsReady] = useState(false);
   const [rows, setRows] = useState<Record<string, RowData>>({});
   const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number; submitted_by: string | null } | null>(null);
   const [rowCount, setRowCount] = useState(0);
@@ -191,19 +193,21 @@ function DailyEntryPage() {
   useEffect(() => {
     const fetchContractors = async () => {
       // Strict project scope: only show contractors assigned to this project via Masters → Project Assignments.
-      if (!projectId) { setContractors([]); return; }
+      if (!projectId) { setContractors([]); setContractorsReady(true); return; }
+      setContractorsReady(false);
       const { data: joins } = await supabase
         .from("project_contractors")
         .select("contractor_id")
         .eq("project_id", projectId);
       const ids = (joins || []).map((j: any) => j.contractor_id);
-      if (ids.length === 0) { setContractors([]); return; }
+      if (ids.length === 0) { setContractors([]); setContractorsReady(true); return; }
       const { data } = await supabase
         .from("contractors")
         .select("id,company_name,contact_number,work_place,contractor_code")
         .in("id", ids)
         .order("company_name");
       setContractors(data || []);
+      setContractorsReady(true);
     };
     fetchContractors();
     const channel = supabase.channel("contractors-daily-entry")
@@ -216,7 +220,8 @@ function DailyEntryPage() {
   // Strict project scope: load assigned departments / categories / links for this project.
   useEffect(() => {
     const fetchAssignments = async () => {
-      if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); return; }
+      if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); setAssignmentsReady(true); return; }
+      setAssignmentsReady(false);
       const [{ data: pd }, { data: pc }, { data: dc }] = await Promise.all([
         supabase.from("project_departments").select("department_id").eq("project_id", projectId),
         supabase.from("project_categories").select("category_id").eq("project_id", projectId),
@@ -235,6 +240,7 @@ function DailyEntryPage() {
       setAssignedDepts(depts || []);
       setAssignedCats(cats || []);
       setDeptCatLinks(dc || []);
+      setAssignmentsReady(true);
     };
     fetchAssignments();
     const channel = supabase.channel("assignments-daily-entry")
