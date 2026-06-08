@@ -27,7 +27,7 @@ const KIND_CONFIG: Record<Kind, {
     joinTable: "project_contractors",
     joinFk: "contractor_id",
     masterTable: "contractors",
-    masterLabel: (r) => r.company_name,
+    masterLabel: (r) => r.contractor_code ? `${r.contractor_code} — ${r.company_name}` : r.company_name,
     createPermScreen: "masters_contractors",
     newPlaceholder: "New contractor company name",
   },
