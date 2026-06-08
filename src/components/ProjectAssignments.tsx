@@ -378,8 +378,8 @@ function AssignmentSection({
     <div className="space-y-4">
       {kind === "contractors" && canCreate && (
         <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setNewContractorOpen(true)}>
-            <UserPlus className="mr-1 h-4 w-4" />New Contractor (full details)
+          <Button size="sm" onClick={() => setNewContractorOpen(true)}>
+            <Plus className="mr-1 h-4 w-4" />Add & Assign
           </Button>
           <NewContractorDialog
             projectId={projectId}
@@ -389,7 +389,7 @@ function AssignmentSection({
           />
         </div>
       )}
-      {canCreate && (
+      {kind !== "contractors" && canCreate && (
         <div className="flex gap-2 items-end">
           <div className="flex-1">
             <Label className="text-xs text-muted-foreground">Create new {cfg.title.toLowerCase().slice(0, -1)}</Label>
