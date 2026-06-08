@@ -126,6 +126,9 @@ function DepartmentsPage() {
 
   const renderInlineForm = (key?: string) => (
     <TableRow key={key} className="border-b border-dashed border-primary/30 bg-primary/5">
+      <TableCell className="align-top py-3 font-mono text-xs text-muted-foreground">
+        {editing?.department_code || "Auto"}
+      </TableCell>
       <TableCell className="align-top py-3">
         <Input
           value={name}
@@ -182,6 +185,7 @@ function DepartmentsPage() {
     </TableRow>
   );
 
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -201,6 +205,7 @@ function DepartmentsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[110px]">Code</TableHead>
                 <TableHead className="w-[200px]">Name</TableHead>
                 <TableHead>Categories</TableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
@@ -213,6 +218,7 @@ function DepartmentsPage() {
                   renderInlineForm(d.id)
                 ) : (
                   <TableRow key={d.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{d.department_code || "—"}</TableCell>
                     <TableCell className="font-medium">{d.name}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -240,11 +246,12 @@ function DepartmentsPage() {
               )}
               {filtered.length === 0 && !showInlineForm && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     No categories of labour found
                   </TableCell>
                 </TableRow>
               )}
+
             </TableBody>
           </Table>
         </CardContent>

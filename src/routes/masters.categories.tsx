@@ -111,18 +111,20 @@ function CategoriesPage() {
       <Input placeholder="Search categories..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>Name</TableHead><TableHead className="w-32">Group</TableHead><TableHead className="w-24">Order</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead className="w-[110px]">Code</TableHead><TableHead>Name</TableHead><TableHead className="w-32">Group</TableHead><TableHead className="w-24">Order</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
           <TableBody>
             {filtered.map((d) => (
               <TableRow key={d.id}>
+                <TableCell className="font-mono text-xs text-muted-foreground">{d.category_code || "—"}</TableCell>
                 <TableCell className="font-medium">{d.name}</TableCell>
                 <TableCell>{d.category_group || <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell className="tabular-nums">{d.display_order || 0}</TableCell>
                 <TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => handleEdit(d)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDelete(d.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
               </TableRow>
             ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No categories found</TableCell></TableRow>}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No categories found</TableCell></TableRow>}
           </TableBody>
+
         </Table>
       </CardContent></Card>
     </div>
