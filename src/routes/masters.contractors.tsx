@@ -324,25 +324,23 @@ function ContractorsPage() {
         return;
       }
 
-      // Project-scoped dedupe: match against contractors already on THIS project.
+      // Project-scoped dedupe by SC Code only. Same name with different
+      // code must create a new contractor row.
       const existingByCode = new Map<string, string>(); // code -> contractor_id
-      const existingByName = new Map<string, string>();
       items.forEach((c) => {
         const code = (c.contractor_code || "").trim().toLowerCase();
-        const name = (c.company_name || "").trim().toLowerCase();
         if (code) existingByCode.set(code, c.id);
-        if (name) existingByName.set(name, c.id);
       });
 
       const toUpdate: { id: string; data: any }[] = [];
       const toCreate: any[] = [];
       for (const { data } of records) {
         const code = (data.contractor_code || "").trim().toLowerCase();
-        const name = (data.company_name || "").trim().toLowerCase();
-        const existingId = (code && existingByCode.get(code)) || (name && existingByName.get(name));
+        const existingId = code ? existingByCode.get(code) : undefined;
         if (existingId) toUpdate.push({ id: existingId, data });
         else toCreate.push(data);
       }
+
 
       const failed: string[] = [];
       let createdCount = 0;
