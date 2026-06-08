@@ -101,9 +101,11 @@ function DailyEntryPage() {
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [projectId, setProjectId] = useState<string>("");
   const [contractors, setContractors] = useState<{ id: string; company_name: string; contact_number: string | null; work_place: string | null; contractor_code: string | null }[]>([]);
+  const [contractorsReady, setContractorsReady] = useState(false);
   const [assignedDepts, setAssignedDepts] = useState<{ id: string; name: string }[]>([]);
   const [assignedCats, setAssignedCats] = useState<{ id: string; name: string; display_order: number }[]>([]);
   const [deptCatLinks, setDeptCatLinks] = useState<{ department_id: string; category_id: string }[]>([]);
+  const [assignmentsReady, setAssignmentsReady] = useState(false);
   const [rows, setRows] = useState<Record<string, RowData>>({});
   const [sheet, setSheet] = useState<{ id: string; sheet_code: string; status: string; current_level: number; total_levels: number; submitted_by: string | null } | null>(null);
   const [rowCount, setRowCount] = useState(0);
@@ -124,6 +126,7 @@ function DailyEntryPage() {
   const [orphanCells, setOrphanCells] = useState<Cell[]>([]);
   // IDs of saved daily_manpower rows that are orphan; Save preserves these.
   const orphanRowIdsRef = useRef<string[]>([]);
+  const loadSeqRef = useRef(0);
 
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
@@ -190,19 +193,21 @@ function DailyEntryPage() {
   useEffect(() => {
     const fetchContractors = async () => {
       // Strict project scope: only show contractors assigned to this project via Masters → Project Assignments.
-      if (!projectId) { setContractors([]); return; }
+      if (!projectId) { setContractors([]); setContractorsReady(true); return; }
+      setContractorsReady(false);
       const { data: joins } = await supabase
         .from("project_contractors")
         .select("contractor_id")
         .eq("project_id", projectId);
       const ids = (joins || []).map((j: any) => j.contractor_id);
-      if (ids.length === 0) { setContractors([]); return; }
+      if (ids.length === 0) { setContractors([]); setContractorsReady(true); return; }
       const { data } = await supabase
         .from("contractors")
         .select("id,company_name,contact_number,work_place,contractor_code")
         .in("id", ids)
         .order("company_name");
       setContractors(data || []);
+      setContractorsReady(true);
     };
     fetchContractors();
     const channel = supabase.channel("contractors-daily-entry")
@@ -215,7 +220,8 @@ function DailyEntryPage() {
   // Strict project scope: load assigned departments / categories / links for this project.
   useEffect(() => {
     const fetchAssignments = async () => {
-      if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); return; }
+      if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); setAssignmentsReady(true); return; }
+      setAssignmentsReady(false);
       const [{ data: pd }, { data: pc }, { data: dc }] = await Promise.all([
         supabase.from("project_departments").select("department_id").eq("project_id", projectId),
         supabase.from("project_categories").select("category_id").eq("project_id", projectId),
@@ -234,6 +240,7 @@ function DailyEntryPage() {
       setAssignedDepts(depts || []);
       setAssignedCats(cats || []);
       setDeptCatLinks(dc || []);
+      setAssignmentsReady(true);
     };
     fetchAssignments();
     const channel = supabase.channel("assignments-daily-entry")
@@ -279,6 +286,10 @@ function DailyEntryPage() {
   }, [assignedDepts, assignedCats, deptCatLinks]);
 
   const allCells: Cell[] = useMemo(() => groups.flatMap((g) => g.cells), [groups]);
+  const displayedCellSignature = useMemo(
+    () => allCells.map((c) => `${c.key}:${c.deptName}:${c.catName}`).join("|"),
+    [allCells]
+  );
 
   // Display-only column set: assigned cells + orphan cells (saved earlier but
   // no longer assigned). Used for rendering and grand totals so the Entry
@@ -326,6 +337,15 @@ function DailyEntryPage() {
   // Load existing sheet for project+date
   const loadEntries = async () => {
     if (!projectId) return;
+    const loadSeq = ++loadSeqRef.current;
+    if (!contractorsReady || !assignmentsReady) return;
+    if (contractors.length > 0 && allCells.length === 0) {
+      setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
+      setOrphanCells([]);
+      orphanRowIdsRef.current = [];
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
@@ -341,6 +361,7 @@ function DailyEntryPage() {
       supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
       supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
     ]);
+    if (loadSeq !== loadSeqRef.current) return;
     setLoading(false);
 
     const next: Record<string, RowData> = {};
@@ -505,7 +526,7 @@ function DailyEntryPage() {
     }
   };
 
-  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, assignedDepts, assignedCats]);
+  useEffect(() => { loadEntries(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId, date, contractors, contractorsReady, assignmentsReady, displayedCellSignature]);
 
   // Load all sheets for the saved-entries table below
   const loadAllSheets = async () => {
@@ -553,7 +574,6 @@ function DailyEntryPage() {
   const rowTotal = (r: RowData) => {
     let s = 0;
     displayCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
-    orphanCells.forEach((c) => { s += Number(r.cells[c.key]) || 0; });
     return s;
   };
 
@@ -565,11 +585,10 @@ function DailyEntryPage() {
       const r = rows[c.id]; if (!r) { m[c.id] = 0; return; }
       let s = 0;
       displayCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
-      orphanCells.forEach((col) => { s += Number(r.cells[col.key]) || 0; });
       m[c.id] = s;
     });
     return m;
-  }, [rows, contractors, displayCells, orphanCells]);
+  }, [rows, contractors, displayCells]);
 
   const colTotals = useMemo(() => {
     const t: Record<string, number> = { total: 0 };
@@ -580,7 +599,7 @@ function DailyEntryPage() {
       t.total += rowTotals[c.id] || 0;
     });
     return t;
-  }, [rows, contractors, displayCells, orphanCells, rowTotals]);
+  }, [rows, contractors, displayCells, rowTotals]);
 
 
   const handleSave = async () => {
