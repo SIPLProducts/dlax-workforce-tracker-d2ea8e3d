@@ -151,7 +151,7 @@ function DepartmentsPage() {
                 onCheckedChange={() => toggleCategory(cat.id)}
                 className="h-4 w-4"
               />
-              <span>{cat.name}</span>
+              <span>{cat.category_code ? `${cat.category_code} — ${cat.name}` : cat.name}</span>
             </label>
           ))}
           {allCategories.length === 0 && (
@@ -224,7 +224,9 @@ function DepartmentsPage() {
                       <div className="flex flex-wrap gap-1">
                         {(deptCategoryMap[d.id] || []).map((catId) => {
                           const cat = allCategories.find((c) => c.id === catId);
-                          return cat ? <Badge key={catId} variant="secondary" className="text-xs">{cat.name}</Badge> : null;
+                          if (!cat) return null;
+                          const label = cat.category_code ? `${cat.category_code} — ${cat.name}` : cat.name;
+                          return <Badge key={catId} variant="secondary" className="text-xs">{label}</Badge>;
                         })}
                         {(!deptCategoryMap[d.id] || deptCategoryMap[d.id].length === 0) && (
                           <span className="text-xs text-muted-foreground">All categories</span>
