@@ -90,14 +90,7 @@ function ProjectsPage() {
       setEditing(null);
       setForm({ name: "", code: "", division: "", project_group: "", location: "", start_date: "", status: "Active" });
       load();
-    } catch (err: any) {
-      const msg = String(err?.message || "");
-      if (/duplicate key|unique/i.test(msg) && /code/i.test(msg)) {
-        toast.error("A project with this code already exists. Please use a different code.");
-      } else {
-        toast.error(msg || "Save failed");
-      }
-    }
+    } catch (err: any) { toast.error(err.message); }
   };
 
   const handleEdit = (p: any) => {

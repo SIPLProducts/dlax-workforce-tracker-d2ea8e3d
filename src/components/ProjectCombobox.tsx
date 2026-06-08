@@ -39,22 +39,11 @@ export function ProjectCombobox({
 }: Props) {
   const [open, setOpen] = useState(false);
 
-  // If multiple projects render to the same label, append a short id suffix so the user can tell them apart.
-  const labelCounts = new Map<string, number>();
-  for (const p of projects) {
-    const l = formatLabel(p);
-    labelCounts.set(l, (labelCounts.get(l) || 0) + 1);
-  }
-  const labelFor = (p: ProjectOption) => {
-    const base = formatLabel(p);
-    return (labelCounts.get(base) || 0) > 1 ? `${base} · #${p.id.slice(0, 4)}` : base;
-  };
-
   const selected =
     includeAllOption && value === "all"
       ? allLabel
       : projects.find((p) => p.id === value)
-      ? labelFor(projects.find((p) => p.id === value)!)
+      ? formatLabel(projects.find((p) => p.id === value)!)
       : "";
 
   return (
@@ -97,7 +86,7 @@ export function ProjectCombobox({
                 </CommandItem>
               )}
               {projects.map((p) => {
-                const label = labelFor(p);
+                const label = formatLabel(p);
                 return (
                   <CommandItem
                     key={p.id}
