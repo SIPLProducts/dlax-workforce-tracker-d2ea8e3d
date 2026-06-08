@@ -287,18 +287,21 @@ export type Database = {
       departments: {
         Row: {
           created_at: string
+          department_code: string | null
           id: string
           name: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          department_code?: string | null
           id?: string
           name: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          department_code?: string | null
           id?: string
           name?: string
           updated_at?: string
@@ -748,6 +751,7 @@ export type Database = {
       }
       worker_categories: {
         Row: {
+          category_code: string | null
           category_group: string | null
           created_at: string
           display_order: number
@@ -756,6 +760,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category_code?: string | null
           category_group?: string | null
           created_at?: string
           display_order?: number
@@ -764,6 +769,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category_code?: string | null
           category_group?: string | null
           created_at?: string
           display_order?: number
