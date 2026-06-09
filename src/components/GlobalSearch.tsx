@@ -323,7 +323,7 @@ export function GlobalSearch() {
         </kbd>
       </div>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
           id="global-search-panel"
           style={{ position: "fixed", top: panelPos.top, left: panelPos.left, width: panelPos.width }}
