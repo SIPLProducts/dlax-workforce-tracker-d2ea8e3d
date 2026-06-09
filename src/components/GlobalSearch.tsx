@@ -35,7 +35,7 @@ async function searchAll(term: string): Promise<Result[]> {
   if (q.length < 2) return [];
   const like = `%${q}%`;
 
-  const [projects, contractors, depts, cats, sheets] = await Promise.all([
+  const [projects, contractors, depts, cats, sheets, users] = await Promise.all([
     supabase
       .from("projects")
       .select("id,name,code,project_group")
@@ -67,6 +67,12 @@ async function searchAll(term: string): Promise<Result[]> {
       .select("id,sheet_code,entry_date,project_id,project:projects(name,code)")
       .ilike("sheet_code", like)
       .order("entry_date", { ascending: false })
+      .limit(LIMIT),
+    supabase
+      .from("profiles")
+      .select("user_id,login_id,display_name,email")
+      .or(`login_id.ilike.${like},display_name.ilike.${like},email.ilike.${like}`)
+      .order("login_id")
       .limit(LIMIT),
   ]);
 
