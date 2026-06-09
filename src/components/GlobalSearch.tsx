@@ -392,6 +392,30 @@ export function GlobalSearch() {
               </CommandGroup>
             </>
           )}
+
+          {groups.user.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Users">
+                {groups.user.map((r) => (
+                  <CommandItem
+                    key={`u-${r.id}`}
+                    value={`user ${r.title} ${r.subtitle || ""}`}
+                    onSelect={() => handleSelect(r)}
+                  >
+                    <User className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{r.title}</span>
+                      {r.subtitle && (
+                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                      )}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
         </CommandList>
       </CommandDialog>
     </>
