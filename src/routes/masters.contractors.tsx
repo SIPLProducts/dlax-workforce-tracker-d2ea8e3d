@@ -19,10 +19,15 @@ import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectCombobox, type ProjectOption } from "@/components/ProjectCombobox";
+import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 const LS_PROJECT_KEY = "masters_contractors_project_id";
 
 export const Route = createFileRoute("/masters/contractors")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    project: typeof search.project === "string" ? search.project : undefined,
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   component: () => <ScreenGuard screen="masters_contractors"><ContractorsPage /></ScreenGuard>,
 });
 
@@ -582,7 +587,7 @@ function ContractorsPage() {
             <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {filtered.map((c) => (
-                <TableRow key={c.id}>
+                <TableRow key={c.id} data-row-id={c.id}>
                   <TableCell className="font-mono text-xs">{c.contractor_code || "—"}</TableCell>
                   <TableCell className="font-medium">{c.company_name}</TableCell>
                   <TableCell>{c.contact_person || "—"}</TableCell>
