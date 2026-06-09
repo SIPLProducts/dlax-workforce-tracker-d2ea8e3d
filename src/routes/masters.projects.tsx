@@ -19,6 +19,9 @@ import { ProjectAssignments } from "@/components/ProjectAssignments";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/masters/projects")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   component: () => <ScreenGuard screen="masters_projects"><ProjectsPage /></ScreenGuard>,
 });
 
