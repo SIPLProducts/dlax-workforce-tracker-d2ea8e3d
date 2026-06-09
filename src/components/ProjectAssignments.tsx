@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Plus, X, Search } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useAuth } from "@/hooks/use-auth";
 
 type ContractorForm = {
   contractor_code: string;
