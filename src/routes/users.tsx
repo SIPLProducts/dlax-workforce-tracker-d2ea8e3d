@@ -21,10 +21,15 @@ import { adminCreateUser } from "@/utils/admin-users.functions";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/users")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   component: () => <ScreenGuard screen="user_management"><UsersPage /></ScreenGuard>,
 });
+
 
 type UserWithRoles = {
   user_id: string;
