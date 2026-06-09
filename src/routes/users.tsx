@@ -80,6 +80,8 @@ function UsersPage() {
   const { canEdit } = usePermissions();
   const canManageUsers = isAdmin || canEdit("user_management");
 
+  useHighlightRow(users.map((u) => ({ id: u.user_id })));
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
