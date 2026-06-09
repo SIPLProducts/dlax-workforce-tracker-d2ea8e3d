@@ -21,6 +21,7 @@ const SYSTEM_BASELINE: Record<string, Partial<Record<ScreenKey, PermissionLevel>
   },
   project_coordinator: {
     dashboard: "view", approvals: "edit", reports: "view",
+    masters_assignments: "edit",
   },
   project_manager: {
     dashboard: "view", approvals: "edit", reports: "view",

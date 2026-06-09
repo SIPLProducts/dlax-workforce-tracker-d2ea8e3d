@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Plus, X, Search } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/hooks/use-auth";
 
 type ContractorForm = {
   contractor_code: string;
@@ -262,8 +263,10 @@ function AssignmentSection({
 }) {
   const cfg = KIND_CONFIG[kind];
   const { canEdit } = usePermissions();
-  const canCreate = canEdit(cfg.createPermScreen);
-  const canAssign = canEdit("masters_projects");
+  const { hasRole } = useAuth();
+  const isAssignmentsAdmin = hasRole("admin") || hasRole("project_coordinator");
+  const canCreate = isAssignmentsAdmin || canEdit(cfg.createPermScreen);
+  const canAssign = isAssignmentsAdmin || canEdit("masters_projects");
 
   const [all, setAll] = useState<Item[]>([]);
   const [assigned, setAssigned] = useState<Set<string>>(new Set());
