@@ -303,9 +303,9 @@ export function GlobalSearch() {
       </div>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden">
-          <Command shouldFilter={false} className="bg-transparent">
-            <CommandList className="max-h-[55vh]">
+        <div className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden">
+          <Command shouldFilter={false} className="bg-popover">
+            <CommandList className="max-h-[55vh] bg-popover">
               {query.trim().length < 2 ? (
                 <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>
               ) : loading ? (
