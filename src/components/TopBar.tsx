@@ -14,6 +14,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { ChevronRight, LogOut, User } from "lucide-react";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { useMemo } from "react";
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -75,8 +76,10 @@ export function TopBar() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-2">
+          <GlobalSearch />
           <ThemeSwitcher />
+
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -16,8 +16,12 @@ import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectAssignments } from "@/components/ProjectAssignments";
+import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/masters/projects")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   component: () => <ScreenGuard screen="masters_projects"><ProjectsPage /></ScreenGuard>,
 });
 
@@ -67,6 +71,8 @@ function ProjectsPage() {
   };
 
   useEffect(() => { load(); }, []);
+  useHighlightRow(projects);
+
 
   const load = async () => {
     const { data } = await supabase.from("projects").select("*").order("name");
@@ -335,7 +341,7 @@ function ProjectsPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((p) => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} data-row-id={p.id}>
                   <TableCell className="font-mono text-sm">{p.code || "—"}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>{p.project_group || "—"}</TableCell>

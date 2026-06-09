@@ -12,8 +12,12 @@ import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/masters/departments")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   component: () => <ScreenGuard screen="masters_departments"><DepartmentsPage /></ScreenGuard>,
 });
 
@@ -37,6 +41,8 @@ function DepartmentsPage() {
   };
 
   useEffect(() => { load(); }, []);
+  useHighlightRow(items);
+
 
   const load = async () => {
     const [deptRes, catRes, linkRes] = await Promise.all([
@@ -217,7 +223,7 @@ function DepartmentsPage() {
                 editing?.id === d.id ? (
                   renderInlineForm(d.id)
                 ) : (
-                  <TableRow key={d.id}>
+                  <TableRow key={d.id} data-row-id={d.id}>
                     <TableCell className="font-mono text-xs text-muted-foreground">{d.department_code || "—"}</TableCell>
                     <TableCell className="font-medium">{d.name}</TableCell>
                     <TableCell>
