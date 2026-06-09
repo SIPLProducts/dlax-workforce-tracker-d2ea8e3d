@@ -1,42 +1,42 @@
 ## Problem
 
-Global Search currently covers Projects, Contractors, Departments, Categories, and Daily Entry Sheets — but not users from the User Management screen. Users want to search by User ID / display name / email and jump straight to the matched row in `/users` with the existing highlight ring.
+The Global Search currently opens as a centered modal dialog (`CommandDialog`) that dims the page and floats in the middle of the viewport. The user wants it to behave like a typical search autocomplete (Amazon-style): the results dropdown anchors directly **below the search input** in the top bar, with no backdrop overlay, while the input itself stays in place and acts as the typing field.
 
 ## Change
 
-### 1. `src/components/GlobalSearch.tsx`
-- Extend the `Result` union with a `"user"` kind: `{ kind: "user"; id: string; title: string; subtitle?: string }`.
-- In `searchAll`, add a parallel query against `profiles`:
-  ```
-  supabase.from("profiles")
-    .select("user_id, login_id, display_name, email")
-    .or(`login_id.ilike.${like},display_name.ilike.${like},email.ilike.${like}`)
-    .order("login_id")
-    .limit(LIMIT)
-  ```
-  Map each row to `{ kind: "user", id: row.user_id, title: row.display_name || row.login_id || row.email, subtitle: [login_id, email].filter(Boolean).join(" · ") }`.
-- Add a `user` group to the `groups` memo and render a new `CommandGroup heading="Users"` using the existing `UserPlus` (or `User`) lucide icon, matching the style of other groups.
-- In `handleSelect`, add a `case "user"` that navigates: `navigate({ to: "/users", search: { highlight: r.id } as any })`.
-- Non-admins typically can't read other profiles via RLS, so results naturally scope themselves; no extra gating needed in the client.
+### `src/components/GlobalSearch.tsx` — replace `CommandDialog` with an anchored popover
 
-### 2. `src/routes/users.tsx`
-- Add `data-row-id={u.user_id}` to the `<TableRow>` in the Users tab (line ~418) so the highlight hook can find it.
-- Import and call `useHighlightRow(users.map(u => ({ id: u.user_id })))` inside `UsersPage`, mirroring how other masters screens use it.
-- No change to permissions, fetching, or layout.
+Convert the trigger button into an actual `Input` (the search field) and render the results panel as a floating dropdown directly beneath it.
 
-### 3. No other changes
-- `use-highlight-row.ts` already supports persistent highlight + dismiss-on-interaction — reuse as-is.
-- No DB / RLS / migration changes.
-- No route, sidebar, or styling changes.
+- Replace the outer `Button` trigger + `CommandDialog` with:
+  - A relatively-positioned wrapper `div` containing:
+    - An `Input` (with a left `Search` icon and right `⌘K` kbd hint) — this is the visible field, matching the current width (`md:w-64`+).
+    - A conditionally rendered results panel: `absolute top-full left-0 right-0 mt-2 rounded-md border bg-popover text-popover-foreground shadow-lg z-50 max-h-[60vh] overflow-hidden`.
+  - The panel uses the existing `Command` primitive (without `CommandInput`, since the outer `Input` drives the query) wrapping the existing `CommandList` + `CommandGroup`s unchanged.
+- State: keep `open`, `query`, `results`, `loading`. Open the panel when the input is focused **or** the user has typed ≥1 char; close on:
+  - `Escape` keydown on the input,
+  - click outside (attach a `mousedown` listener on `document` that checks a `ref` on the wrapper),
+  - selecting a result (existing `handleSelect` already calls `setOpen(false)`).
+- Keep the existing `⌘K` global shortcut, but make it focus the input (`inputRef.current?.focus()`) and open the panel instead of toggling a dialog.
+- Keep all existing search logic, debouncing, result grouping, icons, and `handleSelect` navigation untouched.
+- No backdrop / no dimming — the page stays interactive, only the dropdown appears.
+
+### Styling details (match reference)
+
+- Input height `h-9`, rounded, border, muted placeholder "Search anything…".
+- Dropdown: white/popover background, soft shadow, ~`max-h-[60vh]`, internal scroll via `CommandList` (already has `max-h-[300px]` — bump via `className` to `max-h-[55vh]`).
+- Group headings, separators, and item hover styles remain as-is (already styled via `command.tsx`).
+- On mobile (`<md`), the input collapses to icon-only as today; tapping it expands focus and the dropdown anchors below the top bar — no full-screen modal.
+
+### Out of scope
+
+- No changes to `command.tsx`, no changes to `TopBar.tsx` layout, no changes to search logic, results, or navigation targets.
+- No new dependencies.
 
 ## Verification
 
-- Open Global Search (⌘K), type a login ID / display name / email substring → a "Users" group appears with matching profiles.
-- Selecting a user navigates to `/users`, the matching row scrolls into view and shows the persistent ring highlight.
-- Clicking elsewhere / pressing a key / navigating away clears the highlight and removes `?highlight=` from the URL.
-- Non-admins (no access to `/users`) either see no user results (RLS) or are blocked by `ScreenGuard` on arrival — no regression.
-
-## Out of scope
-
-- No changes to the System Roles / Custom Roles tabs (search targets the Users tab only).
-- No new search filters, no fuzzy ranking changes, no styling token changes.
+- Click the search field in the top bar → dropdown opens directly below it; the rest of the page is **not** dimmed and remains scrollable/interactive.
+- Type ≥2 chars → grouped results render in the dropdown; arrow keys + Enter still navigate/select.
+- Press `Escape` or click outside → dropdown closes, input retains its value until cleared.
+- Press `⌘K` / `Ctrl+K` anywhere → input focuses and dropdown opens.
+- Selecting a result → navigates as before and dropdown closes.

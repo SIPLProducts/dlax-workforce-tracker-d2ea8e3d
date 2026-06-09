@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  CommandDialog,
+  Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Search, Briefcase, HardHat, Layers, Tag, FileText, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -76,8 +75,6 @@ async function searchAll(term: string): Promise<Result[]> {
       .limit(LIMIT),
   ]);
 
-  // For contractors, look up one project they belong to (so the contractors
-  // page can preselect it — that page is project-scoped).
   const contractorRows = contractors.data || [];
   let contractorProjectMap: Record<string, string> = {};
   if (contractorRows.length) {
@@ -109,11 +106,7 @@ async function searchAll(term: string): Promise<Result[]> {
       kind: "contractor",
       id: c.id,
       title: c.company_name,
-      subtitle: [
-        c.contractor_code,
-        c.contact_person,
-        c.contact_number || c.phone,
-      ]
+      subtitle: [c.contractor_code, c.contact_person, c.contact_number || c.phone]
         .filter(Boolean)
         .join(" · "),
       projectId: contractorProjectMap[c.id],
@@ -168,22 +161,37 @@ export function GlobalSearch() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const reqId = useRef(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut: Cmd/Ctrl + K
+  // Keyboard shortcut: Cmd/Ctrl + K — focus the input and open the dropdown
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        inputRef.current?.focus();
+        setOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Debounced query
+  // Click outside closes the dropdown
   useEffect(() => {
     if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  // Debounced query
+  useEffect(() => {
     const term = query.trim();
     if (term.length < 2) {
       setResults([]);
@@ -201,7 +209,7 @@ export function GlobalSearch() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [query, open]);
+  }, [query]);
 
   const groups = useMemo(() => {
     return {
@@ -246,172 +254,182 @@ export function GlobalSearch() {
   };
 
   return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-9 gap-2 text-muted-foreground justify-start px-2 md:px-3 md:w-64"
-        onClick={() => setOpen(true)}
-        aria-label="Open global search"
-      >
-        <Search className="h-4 w-4" />
-        <span className="hidden md:inline text-sm">Search anything…</span>
-        <kbd className="hidden md:inline ml-auto pointer-events-none select-none rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+    <div ref={wrapperRef} className="relative w-full md:w-72">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              inputRef.current?.blur();
+            }
+          }}
+          placeholder="Search anything…"
+          aria-label="Global search"
+          className="h-9 pl-8 pr-12"
+        />
+        <kbd className="hidden md:inline-flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none select-none items-center rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           ⌘K
         </kbd>
-      </Button>
+      </div>
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput
-          placeholder="Search projects, contractors, SC codes, sheets…"
-          value={query}
-          onValueChange={setQuery}
-        />
-        <CommandList>
-          {query.trim().length < 2 ? (
-            <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>
-          ) : loading ? (
-            <CommandEmpty>Searching…</CommandEmpty>
-          ) : results.length === 0 ? (
-            <CommandEmpty>No results found.</CommandEmpty>
-          ) : null}
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden">
+          <Command shouldFilter={false} className="bg-transparent">
+            <CommandList className="max-h-[55vh]">
+              {query.trim().length < 2 ? (
+                <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>
+              ) : loading ? (
+                <CommandEmpty>Searching…</CommandEmpty>
+              ) : results.length === 0 ? (
+                <CommandEmpty>No results found.</CommandEmpty>
+              ) : null}
 
-          {groups.project.length > 0 && (
-            <CommandGroup heading="Projects">
-              {groups.project.map((r) => (
-                <CommandItem
-                  key={`p-${r.id}`}
-                  value={`project ${r.title} ${r.subtitle || ""}`}
-                  onSelect={() => handleSelect(r)}
-                >
-                  <Briefcase className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
-                  <div className="flex flex-col">
-                    <span className="font-medium">{r.title}</span>
-                    {r.subtitle && (
-                      <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
+              {groups.project.length > 0 && (
+                <CommandGroup heading="Projects">
+                  {groups.project.map((r) => (
+                    <CommandItem
+                      key={`p-${r.id}`}
+                      value={`project ${r.title} ${r.subtitle || ""}`}
+                      onSelect={() => handleSelect(r)}
+                    >
+                      <Briefcase className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">{r.title}</span>
+                        {r.subtitle && (
+                          <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
 
-          {groups.contractor.length > 0 && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Contractors">
-                {groups.contractor.map((r) => (
-                  <CommandItem
-                    key={`c-${r.id}`}
-                    value={`contractor ${r.title} ${r.subtitle || ""}`}
-                    onSelect={() => handleSelect(r)}
-                  >
-                    <HardHat className="mr-2 h-4 w-4 text-accent group-data-[selected=true]:text-accent-foreground" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{r.title}</span>
-                      {r.subtitle && (
-                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
+              {groups.contractor.length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Contractors">
+                    {groups.contractor.map((r) => (
+                      <CommandItem
+                        key={`c-${r.id}`}
+                        value={`contractor ${r.title} ${r.subtitle || ""}`}
+                        onSelect={() => handleSelect(r)}
+                      >
+                        <HardHat className="mr-2 h-4 w-4 text-accent group-data-[selected=true]:text-accent-foreground" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{r.title}</span>
+                          {r.subtitle && (
+                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
 
-          {groups.department.length > 0 && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Category of Labour">
-                {groups.department.map((r) => (
-                  <CommandItem
-                    key={`d-${r.id}`}
-                    value={`department ${r.title} ${r.subtitle || ""}`}
-                    onSelect={() => handleSelect(r)}
-                  >
-                    <Layers className="mr-2 h-4 w-4 text-chart-3 group-data-[selected=true]:text-accent-foreground" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{r.title}</span>
-                      {r.subtitle && (
-                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
+              {groups.department.length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Category of Labour">
+                    {groups.department.map((r) => (
+                      <CommandItem
+                        key={`d-${r.id}`}
+                        value={`department ${r.title} ${r.subtitle || ""}`}
+                        onSelect={() => handleSelect(r)}
+                      >
+                        <Layers className="mr-2 h-4 w-4 text-chart-3 group-data-[selected=true]:text-accent-foreground" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{r.title}</span>
+                          {r.subtitle && (
+                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
 
-          {groups.category.length > 0 && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Categories">
-                {groups.category.map((r) => (
-                  <CommandItem
-                    key={`cat-${r.id}`}
-                    value={`category ${r.title} ${r.subtitle || ""}`}
-                    onSelect={() => handleSelect(r)}
-                  >
-                    <Tag className="mr-2 h-4 w-4 text-chart-4 group-data-[selected=true]:text-accent-foreground" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{r.title}</span>
-                      {r.subtitle && (
-                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
+              {groups.category.length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Categories">
+                    {groups.category.map((r) => (
+                      <CommandItem
+                        key={`cat-${r.id}`}
+                        value={`category ${r.title} ${r.subtitle || ""}`}
+                        onSelect={() => handleSelect(r)}
+                      >
+                        <Tag className="mr-2 h-4 w-4 text-chart-4 group-data-[selected=true]:text-accent-foreground" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{r.title}</span>
+                          {r.subtitle && (
+                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
 
-          {groups.sheet.length > 0 && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Daily Entry Sheets">
-                {groups.sheet.map((r) => (
-                  <CommandItem
-                    key={`s-${r.id}`}
-                    value={`sheet ${r.title} ${r.subtitle || ""}`}
-                    onSelect={() => handleSelect(r)}
-                  >
-                    <FileText className="mr-2 h-4 w-4 text-chart-2 group-data-[selected=true]:text-accent-foreground" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{r.title}</span>
-                      {r.subtitle && (
-                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
+              {groups.sheet.length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Daily Entry Sheets">
+                    {groups.sheet.map((r) => (
+                      <CommandItem
+                        key={`s-${r.id}`}
+                        value={`sheet ${r.title} ${r.subtitle || ""}`}
+                        onSelect={() => handleSelect(r)}
+                      >
+                        <FileText className="mr-2 h-4 w-4 text-chart-2 group-data-[selected=true]:text-accent-foreground" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{r.title}</span>
+                          {r.subtitle && (
+                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
 
-          {groups.user.length > 0 && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Users">
-                {groups.user.map((r) => (
-                  <CommandItem
-                    key={`u-${r.id}`}
-                    value={`user ${r.title} ${r.subtitle || ""}`}
-                    onSelect={() => handleSelect(r)}
-                  >
-                    <User className="mr-2 h-4 w-4 text-chart-5 group-data-[selected=true]:text-accent-foreground" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{r.title}</span>
-                      {r.subtitle && (
-                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
-        </CommandList>
-      </CommandDialog>
-    </>
+              {groups.user.length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Users">
+                    {groups.user.map((r) => (
+                      <CommandItem
+                        key={`u-${r.id}`}
+                        value={`user ${r.title} ${r.subtitle || ""}`}
+                        onSelect={() => handleSelect(r)}
+                      >
+                        <User className="mr-2 h-4 w-4 text-chart-5 group-data-[selected=true]:text-accent-foreground" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{r.title}</span>
+                          {r.subtitle && (
+                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+            </CommandList>
+          </Command>
+        </div>
+      )}
+    </div>
   );
 }
