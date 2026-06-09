@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Command,
@@ -322,7 +323,7 @@ export function GlobalSearch() {
         </kbd>
       </div>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
           id="global-search-panel"
           style={{ position: "fixed", top: panelPos.top, left: panelPos.left, width: panelPos.width }}
@@ -474,7 +475,8 @@ export function GlobalSearch() {
               )}
             </CommandList>
           </Command>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
