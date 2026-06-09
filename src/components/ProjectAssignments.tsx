@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Plus, X, Search } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useAuth } from "@/hooks/use-auth";
 
 type ContractorForm = {
   contractor_code: string;
@@ -263,8 +262,7 @@ function AssignmentSection({
 }) {
   const cfg = KIND_CONFIG[kind];
   const { canEdit } = usePermissions();
-  const { hasRole } = useAuth();
-  const isAssignmentsAdmin = hasRole("admin") || hasRole("project_coordinator");
+  const isAssignmentsAdmin = canEdit("masters_assignments");
   const canCreate = isAssignmentsAdmin || canEdit(cfg.createPermScreen);
   const canAssign = isAssignmentsAdmin || canEdit("masters_projects");
 
