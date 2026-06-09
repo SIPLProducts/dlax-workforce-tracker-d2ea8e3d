@@ -81,6 +81,8 @@ function UsersPage() {
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
 
   const isAdmin = hasRole("admin");
+  useHighlightRow(users.map((u) => ({ id: u.user_id })));
+
   const { canEdit } = usePermissions();
   const canManageUsers = isAdmin || canEdit("user_management");
 
