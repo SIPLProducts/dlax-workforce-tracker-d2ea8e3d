@@ -475,7 +475,8 @@ export function GlobalSearch() {
               )}
             </CommandList>
           </Command>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
