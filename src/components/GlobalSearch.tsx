@@ -25,7 +25,8 @@ type Result =
       subtitle?: string;
       projectId: string;
       date: string;
-    };
+    }
+  | { kind: "user"; id: string; title: string; subtitle?: string };
 
 const LIMIT = 8;
 
