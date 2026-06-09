@@ -10,7 +10,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Search, Briefcase, HardHat, Layers, Tag, FileText } from "lucide-react";
+import { Search, Briefcase, HardHat, Layers, Tag, FileText, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Result =
