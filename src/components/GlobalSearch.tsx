@@ -181,6 +181,7 @@ export function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const navigate = useNavigate();
   const reqId = useRef(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -203,14 +204,33 @@ export function GlobalSearch() {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!wrapperRef.current) return;
-      if (!wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (wrapperRef.current?.contains(target)) return;
+      const panel = document.getElementById("global-search-panel");
+      if (panel?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+
+  // Position the fixed overlay just below the input; track resize/scroll
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const el = wrapperRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPanelPos({ top: r.bottom + 8, left: r.left, width: r.width });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, results.length]);
 
   // Debounced query
   useEffect(() => {
