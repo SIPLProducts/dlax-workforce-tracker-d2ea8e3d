@@ -1,42 +1,49 @@
 ## Problem
 
-The Global Search currently opens as a centered modal dialog (`CommandDialog`) that dims the page and floats in the middle of the viewport. The user wants it to behave like a typical search autocomplete (Amazon-style): the results dropdown anchors directly **below the search input** in the top bar, with no backdrop overlay, while the input itself stays in place and acts as the typing field.
+Global Search shows the same record multiple times — e.g. "KVV Satyanarayana Works Contractor (SC8687)" appears twice. Root cause: the underlying tables contain real duplicate rows (same `company_name` + `contractor_code` with different `id`s). The current `searchAll` in `src/components/GlobalSearch.tsx` pushes every row returned by Supabase straight into the results list, so any logical duplicate in the data is shown to the user.
+
+This affects all kinds (projects, contractors, departments, categories, users), not just contractors, since the same pattern is used for each.
 
 ## Change
 
-### `src/components/GlobalSearch.tsx` — replace `CommandDialog` with an anchored popover
+### `src/components/GlobalSearch.tsx` — application-level dedup per kind
 
-Convert the trigger button into an actual `Input` (the search field) and render the results panel as a floating dropdown directly beneath it.
+After fetching each result set and before pushing into `out`, filter rows through a per-kind `Set<string>` keyed by a normalized identity (lowercased, trimmed). First occurrence wins; later duplicates are skipped.
 
-- Replace the outer `Button` trigger + `CommandDialog` with:
-  - A relatively-positioned wrapper `div` containing:
-    - An `Input` (with a left `Search` icon and right `⌘K` kbd hint) — this is the visible field, matching the current width (`md:w-64`+).
-    - A conditionally rendered results panel: `absolute top-full left-0 right-0 mt-2 rounded-md border bg-popover text-popover-foreground shadow-lg z-50 max-h-[60vh] overflow-hidden`.
-  - The panel uses the existing `Command` primitive (without `CommandInput`, since the outer `Input` drives the query) wrapping the existing `CommandList` + `CommandGroup`s unchanged.
-- State: keep `open`, `query`, `results`, `loading`. Open the panel when the input is focused **or** the user has typed ≥1 char; close on:
-  - `Escape` keydown on the input,
-  - click outside (attach a `mousedown` listener on `document` that checks a `ref` on the wrapper),
-  - selecting a result (existing `handleSelect` already calls `setOpen(false)`).
-- Keep the existing `⌘K` global shortcut, but make it focus the input (`inputRef.current?.focus()`) and open the panel instead of toggling a dialog.
-- Keep all existing search logic, debouncing, result grouping, icons, and `handleSelect` navigation untouched.
-- No backdrop / no dimming — the page stays interactive, only the dropdown appears.
+Dedup keys per kind:
+- **project**: `code || name`
+- **contractor**: `contractor_code || company_name`
+- **department**: `department_code || name`
+- **category**: `category_code || name`
+- **sheet**: `sheet_code` (already unique, but keep for safety)
+- **user**: `login_id || email || user_id`
 
-### Styling details (match reference)
+Implementation shape:
 
-- Input height `h-9`, rounded, border, muted placeholder "Search anything…".
-- Dropdown: white/popover background, soft shadow, ~`max-h-[60vh]`, internal scroll via `CommandList` (already has `max-h-[300px]` — bump via `className` to `max-h-[55vh]`).
-- Group headings, separators, and item hover styles remain as-is (already styled via `command.tsx`).
-- On mobile (`<md`), the input collapses to icon-only as today; tapping it expands focus and the dropdown anchors below the top bar — no full-screen modal.
+```ts
+const seen: Record<string, Set<string>> = {
+  project: new Set(), contractor: new Set(), department: new Set(),
+  category: new Set(), sheet: new Set(), user: new Set(),
+};
+const norm = (v?: string | null) => (v || "").trim().toLowerCase();
+const take = (kind: string, key: string) => {
+  if (!key) return true; // no identity → don't dedup
+  if (seen[kind].has(key)) return false;
+  seen[kind].add(key);
+  return true;
+};
+```
+
+Wrap each existing `.forEach` push with a `take(...)` guard.
 
 ### Out of scope
 
-- No changes to `command.tsx`, no changes to `TopBar.tsx` layout, no changes to search logic, results, or navigation targets.
-- No new dependencies.
+- No DB cleanup of duplicate rows (data fix is a separate concern).
+- No changes to dropdown layout, styling, or navigation.
+- No changes to per-page lists (this is search-only).
 
 ## Verification
 
-- Click the search field in the top bar → dropdown opens directly below it; the rest of the page is **not** dimmed and remains scrollable/interactive.
-- Type ≥2 chars → grouped results render in the dropdown; arrow keys + Enter still navigate/select.
-- Press `Escape` or click outside → dropdown closes, input retains its value until cleared.
-- Press `⌘K` / `Ctrl+K` anywhere → input focuses and dropdown opens.
-- Selecting a result → navigates as before and dropdown closes.
+- Search "kv" → "KVV Satyanarayana Works Contractor (SC8687)" appears exactly once under Contractors.
+- Other kinds (projects, users, etc.) also collapse to one row per code/name.
+- Selecting a result still navigates and highlights correctly (uses the first row's `id`).
