@@ -149,6 +149,15 @@ async function searchAll(term: string): Promise<Result[]> {
     })
   );
 
+  (users.data || []).forEach((u: any) =>
+    out.push({
+      kind: "user",
+      id: u.user_id,
+      title: u.display_name || u.login_id || u.email || "User",
+      subtitle: [u.login_id, u.email].filter(Boolean).join(" · "),
+    })
+  );
+
   return out;
 }
 
