@@ -1,13 +1,31 @@
 ## Problem
 
-PC sees 219 "Available" contractors because RLS on `project_contractors` only returns rows for projects the PC has access to. The "assigned elsewhere" filter finds nothing, so every other contractor looks free. Admin sees the correct short list because their RLS returns all project_contractors rows.
+In `src/hooks/use-highlight-row.ts`, after navigating from Global Search, the matched row gets a ring highlight that is removed after 2500ms and the `?highlight=` param is cleared. Users find this too quick to notice.
 
-## Fix
+## Change
 
-1. **New DB function** `public.get_globally_assigned_contractor_ids()` — `SECURITY DEFINER`, `STABLE`, returns `setof uuid` (distinct `contractor_id` from `project_contractors`). `GRANT EXECUTE` to `authenticated`. Exposes only contractor IDs — no project linkage, no other data.
+Update `src/hooks/use-highlight-row.ts` so the highlight persists instead of auto-clearing:
 
-2. **`src/components/ProjectAssignments.tsx`** — In `load()`, replace the contractors-only `allJoins` query (`supabase.from("project_contractors").select("contractor_id")`) with `supabase.rpc("get_globally_assigned_contractor_ids")`, and build the `assignedElsewhere` set from those IDs minus `assignedHere`. Departments/categories logic unchanged.
+1. Scroll the matched row (`[data-row-id="<id>"]`) into view as today.
+2. Apply a stronger, more visible highlight using existing design tokens:
+   - `bg-primary/10`, `outline`, `outline-2`, `outline-primary`, plus `rounded-sm` for a cleaner ring.
+3. **Remove the `setTimeout` that strips the classes and clears the URL param.** The highlight stays on the row.
+4. Add dismiss triggers so the highlight does not stay forever:
+   - First user click anywhere in the document, OR
+   - First `keydown` (Esc / any key), OR
+   - Route/path change (navigating away).
+   On any of these, remove the highlight classes and clear `?highlight=` from the URL via `navigate({ to: ".", search: prev => { delete prev.highlight; return prev }, replace: true })`.
+5. Clean up listeners on unmount.
+
+No other files change. No change to `GlobalSearch.tsx`, route configs, or styling tokens. Behavior for screens that don't use the hook is unaffected.
 
 ## Verification
 
-Sign in as `projectcordinator1`, open Project Assignments → Testing → Contractors: Available drops from 219 to just the contractors not assigned to any project (matches Admin view). Admin behavior, Departments/Categories tabs, and all other screens/roles unchanged.
+- Open Global Search, pick a Project / Contractor / Department / Category / Sheet result.
+- Target screen opens, row scrolls into view, ring + tint remain visible indefinitely.
+- Clicking anywhere or pressing a key clears the highlight and removes `?highlight=` from the URL.
+- Navigating to another screen also clears it.
+
+## Out of scope
+
+- No change to which screens consume the hook, the search itself, or the highlight color tokens beyond adding `rounded-sm`.
