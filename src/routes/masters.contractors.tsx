@@ -73,14 +73,29 @@ function ContractorsPage() {
     return true;
   };
 
+  const routeSearch = Route.useSearch();
+
   useEffect(() => { loadProjects(); }, []);
   useEffect(() => { if (projectId) load(); else setItems([]); }, [projectId]);
   useEffect(() => { if (projectId) loadManpower(); }, [dateFrom, dateTo, contractorId, projectId]);
+
+  // Honor ?project= deep link from global search
+  useEffect(() => {
+    if (routeSearch.project && projects.some((p) => p.id === routeSearch.project)) {
+      setProjectId(routeSearch.project);
+    }
+  }, [routeSearch.project, projects]);
+
+  useHighlightRow(items);
 
   const loadProjects = async () => {
     const { data } = await supabase.from("projects").select("id,name,code").order("name");
     const list = (data || []) as ProjectOption[];
     setProjects(list);
+    if (routeSearch.project && list.some((p) => p.id === routeSearch.project)) {
+      setProjectId(routeSearch.project);
+      return;
+    }
     const stored = typeof window !== "undefined" ? localStorage.getItem(LS_PROJECT_KEY) : null;
     if (stored && list.some((p) => p.id === stored)) setProjectId(stored);
     else if (list.length === 1) setProjectId(list[0].id);
