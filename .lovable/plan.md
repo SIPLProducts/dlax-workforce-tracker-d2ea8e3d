@@ -1,38 +1,52 @@
-## Problem
+# Global Search in Top Bar
 
-On the Approvals screen, clicking **View** correctly navigates to `/daily-entry?project=<id>&date=<date>`. The Daily Entry page picks up the `project` search param and calls `setProjectId(search.project)`. However, a second effect that loads the project list also runs on mount and contains:
+Add a search input in the `TopBar` (visible on every screen) that lets users find Projects, Contractors (incl. SC code & contact), Departments (Category of Labour), Categories, and Daily Entry sheets (DE-number). Selecting a result navigates to the matching screen with the row highlighted/filtered. No existing behaviour on any screen is changed.
 
-```ts
-if (data && data.length && !projectId) setProjectId(data[0].id);
-```
+## UX
 
-That async closure captured the initial empty `projectId`. When its `await` resolves (typically after the deep-link effect has already set the correct project), the stale check still sees `!projectId === true` and overwrites the selection with `data[0].id` — the first project in the list. Result: Daily Entry always opens the first assigned project instead of the one chosen in Approvals.
+- Search input (with `Search` icon, `Cmd/Ctrl+K` shortcut) placed in `TopBar` between the breadcrumb and the theme switcher; collapses to an icon-button on mobile that opens the same dialog.
+- Click or shortcut opens a `CommandDialog` (shadcn `command`) with grouped results:
+  - Projects (name, code)
+  - Contractors (name, SC code, contact)
+  - Departments / Category of Labour (name, code)
+  - Categories (name, code)
+  - Daily Entry Sheets (DE-number, project, date)
+- Debounced query (~250 ms), min 2 chars, max 8 results per group. Empty state, loading skeleton, "no results" copy.
+- Respect RLS — uses the user's session, so each user only sees what they can already access (project scoping kicks in automatically for sheets and project-scoped data).
 
-## Fix
+## Navigation targets (highlight via `?highlight=<id>`)
 
-In `src/routes/daily-entry.tsx`, make the default-project fallback respect the deep-link search param so it cannot overwrite an explicitly requested project.
+| Entity | Route | Highlight behaviour |
+|---|---|---|
+| Project | `/masters/projects?highlight=<id>` | Scroll row into view + brief ring highlight |
+| Contractor | `/masters/contractors?highlight=<id>` | Same |
+| Department | `/masters/departments?highlight=<id>` | Same |
+| Category | `/masters/categories?highlight=<id>` | Same |
+| Daily Entry sheet | `/daily-entry?project=<projectId>&date=<YYYY-MM-DD>` (existing deep-link) | Opens sheet in View mode (already supported) |
 
-Change the project-list loading effect (around lines 171–177) so it:
-- Only auto-selects `data[0].id` when there is no `search.project` in the URL.
-- Uses the functional form of `setProjectId` to avoid the stale-closure race (only set when the current value is still empty).
+Each masters screen reads `highlight` from search params, scrolls the matched row into view, and applies a 2s `ring-2 ring-primary` pulse, then clears the param. No other logic touched.
 
-```ts
-useEffect(() => {
-  (async () => {
-    const { data } = await supabase.from("projects").select("id,name,code").order("name");
-    setProjects(data || []);
-    if (data && data.length && !search.project) {
-      setProjectId((prev) => prev || data[0].id);
-    }
-  })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-```
+## Implementation
 
-No other logic changes; the deep-link effect at lines 180–191 already handles setting the project + date and switching to View mode.
+New files:
+- `src/components/GlobalSearch.tsx` — button + `CommandDialog`, debounced query, groups, keyboard shortcut, navigation.
+- `src/lib/global-search.ts` — single `searchAll(term)` helper running parallel Supabase queries with `ilike` on relevant columns + `eq` on codes; for sheets joins `daily_manpower_sheets` to `projects` and filters by `sheet_no` (DE-number) or project name/code.
+
+Edits (minimal, additive):
+- `src/components/TopBar.tsx` — render `<GlobalSearch />` in the right-hand cluster (and a compact trigger for mobile). No other changes.
+- `src/routes/masters.projects.tsx`, `masters.contractors.tsx`, `masters.departments.tsx`, `masters.categories.tsx` — add `validateSearch` for optional `highlight`, a small `useEffect` that scrolls `data-row-id={id}` into view and toggles a highlight class, then clears the param via `navigate({ search: {} , replace: true })`. Add `data-row-id` to each row.
+- No DB changes; existing RLS already restricts results appropriately.
+
+## Out of scope (confirmed)
+
+- Individual employees/workers (per-worker attendance) — not included; "employee" is treated as contractor as you selected.
+- Inline detail modals — not used; navigation-with-highlight only.
 
 ## Validation
 
-- From Approvals, click **View** on a sheet whose project is NOT first alphabetically → Daily Entry opens with that project preselected and the correct date in View mode.
-- Open `/daily-entry` directly (no params) → first project still auto-selects as before.
-- Switch projects manually inside Daily Entry → behavior unchanged.
+- Open from any screen via icon click or `Ctrl/Cmd+K`.
+- Search "SC9035" → contractor result → lands on `/masters/contractors` with that row highlighted.
+- Search "BHELSTPP" → project result → lands on `/masters/projects` highlighted; contractor results filtered by project scope still appear.
+- Search "DE-000048" → opens that sheet in Daily Entry View mode.
+- Verify a non-admin user only sees results within their assigned projects.
+- Confirm Daily Entry, Approvals, and all other existing flows are unchanged.
