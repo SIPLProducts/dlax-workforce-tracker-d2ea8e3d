@@ -243,7 +243,11 @@ export function GlobalSearch() {
           search: { project: r.projectId, date: r.date } as any,
         });
         break;
+      case "user":
+        navigate({ to: "/users", search: { highlight: r.id } as any });
+        break;
     }
+
   };
 
   return (
