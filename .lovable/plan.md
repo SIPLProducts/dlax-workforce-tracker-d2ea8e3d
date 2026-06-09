@@ -1,59 +1,40 @@
 ## Goal
+On the Project Assignments screen, any user whose role (built-in or custom) has **edit** permission on `masters_assignments` gets the same capabilities as Admin: Add & Assign (with inline-create of contractors / departments / categories), bulk select, toggle on/off, auto-assign categories. No changes to Supervisor, Manager, or any role without edit on this screen.
 
-On the **Project Assignments** screen (`/masters/assignments`), the **Project Coordinator (PC)** role should have exactly the same capabilities as Admin:
-
-- Open the screen from the sidebar
-- Pick any project
-- Assign/unassign contractors, departments, categories (single + bulk)
-- Auto-assign mapped categories when a department is added
-- Create new contractor (via "Add & Assign" dialog) and create new department / category inline
-
-No other role's behavior changes, and PC's access to the other master screens (Projects, Contractors, Departments, Categories master pages) stays exactly as it is today (hidden / no edit).
-
-## Why a scoped change is needed
-
-The current permission model would normally require granting PC `edit` on `masters_projects`, `masters_contractors`, `masters_departments`, and `masters_categories`. That would also surface those four master screens in the sidebar for PC — which we explicitly don't want.
-
-So we'll scope the new access narrowly to the Assignments screen and the join tables it writes, by role rather than by screen permission.
+## Why the previous change didn't take effect
+The earlier fix gated PC features on `hasRole("project_coordinator")` (the built-in system role). In your database, **no user holds that system role** — every Project Coordinator user is on a custom role (e.g. "Project Cordinator", "Project cordinator1", "pccordinator 2", "Project Incharge"). So the gate never opened for real users. Switching the gate to `canEdit("masters_assignments")` makes it work for every current and future PC custom role automatically — just tick "edit" on Project Assignments for that role in User Management.
 
 ## Changes
 
-### 1. `src/hooks/use-permissions.tsx` — PC baseline
-Add one line to the `project_coordinator` baseline so the Assignments screen is reachable and editable for PC:
-```
-masters_assignments: "edit"
-```
-No other baseline entries change. Sidebar already shows links based on `canView`, so PC will now see "Project Assignments" but still NOT see Projects / Contractors / Departments / Categories master screens.
+### 1. `src/components/ProjectAssignments.tsx` (frontend only)
+- Drop the `useAuth` / `hasRole` based check.
+- Replace `isAssignmentsAdmin` with `canEdit("masters_assignments")`:
+  - `canCreate = canEdit("masters_assignments") || canEdit(cfg.createPermScreen)`
+  - `canAssign = canEdit("masters_assignments") || canEdit("masters_projects")`
+- No other behaviour change. The "Add & Assign" dialog for contractors and the inline create input for departments / categories already exist — they will simply unlock for PCs.
 
-### 2. `src/components/ProjectAssignments.tsx` — component-level gating
-Currently:
-```
-const canCreate = canEdit(cfg.createPermScreen); // masters_contractors / _departments / _categories
-const canAssign = canEdit("masters_projects");
-```
-Replace both checks with: admin OR project_coordinator OR existing `canEdit(...)`. Pull role from `useAuth()`. This keeps Supervisor / Manager / PM behavior unchanged and unlocks the same UI for PC that Admin sees, without touching unrelated screens.
+### 2. RLS policies (single migration)
+Extend the existing Manage policies so PC custom-role users can actually write the rows the UI exposes. Match on `has_screen_edit(auth.uid(), 'masters_assignments') AND has_project_access(auth.uid(), project_id)` (function already exists in DB). Admin policies stay as-is.
 
-### 3. RLS policies — allow PC to write on the assignment tables
-Today the `Manage ...` policies on `project_contractors`, `project_departments`, `project_categories` only allow admin, `masters_projects` editors, or the master-screen editor + project access. Extend each policy's USING/WITH CHECK to also allow:
-```
-has_role(auth.uid(), 'project_coordinator') AND has_project_access(auth.uid(), project_id)
-```
-The matching SELECT policies will also be extended so PC can read the joins for their projects.
+- `project_contractors`, `project_departments`, `project_categories` — extend Manage policy to also allow users with `masters_assignments` edit + project access (USING + WITH CHECK).
+- `contractors`, `departments`, `worker_categories` — extend Manage policy so the inline "Add & Assign" inserts succeed for the same users. No project scoping on the master tables themselves (they're global); the join-table insert that follows is still project-scoped.
 
-For "Add & Assign" (which inserts into the master table first), extend the `Manage` policies on `contractors`, `departments`, and `worker_categories` to also allow `has_role(auth.uid(), 'project_coordinator')`. PC still cannot reach those screens directly (sidebar/ScreenGuard hide them), but the insert from the Assignments dialog will succeed.
+The previous migration added similar policies tied to the built-in `project_coordinator` role; those stay but are now effectively unused. Safe to leave in place.
 
-No changes to the `daily_manpower`, approvals, profiles, or any other tables.
+### 3. No changes to
+- `src/hooks/use-permissions.tsx` — `project_coordinator` baseline already grants `masters_assignments: "edit"`; the screen will continue to appear in the sidebar for that built-in role, and for any custom role with edit on this screen.
+- Sidebar, ScreenGuard, route file — already keyed off `canView("masters_assignments")`.
+- Other master screens, Daily Entry, Approvals, Reports, User Management.
 
-### 4. Verify
-After the migration:
-- Sign in as PC → sidebar shows "Project Assignments" (and the screens PC already had); Projects/Contractors/Departments/Categories master pages remain hidden.
-- On Assignments: project picker works; both "Add & Assign" flows work; checkbox toggle + "Select all" work; auto-assign categories runs on department assignment.
-- Sign in as Supervisor / Manager / PM / a custom-role user → no change vs. today.
-- Sign in as Admin → no change vs. today.
+## Verification
+1. Pick a real PC user (e.g. on the custom role "Project Cordinator"). In User Management, confirm that custom role has **edit** on "Project Assignments (Master)". If not, tick it — that single tick is now the only gate.
+2. Sign in as that user → open Project Assignments → confirm:
+   - Project picker works.
+   - "Add & Assign" button visible on Contractors tab; dialog opens and creates + assigns a contractor.
+   - "Create new department / category" input + button visible on those tabs and works.
+   - Checkbox toggle, "Select all matching", and auto-assign categories on department add all work.
+3. Sign in as Supervisor / Manager — Project Assignments hidden in sidebar; URL access blocked. No regression.
+4. Sign in as Admin — unchanged.
 
 ## Out of scope
-
-- No data migration, no schema changes (only policy edits).
-- No changes to Projects / Contractors / Departments / Categories master screens.
-- No changes to Daily Entry, Approvals, Reports, or User Management.
-- Earlier-discussed contractor/project duplicate cleanup is unrelated and not included here.
+No schema changes beyond policy edits, no changes to other screens, no data migration.
