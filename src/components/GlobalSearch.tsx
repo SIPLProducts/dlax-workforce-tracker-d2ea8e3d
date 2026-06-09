@@ -323,7 +323,11 @@ export function GlobalSearch() {
       </div>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden">
+        <div
+          id="global-search-panel"
+          style={{ position: "fixed", top: panelPos.top, left: panelPos.left, width: panelPos.width }}
+          className="z-[1000] rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden"
+        >
           <Command shouldFilter={false} className="bg-popover">
             <CommandList className="max-h-[55vh] bg-popover">
               {query.trim().length < 2 ? (
