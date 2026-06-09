@@ -213,7 +213,9 @@ export function GlobalSearch() {
       department: results.filter((r) => r.kind === "department"),
       category: results.filter((r) => r.kind === "category"),
       sheet: results.filter((r) => r.kind === "sheet"),
+      user: results.filter((r) => r.kind === "user"),
     } as Record<Result["kind"], Result[]>;
+
   }, [results]);
 
   const handleSelect = (r: Result) => {
