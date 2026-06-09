@@ -21,10 +21,15 @@ import { adminCreateUser } from "@/utils/admin-users.functions";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/users")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   component: () => <ScreenGuard screen="user_management"><UsersPage /></ScreenGuard>,
 });
+
 
 type UserWithRoles = {
   user_id: string;
@@ -76,6 +81,8 @@ function UsersPage() {
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
 
   const isAdmin = hasRole("admin");
+  useHighlightRow(users.map((u) => ({ id: u.user_id })));
+
   const { canEdit } = usePermissions();
   const canManageUsers = isAdmin || canEdit("user_management");
 
@@ -415,7 +422,8 @@ function UsersPage() {
                       const isUserAdmin = u.roles.includes("admin");
                       const noProjects = !isUserAdmin && u.project_ids.length === 0;
                       return (
-                      <TableRow key={u.user_id}>
+                      <TableRow key={u.user_id} data-row-id={u.user_id}>
+
                         <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
                         <TableCell>
