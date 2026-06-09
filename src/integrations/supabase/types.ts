@@ -808,6 +808,7 @@ export type Database = {
         }
       }
       get_email_for_login_id: { Args: { _login_id: string }; Returns: string }
+      get_globally_assigned_contractor_ids: { Args: never; Returns: string[] }
       get_screen_permission: {
         Args: { _screen_key: string; _user_id: string }
         Returns: Database["public"]["Enums"]["permission_level"]

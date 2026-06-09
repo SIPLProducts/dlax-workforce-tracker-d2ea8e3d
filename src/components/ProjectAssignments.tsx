@@ -273,22 +273,23 @@ function AssignmentSection({
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    const [{ data: masters }, { data: joins }, { data: allJoins }] = await Promise.all([
+    const [{ data: masters }, { data: joins }, allAssignedRes] = await Promise.all([
       supabase.from(cfg.masterTable as any).select("*").order(kind === "contractors" ? "company_name" : "name"),
       supabase.from(cfg.joinTable as any).select(cfg.joinFk).eq("project_id", projectId),
       kind === "contractors"
-        ? supabase.from(cfg.joinTable as any).select(cfg.joinFk)
+        ? supabase.rpc("get_globally_assigned_contractor_ids")
         : Promise.resolve({ data: [] as any[] }),
     ]);
     const assignedHere = new Set((joins || []).map((j: any) => j[cfg.joinFk]));
     // For contractors only: hide any contractor assigned to a different project.
     const assignedElsewhere = kind === "contractors"
       ? new Set(
-          (allJoins || [])
-            .map((j: any) => j[cfg.joinFk])
-            .filter((id: string) => !assignedHere.has(id))
+          ((allAssignedRes as any)?.data || [])
+            .map((row: any) => (typeof row === "string" ? row : row?.contractor_id ?? row))
+            .filter((id: string) => id && !assignedHere.has(id))
         )
       : new Set<string>();
+
 
     const visible = (masters || [])
       .filter((r: any) => assignedHere.has(r.id) || !assignedElsewhere.has(r.id))
