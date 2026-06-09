@@ -91,17 +91,34 @@ async function searchAll(term: string): Promise<Result[]> {
   }
 
   const out: Result[] = [];
+  const seen: Record<string, Set<string>> = {
+    project: new Set(),
+    contractor: new Set(),
+    department: new Set(),
+    category: new Set(),
+    sheet: new Set(),
+    user: new Set(),
+  };
+  const norm = (v?: string | null) => (v || "").trim().toLowerCase();
+  const take = (kind: keyof typeof seen, key: string) => {
+    if (!key) return true;
+    if (seen[kind].has(key)) return false;
+    seen[kind].add(key);
+    return true;
+  };
 
-  (projects.data || []).forEach((p: any) =>
+  (projects.data || []).forEach((p: any) => {
+    if (!take("project", norm(p.code) || norm(p.name))) return;
     out.push({
       kind: "project",
       id: p.id,
       title: p.name,
       subtitle: [p.code, p.project_group].filter(Boolean).join(" · "),
-    })
-  );
+    });
+  });
 
-  contractorRows.forEach((c: any) =>
+  contractorRows.forEach((c: any) => {
+    if (!take("contractor", norm(c.contractor_code) || norm(c.company_name))) return;
     out.push({
       kind: "contractor",
       id: c.id,
@@ -110,28 +127,31 @@ async function searchAll(term: string): Promise<Result[]> {
         .filter(Boolean)
         .join(" · "),
       projectId: contractorProjectMap[c.id],
-    })
-  );
+    });
+  });
 
-  (depts.data || []).forEach((d: any) =>
+  (depts.data || []).forEach((d: any) => {
+    if (!take("department", norm(d.department_code) || norm(d.name))) return;
     out.push({
       kind: "department",
       id: d.id,
       title: d.name,
       subtitle: d.department_code || undefined,
-    })
-  );
+    });
+  });
 
-  (cats.data || []).forEach((c: any) =>
+  (cats.data || []).forEach((c: any) => {
+    if (!take("category", norm(c.category_code) || norm(c.name))) return;
     out.push({
       kind: "category",
       id: c.id,
       title: c.name,
       subtitle: [c.category_code, c.category_group].filter(Boolean).join(" · "),
-    })
-  );
+    });
+  });
 
-  (sheets.data || []).forEach((s: any) =>
+  (sheets.data || []).forEach((s: any) => {
+    if (!take("sheet", norm(s.sheet_code))) return;
     out.push({
       kind: "sheet",
       id: s.id,
@@ -139,17 +159,19 @@ async function searchAll(term: string): Promise<Result[]> {
       subtitle: `${s.project?.code ? s.project.code + " — " : ""}${s.project?.name || ""} · ${s.entry_date}`,
       projectId: s.project_id,
       date: s.entry_date,
-    })
-  );
+    });
+  });
 
-  (users.data || []).forEach((u: any) =>
+  (users.data || []).forEach((u: any) => {
+    if (!take("user", norm(u.login_id) || norm(u.email) || u.user_id)) return;
     out.push({
       kind: "user",
       id: u.user_id,
       title: u.display_name || u.login_id || u.email || "User",
       subtitle: [u.login_id, u.email].filter(Boolean).join(" · "),
-    })
-  );
+    });
+  });
+
 
   return out;
 }
