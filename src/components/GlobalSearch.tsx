@@ -264,11 +264,11 @@ export function GlobalSearch() {
                   value={`project ${r.title} ${r.subtitle || ""}`}
                   onSelect={() => handleSelect(r)}
                 >
-                  <Briefcase className="mr-2 h-4 w-4 text-primary" />
+                  <Briefcase className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
                   <div className="flex flex-col">
                     <span className="font-medium">{r.title}</span>
                     {r.subtitle && (
-                      <span className="text-xs text-muted-foreground">{r.subtitle}</span>
+                      <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
                     )}
                   </div>
                 </CommandItem>
@@ -286,11 +286,11 @@ export function GlobalSearch() {
                     value={`contractor ${r.title} ${r.subtitle || ""}`}
                     onSelect={() => handleSelect(r)}
                   >
-                    <HardHat className="mr-2 h-4 w-4 text-accent" />
+                    <HardHat className="mr-2 h-4 w-4 text-accent group-data-[selected=true]:text-accent-foreground" />
                     <div className="flex flex-col">
                       <span className="font-medium">{r.title}</span>
                       {r.subtitle && (
-                        <span className="text-xs text-muted-foreground">{r.subtitle}</span>
+                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
                       )}
                     </div>
                   </CommandItem>
@@ -309,11 +309,11 @@ export function GlobalSearch() {
                     value={`department ${r.title} ${r.subtitle || ""}`}
                     onSelect={() => handleSelect(r)}
                   >
-                    <Layers className="mr-2 h-4 w-4 text-chart-3" />
+                    <Layers className="mr-2 h-4 w-4 text-chart-3 group-data-[selected=true]:text-accent-foreground" />
                     <div className="flex flex-col">
                       <span className="font-medium">{r.title}</span>
                       {r.subtitle && (
-                        <span className="text-xs text-muted-foreground">{r.subtitle}</span>
+                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
                       )}
                     </div>
                   </CommandItem>
@@ -332,11 +332,11 @@ export function GlobalSearch() {
                     value={`category ${r.title} ${r.subtitle || ""}`}
                     onSelect={() => handleSelect(r)}
                   >
-                    <Tag className="mr-2 h-4 w-4 text-chart-4" />
+                    <Tag className="mr-2 h-4 w-4 text-chart-4 group-data-[selected=true]:text-accent-foreground" />
                     <div className="flex flex-col">
                       <span className="font-medium">{r.title}</span>
                       {r.subtitle && (
-                        <span className="text-xs text-muted-foreground">{r.subtitle}</span>
+                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
                       )}
                     </div>
                   </CommandItem>
@@ -355,11 +355,11 @@ export function GlobalSearch() {
                     value={`sheet ${r.title} ${r.subtitle || ""}`}
                     onSelect={() => handleSelect(r)}
                   >
-                    <FileText className="mr-2 h-4 w-4 text-chart-2" />
+                    <FileText className="mr-2 h-4 w-4 text-chart-2 group-data-[selected=true]:text-accent-foreground" />
                     <div className="flex flex-col">
                       <span className="font-medium">{r.title}</span>
                       {r.subtitle && (
-                        <span className="text-xs text-muted-foreground">{r.subtitle}</span>
+                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
                       )}
                     </div>
                   </CommandItem>
