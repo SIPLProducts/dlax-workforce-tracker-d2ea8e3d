@@ -10,7 +10,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Search, Briefcase, HardHat, Layers, Tag, FileText } from "lucide-react";
+import { Search, Briefcase, HardHat, Layers, Tag, FileText, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Result =
@@ -25,7 +25,8 @@ type Result =
       subtitle?: string;
       projectId: string;
       date: string;
-    };
+    }
+  | { kind: "user"; id: string; title: string; subtitle?: string };
 
 const LIMIT = 8;
 
@@ -34,7 +35,7 @@ async function searchAll(term: string): Promise<Result[]> {
   if (q.length < 2) return [];
   const like = `%${q}%`;
 
-  const [projects, contractors, depts, cats, sheets] = await Promise.all([
+  const [projects, contractors, depts, cats, sheets, users] = await Promise.all([
     supabase
       .from("projects")
       .select("id,name,code,project_group")
@@ -66,6 +67,12 @@ async function searchAll(term: string): Promise<Result[]> {
       .select("id,sheet_code,entry_date,project_id,project:projects(name,code)")
       .ilike("sheet_code", like)
       .order("entry_date", { ascending: false })
+      .limit(LIMIT),
+    supabase
+      .from("profiles")
+      .select("user_id,login_id,display_name,email")
+      .or(`login_id.ilike.${like},display_name.ilike.${like},email.ilike.${like}`)
+      .order("login_id")
       .limit(LIMIT),
   ]);
 
@@ -142,6 +149,15 @@ async function searchAll(term: string): Promise<Result[]> {
     })
   );
 
+  (users.data || []).forEach((u: any) =>
+    out.push({
+      kind: "user",
+      id: u.user_id,
+      title: u.display_name || u.login_id || u.email || "User",
+      subtitle: [u.login_id, u.email].filter(Boolean).join(" · "),
+    })
+  );
+
   return out;
 }
 
@@ -194,6 +210,7 @@ export function GlobalSearch() {
       department: results.filter((r) => r.kind === "department"),
       category: results.filter((r) => r.kind === "category"),
       sheet: results.filter((r) => r.kind === "sheet"),
+      user: results.filter((r) => r.kind === "user"),
     } as Record<Result["kind"], Result[]>;
   }, [results]);
 
@@ -221,6 +238,9 @@ export function GlobalSearch() {
           to: "/daily-entry",
           search: { project: r.projectId, date: r.date } as any,
         });
+        break;
+      case "user":
+        navigate({ to: "/users", search: { highlight: r.id } as any });
         break;
     }
   };
@@ -356,6 +376,29 @@ export function GlobalSearch() {
                     onSelect={() => handleSelect(r)}
                   >
                     <FileText className="mr-2 h-4 w-4 text-chart-2 group-data-[selected=true]:text-accent-foreground" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{r.title}</span>
+                      {r.subtitle && (
+                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
+                      )}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
+          {groups.user.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Users">
+                {groups.user.map((r) => (
+                  <CommandItem
+                    key={`u-${r.id}`}
+                    value={`user ${r.title} ${r.subtitle || ""}`}
+                    onSelect={() => handleSelect(r)}
+                  >
+                    <User className="mr-2 h-4 w-4 text-chart-5 group-data-[selected=true]:text-accent-foreground" />
                     <div className="flex flex-col">
                       <span className="font-medium">{r.title}</span>
                       {r.subtitle && (
