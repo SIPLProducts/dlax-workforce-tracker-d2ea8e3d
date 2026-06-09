@@ -13,8 +13,12 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/masters/categories")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   component: () => <ScreenGuard screen="masters_categories"><CategoriesPage /></ScreenGuard>,
 });
 
@@ -36,6 +40,8 @@ function CategoriesPage() {
   };
 
   useEffect(() => { load(); }, []);
+  useHighlightRow(items);
+
 
   const load = async () => {
     const { data } = await supabase.from("worker_categories").select("*").order("category_group", { nullsFirst: false }).order("display_order").order("name");
@@ -114,7 +120,7 @@ function CategoriesPage() {
           <TableHeader><TableRow><TableHead className="w-[110px]">Code</TableHead><TableHead>Name</TableHead><TableHead className="w-32">Group</TableHead><TableHead className="w-24">Order</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
           <TableBody>
             {filtered.map((d) => (
-              <TableRow key={d.id}>
+              <TableRow key={d.id} data-row-id={d.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">{d.category_code || "—"}</TableCell>
                 <TableCell className="font-medium">{d.name}</TableCell>
                 <TableCell>{d.category_group || <span className="text-muted-foreground">—</span>}</TableCell>
