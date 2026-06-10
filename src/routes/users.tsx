@@ -59,12 +59,14 @@ function UsersPage() {
   const updateUserFn = useServerFn(adminUpdateUser);
 
   const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
+  const [editLoginId, setEditLoginId] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const openEdit = (u: UserWithRoles) => {
     setEditTarget(u);
+    setEditLoginId(u.login_id || "");
     setEditDisplayName(u.display_name || "");
     setEditPassword("");
   };
@@ -73,9 +75,16 @@ function UsersPage() {
     e.preventDefault();
     if (!editTarget) return;
     const trimmedName = editDisplayName.trim();
+    const trimmedLogin = editLoginId.trim().toLowerCase();
     const newPwd = editPassword.trim();
-    if (trimmedName === (editTarget.display_name || "") && !newPwd) {
+    const loginChanged = trimmedLogin !== (editTarget.login_id || "").toLowerCase();
+    const nameChanged = trimmedName !== (editTarget.display_name || "");
+    if (!loginChanged && !nameChanged && !newPwd) {
       toast.info("No changes to save");
+      return;
+    }
+    if (loginChanged && !/^[a-z0-9._-]{2,40}$/.test(trimmedLogin)) {
+      toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
       return;
     }
     if (newPwd && newPwd.length < 6) {
@@ -87,7 +96,8 @@ function UsersPage() {
       await updateUserFn({
         data: {
           userId: editTarget.user_id,
-          displayName: trimmedName,
+          ...(nameChanged ? { displayName: trimmedName } : {}),
+          ...(loginChanged ? { loginId: trimmedLogin } : {}),
           ...(newPwd ? { password: newPwd } : {}),
         },
       });
