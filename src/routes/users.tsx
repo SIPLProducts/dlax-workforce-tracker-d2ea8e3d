@@ -17,7 +17,8 @@ import { toast } from "sonner";
 import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
 import { APP_SCREENS } from "@/lib/screens";
 import { useServerFn } from "@tanstack/react-start";
-import { adminCreateUser } from "@/utils/admin-users.functions";
+import { adminCreateUser, adminDeleteUser } from "@/utils/admin-users.functions";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
@@ -51,7 +52,26 @@ type RolePerm = { role_id: string; screen_key: string; permission: string };
 const ALL_ROLES = ["admin", "supervisor", "manager", "project_coordinator", "project_manager"] as const;
 
 function UsersPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, user: currentUser } = useAuth();
+  const [deleteTarget, setDeleteTarget] = useState<UserWithRoles | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteUserFn = useServerFn(adminDeleteUser);
+
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteUserFn({ data: { userId: deleteTarget.user_id } });
+      toast.success(`Deleted user "${deleteTarget.login_id || deleteTarget.email}"`);
+      setDeleteTarget(null);
+      await fetchAll();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete user");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [rolePerms, setRolePerms] = useState<RolePerm[]>([]);
@@ -470,6 +490,16 @@ function UsersPage() {
                           <Button variant="outline" size="sm" onClick={() => openProjectsAssign(u)}>
                             <FolderKanban className="h-3 w-3 mr-1" />Projects
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            disabled={currentUser?.id === u.user_id}
+                            title={currentUser?.id === u.user_id ? "You cannot delete your own account" : "Delete user"}
+                            onClick={() => setDeleteTarget(u)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />Delete
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );})}
@@ -685,6 +715,28 @@ function UsersPage() {
         roleId={editingRoleId}
         onSaved={fetchAll}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete user permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deleteTarget?.login_id || deleteTarget?.email}</strong>
+              {deleteTarget?.display_name ? ` (${deleteTarget.display_name})` : ""} along with their roles and project assignments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDeleteUser(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Deleting...</> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
