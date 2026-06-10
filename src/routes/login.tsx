@@ -27,6 +27,36 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const resetFn = useServerFn(resetPasswordByUserId);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [fpUserId, setFpUserId] = useState("");
+  const [fpNew, setFpNew] = useState("");
+  const [fpConfirm, setFpConfirm] = useState("");
+  const [fpShowNew, setFpShowNew] = useState(false);
+  const [fpShowConfirm, setFpShowConfirm] = useState(false);
+  const [fpLoading, setFpLoading] = useState(false);
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedId = (fpUserId.includes("@") ? fpUserId.split("@")[0] : fpUserId).trim().toLowerCase();
+    if (!cleanedId) return toast.error("Please enter your User ID");
+    if (fpNew.length < 6) return toast.error("Password must be at least 6 characters");
+    if (fpNew !== fpConfirm) return toast.error("Passwords do not match");
+    setFpLoading(true);
+    try {
+      await resetFn({ data: { loginId: cleanedId, newPassword: fpNew } });
+      toast.success("Password updated. Please sign in.");
+      setUserId(cleanedId);
+      setForgotOpen(false);
+      setFpUserId("");
+      setFpNew("");
+      setFpConfirm("");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reset password");
+    } finally {
+      setFpLoading(false);
+    }
+  };
 
   // Purge any stale Supabase session on landing here. If a previous deploy
   // signed the JWT with a different JWT_SECRET, the stored token will fail
