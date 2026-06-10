@@ -133,7 +133,7 @@ function UsersPage() {
   const [projects, setProjects] = useState<ProjectLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
-  const [roleOpen, setRoleOpen] = useState(false);
+  
   const [customAssignOpen, setCustomAssignOpen] = useState(false);
   const [projectsAssignOpen, setProjectsAssignOpen] = useState(false);
   const [projectsAssignSelection, setProjectsAssignSelection] = useState<Set<string>>(new Set());
