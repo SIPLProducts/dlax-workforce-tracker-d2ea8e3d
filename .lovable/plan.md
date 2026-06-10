@@ -1,46 +1,17 @@
-## Goals
+## Goal
+Add a Show/Hide Password (eye) toggle icon in the New Password field of the Edit User dialog on the User Management screen.
 
-1. Allow editing the **User ID** (login_id) in the Edit User dialog.
-2. Address the "existing password not fetched" issue.
-3. Remove **all System Roles** buttons, columns, tabs and dialogs from the User Management screen.
+## Changes
+1. In `src/routes/users.tsx`:
+   - Add `showPassword` boolean state within the UsersPage component.
+   - In the Edit dialog's New Password input, wrap the `<Input>` in a `relative` container.
+   - Add an eye icon button (`Eye` / `EyeOff` from `lucide-react`) to the right of the input that toggles `showPassword`.
+   - Bind the input's `type` to `showPassword ? "text" : "password"`.
+   - Ensure the eye button uses `type="button"` to avoid form submission.
 
----
+## Out of Scope
+- No changes to the Create User form or any other password fields.
+- No backend or validation changes.
 
-## 1. Editable User ID
-
-Add a "User ID" field to the Edit User dialog, pre-filled with the user's current `login_id`. Validate same as create: 2–40 chars, lowercase letters/numbers/`._-`. On save:
-- Lowercase + trim the value.
-- If unchanged, skip; if changed, update both the `profiles.login_id` and the auth user's `email` (kept in sync as `<loginId>@dlax.local`, matching the create flow) plus `user_metadata.login_id`.
-- Pre-check uniqueness against `profiles.login_id` (case-insensitive), excluding the current user. Return a clear "User ID already exists" error if taken.
-
-Extend `adminUpdateUser` server fn input to accept an optional `loginId` and perform the validation, uniqueness check, `auth.admin.updateUserById({ email, user_metadata })`, and `profiles.update({ login_id, email })`.
-
-## 2. Password field clarification
-
-Supabase stores only a one-way hash — the existing password **cannot be fetched or shown** in plain text by design (this is a security feature, not a bug). The Edit dialog will keep a **"New Password"** field that's blank by default with helper text:
-
-> "Passwords cannot be retrieved for security reasons. Leave blank to keep the current password, or enter a new one to reset it (min 6 characters)."
-
-No backend change needed beyond the existing password-update path.
-
-## 3. Remove System Roles UI
-
-In `src/routes/users.tsx`:
-- Remove the **System Roles** tab (`TabsTrigger value="roles"` and its `TabsContent`). Tabs become just **Users** and **Custom Roles**.
-- Remove the **System Roles** column from the Users table header and body (the `<Badge>` row showing `u.roles`).
-- Remove the "Add system role" Dialog (`roleOpen`) and any leftover trigger.
-- Remove related state and handlers: `roleOpen`, `selectedRole`, `savingRole` usage tied to system roles, `handleAddRole`, `handleRemoveRole`, the `ALL_ROLES` constant, and the `Shield` icon import if unused.
-- Keep system-role *data* loading (`user_roles` query) intact — it's still used elsewhere (admin detection in Projects badge, `isAdmin` checks). Only the UI is removed.
-- Update the empty-state `colSpan` from 6 → 5 to match the new column count.
-
-The Custom Roles tab, projects assignment, edit, delete, and add-user flows are unchanged.
-
----
-
-## Technical notes
-
-**Files touched:**
-- `src/utils/admin-users.functions.ts` — extend `adminUpdateUser` with optional `loginId` (validation, uniqueness, sync to auth `email`/metadata and `profiles`).
-- `src/routes/users.tsx` — add User ID input + password helper text to Edit dialog; remove System Roles tab, column, dialog, state and handlers; adjust `colSpan`.
-
-**Out of scope:** no DB migrations, no changes to create-user or delete flows, no changes to custom roles or project assignment.
+## Implementation
+Straightforward UI-only change: add local state and an absolute-positioned toggle button next to the existing password input in the Edit dialog.
