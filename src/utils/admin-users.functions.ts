@@ -101,3 +101,53 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       displayName: data.displayName || null,
     };
   });
+
+export const adminDeleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string }) => {
+    if (!input.userId || typeof input.userId !== "string") {
+      throw new Error("userId is required");
+    }
+    return { userId: input.userId };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    if (data.userId === userId) {
+      throw new Error("You cannot delete your own account");
+    }
+
+    const [{ data: isAdmin, error: roleErr }, { data: canEdit, error: permErr }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_screen_edit", { _user_id: userId, _screen_key: "user_management" }),
+    ]);
+    if (roleErr || permErr) throw new Error("Failed to verify permissions");
+    if (!isAdmin && !canEdit) throw new Error("Forbidden: requires User Management edit permission");
+
+    const SUPABASE_URL = process.env.SUPABASE_URL!;
+    const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const admin = createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Last-admin guard
+    const { data: targetRoles } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.userId);
+    const targetIsAdmin = (targetRoles || []).some((r: any) => r.role === "admin");
+    if (targetIsAdmin) {
+      const { count } = await admin
+        .from("user_roles")
+        .select("user_id", { count: "exact", head: true })
+        .eq("role", "admin");
+      if ((count || 0) <= 1) {
+        throw new Error("Cannot delete the last remaining admin");
+      }
+    }
+
+    const { error } = await admin.auth.admin.deleteUser(data.userId);
+    if (error) throw new Error(error.message || "Failed to delete user");
+
+    return { userId: data.userId };
+  });
