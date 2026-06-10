@@ -800,6 +800,18 @@ function UsersPage() {
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-4">
             <div className="space-y-2">
+              <Label>User ID</Label>
+              <Input
+                value={editLoginId}
+                onChange={(e) => setEditLoginId(e.target.value)}
+                placeholder="e.g. kpc001 or john.doe"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <p className="text-xs text-muted-foreground">2-40 chars. Letters, numbers, . _ -</p>
+            </div>
+            <div className="space-y-2">
               <Label>Display Name</Label>
               <Input
                 value={editDisplayName}
@@ -816,7 +828,9 @@ function UsersPage() {
                 placeholder="Leave blank to keep current"
                 minLength={6}
               />
-              <p className="text-xs text-muted-foreground">Min 6 characters. Leave blank to keep the existing password.</p>
+              <p className="text-xs text-muted-foreground">
+                Passwords cannot be retrieved for security reasons. Leave blank to keep the current password, or enter a new one to reset it (min 6 characters).
+              </p>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => { setEditTarget(null); setEditPassword(""); }} disabled={savingEdit}>Cancel</Button>
