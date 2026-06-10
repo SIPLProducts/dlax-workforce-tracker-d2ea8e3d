@@ -52,7 +52,26 @@ type RolePerm = { role_id: string; screen_key: string; permission: string };
 const ALL_ROLES = ["admin", "supervisor", "manager", "project_coordinator", "project_manager"] as const;
 
 function UsersPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, user: currentUser } = useAuth();
+  const [deleteTarget, setDeleteTarget] = useState<UserWithRoles | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteUserFn = useServerFn(adminDeleteUser);
+
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteUserFn({ data: { userId: deleteTarget.user_id } });
+      toast.success(`Deleted user "${deleteTarget.login_id || deleteTarget.email}"`);
+      setDeleteTarget(null);
+      await fetchAll();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete user");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [rolePerms, setRolePerms] = useState<RolePerm[]>([]);
