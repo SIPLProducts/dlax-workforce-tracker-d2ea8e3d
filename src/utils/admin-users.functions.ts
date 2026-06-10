@@ -234,7 +234,7 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
       }
     }
 
-    const profileUpdate: Record<string, unknown> = {};
+    const profileUpdate: { display_name?: string | null; login_id?: string; email?: string } = {};
     if (data.displayName !== undefined) profileUpdate.display_name = data.displayName || null;
     if (newEmail && data.loginId) {
       profileUpdate.login_id = data.loginId;
