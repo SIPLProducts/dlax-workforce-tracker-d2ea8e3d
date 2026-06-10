@@ -2,10 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { resetPasswordByUserId } from "@/utils/auth-reset.functions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Eye, EyeOff, Loader2, Smartphone, User, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -24,6 +27,36 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const resetFn = useServerFn(resetPasswordByUserId);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [fpUserId, setFpUserId] = useState("");
+  const [fpNew, setFpNew] = useState("");
+  const [fpConfirm, setFpConfirm] = useState("");
+  const [fpShowNew, setFpShowNew] = useState(false);
+  const [fpShowConfirm, setFpShowConfirm] = useState(false);
+  const [fpLoading, setFpLoading] = useState(false);
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedId = (fpUserId.includes("@") ? fpUserId.split("@")[0] : fpUserId).trim().toLowerCase();
+    if (!cleanedId) return toast.error("Please enter your User ID");
+    if (fpNew.length < 6) return toast.error("Password must be at least 6 characters");
+    if (fpNew !== fpConfirm) return toast.error("Passwords do not match");
+    setFpLoading(true);
+    try {
+      await resetFn({ data: { loginId: cleanedId, newPassword: fpNew } });
+      toast.success("Password updated. Please sign in.");
+      setUserId(cleanedId);
+      setForgotOpen(false);
+      setFpUserId("");
+      setFpNew("");
+      setFpConfirm("");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reset password");
+    } finally {
+      setFpLoading(false);
+    }
+  };
 
   // Purge any stale Supabase session on landing here. If a previous deploy
   // signed the JWT with a different JWT_SECRET, the stored token will fail
@@ -337,6 +370,18 @@ function LoginPage() {
               </div>
             </div>
 
+            <div className="flex justify-end -mt-1">
+              <button
+                type="button"
+                onClick={() => setForgotOpen(true)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+
+
             <Button
               type="submit"
               className="group relative w-full h-12 rounded-xl font-semibold text-sm tracking-wide text-white border-0 bg-gradient-to-r from-indigo-500 via-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 shadow-[0_10px_30px_-8px_rgba(99,102,241,0.6)] hover:shadow-[0_14px_36px_-8px_rgba(99,102,241,0.75)] transition-all hover:-translate-y-0.5"
@@ -385,6 +430,84 @@ function LoginPage() {
           </p>
         </div>
       </div>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>
+              Enter your User ID and set a new password.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="fpUserId">User ID</Label>
+              <Input
+                id="fpUserId"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={fpUserId}
+                onChange={(e) => setFpUserId(e.target.value)}
+                placeholder="e.g. bala"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fpNew">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="fpNew"
+                  type={fpShowNew ? "text" : "password"}
+                  value={fpNew}
+                  onChange={(e) => setFpNew(e.target.value)}
+                  minLength={6}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFpShowNew((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {fpShowNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fpConfirm">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="fpConfirm"
+                  type={fpShowConfirm ? "text" : "password"}
+                  value={fpConfirm}
+                  onChange={(e) => setFpConfirm(e.target.value)}
+                  minLength={6}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFpShowConfirm((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {fpShowConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setForgotOpen(false)} disabled={fpLoading}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={fpLoading}>
+                {fpLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />Updating...</> : "Reset Password"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
