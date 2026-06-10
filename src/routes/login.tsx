@@ -370,6 +370,7 @@ function LoginPage() {
               </div>
             </div>
 
+            {/* Forgot password temporarily disabled
             <div className="flex justify-end -mt-1">
               <button
                 type="button"
@@ -379,6 +380,7 @@ function LoginPage() {
                 Forgot password?
               </button>
             </div>
+            */}
 
 
 

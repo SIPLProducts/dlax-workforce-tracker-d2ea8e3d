@@ -1,30 +1,14 @@
-## Problem
+## Objective
+Temporarily disable the forgot-password flow on `/login` by commenting out all related UI and state logic, without affecting any other functionality.
 
-Deleting a user fails with "Database error deleting user" because two foreign keys in `public` reference `auth.users(id)` with `ON DELETE NO ACTION`:
+## Scope
+- `src/routes/login.tsx`
 
-- `daily_manpower.created_by → auth.users(id)`
-- `worker_attendance.created_by → auth.users(id)`
-
-When the target user has authored any daily-manpower or worker-attendance rows, Postgres blocks `auth.admin.deleteUser()`, which surfaces as the generic "Database error deleting user" from GoTrue. All other user-referencing columns (profiles, user_roles, user_projects, user_custom_roles, submitted_by, approver_user_id, l1/l2_user_id, sheet_approval_history) are either `ON DELETE CASCADE` or have no FK, so they don't block deletion.
-
-## Fix
-
-Migration to switch both FKs to `ON DELETE SET NULL`. The columns are already nullable, so historical rows stay intact and just lose the author reference — the right tradeoff (we keep attendance/manpower history when an account is removed).
-
-```sql
-ALTER TABLE public.daily_manpower
-  DROP CONSTRAINT daily_manpower_created_by_fkey,
-  ADD  CONSTRAINT daily_manpower_created_by_fkey
-       FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-ALTER TABLE public.worker_attendance
-  DROP CONSTRAINT worker_attendance_created_by_fkey,
-  ADD  CONSTRAINT worker_attendance_created_by_fkey
-       FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-```
-
-No code changes — `adminDeleteUser` already has the last-admin guard and self-delete guard; once the FKs allow it, deletion will succeed.
-
-## Verification
-
-Retry deleting `peubhelstpp` from User Management — the toast should confirm success and the row should disappear.
+## Changes
+1. Comment out the `forgotOpen`, `fpUserId`, `fpNew`, `fpConfirm`, `fpShowNew`, `fpShowConfirm`, `fpLoading` state declarations.
+2. Comment out `resetFn = useServerFn(resetPasswordByUserId)`.
+3. Comment out `handleForgotSubmit`.
+4. Comment out the "Forgot password?" link button in the login form.
+5. Comment out the entire `<Dialog>...</Dialog>` block for the forgot-password modal.
+6. Keep all imports at the top of the file intact (even if some become unused temporarily) so re-enabling later is a simple uncomment.
+7. Leave the login form, brand panel, QR code, background mesh, and sign-in handler completely untouched.
