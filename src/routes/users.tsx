@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
 import { APP_SCREENS } from "@/lib/screens";
 import { useServerFn } from "@tanstack/react-start";
-import { adminCreateUser, adminDeleteUser } from "@/utils/admin-users.functions";
+import { adminCreateUser, adminDeleteUser, adminUpdateUser } from "@/utils/admin-users.functions";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
