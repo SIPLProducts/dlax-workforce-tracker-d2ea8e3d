@@ -63,6 +63,7 @@ function UsersPage() {
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const openEdit = (u: UserWithRoles) => {
     setEditTarget(u);
