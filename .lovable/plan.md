@@ -1,18 +1,30 @@
-# Disable Leaked-Password Check
+## Problem
 
-The error message "Password is known to be weak and easy to guess, please choose a different one" comes from Supabase Auth's built-in HIBP (Have I Been Pwned) check, which is currently enabled on the project. It is not a client-side validation in our code.
+Deleting a user fails with "Database error deleting user" because two foreign keys in `public` reference `auth.users(id)` with `ON DELETE NO ACTION`:
 
-## Change
+- `daily_manpower.created_by → auth.users(id)`
+- `worker_attendance.created_by → auth.users(id)`
 
-- Call `supabase--configure_auth` to set `password_hibp_enabled: false` (keeping the other auth settings unchanged: `disable_signup: true`, `external_anonymous_users_enabled: false`, `auto_confirm_email: true`).
+When the target user has authored any daily-manpower or worker-attendance rows, Postgres blocks `auth.admin.deleteUser()`, which surfaces as the generic "Database error deleting user" from GoTrue. All other user-referencing columns (profiles, user_roles, user_projects, user_custom_roles, submitted_by, approver_user_id, l1/l2_user_id, sheet_approval_history) are either `ON DELETE CASCADE` or have no FK, so they don't block deletion.
 
-After this, any password meeting the minimum 6-character length (our app's own check) will be accepted on the Forgot Password dialog and the User Management edit dialog.
+## Fix
 
-## Not changed
+Migration to switch both FKs to `ON DELETE SET NULL`. The columns are already nullable, so historical rows stay intact and just lose the author reference — the right tradeoff (we keep attendance/manpower history when an account is removed).
 
-- No code changes.
-- Minimum-length check (6 chars) and "passwords must match" check on the Forgot Password dialog stay — without them the form would let through empty or mismatched values.
+```sql
+ALTER TABLE public.daily_manpower
+  DROP CONSTRAINT daily_manpower_created_by_fkey,
+  ADD  CONSTRAINT daily_manpower_created_by_fkey
+       FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 
-## Security note
+ALTER TABLE public.worker_attendance
+  DROP CONSTRAINT worker_attendance_created_by_fkey,
+  ADD  CONSTRAINT worker_attendance_created_by_fkey
+       FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+```
 
-Disabling HIBP means users can pick common/breached passwords (e.g. `password123`). Acknowledged per your request.
+No code changes — `adminDeleteUser` already has the last-admin guard and self-delete guard; once the FKs allow it, deletion will succeed.
+
+## Verification
+
+Retry deleting `peubhelstpp` from User Management — the toast should confirm success and the row should disappear.

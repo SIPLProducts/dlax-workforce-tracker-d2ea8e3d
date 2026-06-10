@@ -1,0 +1,2 @@
+ALTER TABLE public.daily_manpower DROP CONSTRAINT daily_manpower_created_by_fkey, ADD CONSTRAINT daily_manpower_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.worker_attendance DROP CONSTRAINT worker_attendance_created_by_fkey, ADD CONSTRAINT worker_attendance_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
