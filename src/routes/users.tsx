@@ -782,6 +782,42 @@ function UsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o && !savingEdit) { setEditTarget(null); setEditPassword(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit user {editTarget?.login_id || editTarget?.email}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input
+                value={editDisplayName}
+                onChange={(e) => setEditDisplayName(e.target.value)}
+                placeholder="Full name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                placeholder="Leave blank to keep current"
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">Min 6 characters. Leave blank to keep the existing password.</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => { setEditTarget(null); setEditPassword(""); }} disabled={savingEdit}>Cancel</Button>
+              <Button type="submit" disabled={savingEdit}>
+                {savingEdit ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
