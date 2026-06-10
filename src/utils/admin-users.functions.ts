@@ -154,19 +154,26 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
 
 export const adminUpdateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { userId: string; displayName?: string; password?: string }) => {
+  .inputValidator((input: { userId: string; displayName?: string; password?: string; loginId?: string }) => {
     if (!input.userId || typeof input.userId !== "string") {
       throw new Error("userId is required");
     }
     const displayName = input.displayName !== undefined ? String(input.displayName).trim() : undefined;
     const password = input.password !== undefined && input.password !== "" ? String(input.password) : undefined;
-    if (displayName === undefined && password === undefined) {
-      throw new Error("Provide a display name or password to update");
+    let loginId: string | undefined;
+    if (input.loginId !== undefined) {
+      loginId = String(input.loginId).trim().toLowerCase();
+      if (!/^[a-z0-9._-]{2,40}$/.test(loginId)) {
+        throw new Error("User ID must be 2-40 chars: letters, numbers, . _ -");
+      }
+    }
+    if (displayName === undefined && password === undefined && loginId === undefined) {
+      throw new Error("Provide a value to update");
     }
     if (password !== undefined && password.length < 6) {
       throw new Error("Password must be at least 6 characters");
     }
-    return { userId: input.userId, displayName, password };
+    return { userId: input.userId, displayName, password, loginId };
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -184,22 +191,62 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const authUpdate: { password?: string; user_metadata?: Record<string, unknown> } = {};
+    let newEmail: string | undefined;
+    if (data.loginId !== undefined) {
+      const { data: currentProfile } = await admin
+        .from("profiles")
+        .select("login_id")
+        .eq("user_id", data.userId)
+        .maybeSingle();
+      const currentLogin = (currentProfile?.login_id || "").toLowerCase();
+      if (currentLogin !== data.loginId) {
+        const { data: existing } = await admin
+          .from("profiles")
+          .select("user_id")
+          .ilike("login_id", data.loginId)
+          .neq("user_id", data.userId)
+          .maybeSingle();
+        if (existing) {
+          throw new Error(`User ID "${data.loginId}" already exists`);
+        }
+        newEmail = `${data.loginId}@dlax.local`;
+      }
+    }
+
+    const authUpdate: { password?: string; email?: string; user_metadata?: Record<string, unknown> } = {};
     if (data.password) authUpdate.password = data.password;
-    if (data.displayName !== undefined) authUpdate.user_metadata = { display_name: data.displayName || null };
+    if (newEmail) authUpdate.email = newEmail;
+    if (data.displayName !== undefined || newEmail) {
+      const meta: Record<string, unknown> = {};
+      if (data.displayName !== undefined) meta.display_name = data.displayName || null;
+      if (newEmail && data.loginId) meta.login_id = data.loginId;
+      authUpdate.user_metadata = meta;
+    }
 
     if (Object.keys(authUpdate).length > 0) {
       const { error } = await admin.auth.admin.updateUserById(data.userId, authUpdate);
-      if (error) throw new Error(error.message || "Failed to update user");
+      if (error) {
+        const msg = error.message || "Failed to update user";
+        if (newEmail && /already|exists|registered|duplicate/i.test(msg)) {
+          throw new Error(`User ID "${data.loginId}" already exists`);
+        }
+        throw new Error(msg);
+      }
     }
 
-    if (data.displayName !== undefined) {
+    const profileUpdate: { display_name?: string | null; login_id?: string; email?: string } = {};
+    if (data.displayName !== undefined) profileUpdate.display_name = data.displayName || null;
+    if (newEmail && data.loginId) {
+      profileUpdate.login_id = data.loginId;
+      profileUpdate.email = newEmail;
+    }
+    if (Object.keys(profileUpdate).length > 0) {
       const { error: profErr } = await admin
         .from("profiles")
-        .update({ display_name: data.displayName || null })
+        .update(profileUpdate)
         .eq("user_id", data.userId);
       if (profErr) throw new Error(profErr.message || "Failed to update profile");
     }
 
-    return { userId: data.userId, displayName: data.displayName ?? null };
+    return { userId: data.userId, displayName: data.displayName ?? null, loginId: data.loginId ?? null };
   });

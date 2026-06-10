@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, Shield, Trash2, Loader2, Plus, Pencil, Key, X, FolderKanban, Check } from "lucide-react";
+import { UserPlus, Trash2, Loader2, Plus, Pencil, Key, X, FolderKanban, Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
@@ -49,7 +49,7 @@ type CustomRole = {
 
 type RolePerm = { role_id: string; screen_key: string; permission: string };
 
-const ALL_ROLES = ["admin", "supervisor", "manager", "project_coordinator", "project_manager"] as const;
+
 
 function UsersPage() {
   const { hasRole, user: currentUser } = useAuth();
@@ -59,12 +59,14 @@ function UsersPage() {
   const updateUserFn = useServerFn(adminUpdateUser);
 
   const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
+  const [editLoginId, setEditLoginId] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const openEdit = (u: UserWithRoles) => {
     setEditTarget(u);
+    setEditLoginId(u.login_id || "");
     setEditDisplayName(u.display_name || "");
     setEditPassword("");
   };
@@ -73,9 +75,16 @@ function UsersPage() {
     e.preventDefault();
     if (!editTarget) return;
     const trimmedName = editDisplayName.trim();
+    const trimmedLogin = editLoginId.trim().toLowerCase();
     const newPwd = editPassword.trim();
-    if (trimmedName === (editTarget.display_name || "") && !newPwd) {
+    const loginChanged = trimmedLogin !== (editTarget.login_id || "").toLowerCase();
+    const nameChanged = trimmedName !== (editTarget.display_name || "");
+    if (!loginChanged && !nameChanged && !newPwd) {
       toast.info("No changes to save");
+      return;
+    }
+    if (loginChanged && !/^[a-z0-9._-]{2,40}$/.test(trimmedLogin)) {
+      toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
       return;
     }
     if (newPwd && newPwd.length < 6) {
@@ -87,7 +96,8 @@ function UsersPage() {
       await updateUserFn({
         data: {
           userId: editTarget.user_id,
-          displayName: trimmedName,
+          ...(nameChanged ? { displayName: trimmedName } : {}),
+          ...(loginChanged ? { loginId: trimmedLogin } : {}),
           ...(newPwd ? { password: newPwd } : {}),
         },
       });
@@ -123,7 +133,7 @@ function UsersPage() {
   const [projects, setProjects] = useState<ProjectLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
-  const [roleOpen, setRoleOpen] = useState(false);
+  
   const [customAssignOpen, setCustomAssignOpen] = useState(false);
   const [projectsAssignOpen, setProjectsAssignOpen] = useState(false);
   const [projectsAssignSelection, setProjectsAssignSelection] = useState<Set<string>>(new Set());
@@ -134,7 +144,7 @@ function UsersPage() {
   const [newPassword, setNewPassword] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<string>("");
+  
   const [selectedCustomRole, setSelectedCustomRole] = useState<string>("");
   const [savingRole, setSavingRole] = useState(false);
 
@@ -237,33 +247,6 @@ function UsersPage() {
     }
   };
 
-  const handleAddRole = async () => {
-    if (!selectedUser || !selectedRole) return;
-    if (selectedRole !== "admin" && selectedUser.custom_role_ids?.length > 0) {
-      if (!confirm("This user has a custom role assigned. Adding a system role will override the custom role's restrictions. Continue?")) {
-        return;
-      }
-    }
-    setSavingRole(true);
-    try {
-      const { error } = await supabase.from("user_roles").insert({ user_id: selectedUser.user_id, role: selectedRole as any });
-      if (error) throw error;
-      toast.success(`Role "${selectedRole}" added`);
-      setRoleOpen(false); setSelectedRole("");
-      fetchAll();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add role");
-    } finally { setSavingRole(false); }
-  };
-
-  const handleRemoveRole = async (userId: string, role: string) => {
-    try {
-      const { error } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role as any);
-      if (error) throw error;
-      toast.success(`Role "${role}" removed`);
-      fetchAll();
-    } catch (err: any) { toast.error(err.message || "Failed"); }
-  };
 
   const handleAssignCustomRole = async () => {
     if (!selectedUser || !selectedCustomRole) return;
@@ -456,9 +439,10 @@ function UsersPage() {
       <Tabs defaultValue="users">
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="roles">System Roles</TabsTrigger>
           <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>
         </TabsList>
+
+
 
         <TabsContent value="users">
           <Card>
@@ -472,7 +456,6 @@ function UsersPage() {
                     <TableRow>
                       <TableHead>User ID</TableHead>
                       <TableHead>Display Name</TableHead>
-                      <TableHead>System Roles</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Projects</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -486,14 +469,6 @@ function UsersPage() {
                       <TableRow key={u.user_id} data-row-id={u.user_id}>
                         <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {u.roles.length === 0 && <span className="text-muted-foreground text-sm">—</span>}
-                            {u.roles.map((r) => (
-                              <Badge key={r} variant={r === "admin" ? "default" : "secondary"} className="capitalize">{r}</Badge>
-                            ))}
-                          </div>
-                        </TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
                             {u.custom_role_ids.length === 0 && <span className="text-muted-foreground text-sm">—</span>}
@@ -549,7 +524,7 @@ function UsersPage() {
                       </TableRow>
                     );})}
                     {users.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -558,38 +533,6 @@ function UsersPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="roles">
-          <Card>
-            <CardHeader><CardTitle>System Role Management</CardTitle></CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Current System Roles</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.user_id}>
-                      <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 flex-wrap">
-                          {u.roles.length === 0 && <span className="text-muted-foreground text-sm">No role</span>}
-                          {u.roles.map((r) => (
-                            <Badge key={r} variant={r === "admin" ? "default" : "secondary"} className="capitalize group cursor-pointer" onClick={() => handleRemoveRole(u.user_id, r)}>
-                              {r}<Trash2 className="h-3 w-3 ml-1 opacity-60 group-hover:opacity-100" />
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="custom-roles">
           <Card>
@@ -656,25 +599,6 @@ function UsersPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Add system role dialog */}
-      <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add System Role to {selectedUser?.login_id || selectedUser?.email}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <Select value={selectedRole} onValueChange={setSelectedRole}>
-              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-              <SelectContent>
-                {ALL_ROLES.filter((r) => !selectedUser?.roles.includes(r)).map((r) => (
-                  <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleAddRole} className="w-full" disabled={!selectedRole || savingRole}>
-              {savingRole ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Add Role"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Assign custom role dialog */}
       <Dialog open={customAssignOpen} onOpenChange={setCustomAssignOpen}>
@@ -790,6 +714,18 @@ function UsersPage() {
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-4">
             <div className="space-y-2">
+              <Label>User ID</Label>
+              <Input
+                value={editLoginId}
+                onChange={(e) => setEditLoginId(e.target.value)}
+                placeholder="e.g. kpc001 or john.doe"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <p className="text-xs text-muted-foreground">2-40 chars. Letters, numbers, . _ -</p>
+            </div>
+            <div className="space-y-2">
               <Label>Display Name</Label>
               <Input
                 value={editDisplayName}
@@ -806,7 +742,9 @@ function UsersPage() {
                 placeholder="Leave blank to keep current"
                 minLength={6}
               />
-              <p className="text-xs text-muted-foreground">Min 6 characters. Leave blank to keep the existing password.</p>
+              <p className="text-xs text-muted-foreground">
+                Passwords cannot be retrieved for security reasons. Leave blank to keep the current password, or enter a new one to reset it (min 6 characters).
+              </p>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => { setEditTarget(null); setEditPassword(""); }} disabled={savingEdit}>Cancel</Button>
