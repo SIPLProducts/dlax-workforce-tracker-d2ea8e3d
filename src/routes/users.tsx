@@ -247,33 +247,6 @@ function UsersPage() {
     }
   };
 
-  const handleAddRole = async () => {
-    if (!selectedUser || !selectedRole) return;
-    if (selectedRole !== "admin" && selectedUser.custom_role_ids?.length > 0) {
-      if (!confirm("This user has a custom role assigned. Adding a system role will override the custom role's restrictions. Continue?")) {
-        return;
-      }
-    }
-    setSavingRole(true);
-    try {
-      const { error } = await supabase.from("user_roles").insert({ user_id: selectedUser.user_id, role: selectedRole as any });
-      if (error) throw error;
-      toast.success(`Role "${selectedRole}" added`);
-      setRoleOpen(false); setSelectedRole("");
-      fetchAll();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add role");
-    } finally { setSavingRole(false); }
-  };
-
-  const handleRemoveRole = async (userId: string, role: string) => {
-    try {
-      const { error } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role as any);
-      if (error) throw error;
-      toast.success(`Role "${role}" removed`);
-      fetchAll();
-    } catch (err: any) { toast.error(err.message || "Failed"); }
-  };
 
   const handleAssignCustomRole = async () => {
     if (!selectedUser || !selectedCustomRole) return;
