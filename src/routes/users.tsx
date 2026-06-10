@@ -498,14 +498,6 @@ function UsersPage() {
                         <TableCell>{u.display_name || "—"}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
-                            {u.roles.length === 0 && <span className="text-muted-foreground text-sm">—</span>}
-                            {u.roles.map((r) => (
-                              <Badge key={r} variant={r === "admin" ? "default" : "secondary"} className="capitalize">{r}</Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
                             {u.custom_role_ids.length === 0 && <span className="text-muted-foreground text-sm">—</span>}
                             {u.custom_role_ids.map((rid) => {
                               const r = customRoles.find((c) => c.id === rid);
