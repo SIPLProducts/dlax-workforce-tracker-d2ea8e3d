@@ -490,6 +490,16 @@ function UsersPage() {
                           <Button variant="outline" size="sm" onClick={() => openProjectsAssign(u)}>
                             <FolderKanban className="h-3 w-3 mr-1" />Projects
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            disabled={currentUser?.id === u.user_id}
+                            title={currentUser?.id === u.user_id ? "You cannot delete your own account" : "Delete user"}
+                            onClick={() => setDeleteTarget(u)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />Delete
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );})}
