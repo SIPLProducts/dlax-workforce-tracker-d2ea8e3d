@@ -526,8 +526,8 @@ function UsersPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right space-x-2 whitespace-nowrap">
-                          <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setRoleOpen(true); }}>
-                            <Shield className="h-3 w-3 mr-1" />System
+                          <Button variant="outline" size="sm" onClick={() => openEdit(u)}>
+                            <Pencil className="h-3 w-3 mr-1" />Edit
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setCustomAssignOpen(true); }}>
                             <Key className="h-3 w-3 mr-1" />Custom
