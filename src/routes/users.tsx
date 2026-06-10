@@ -466,9 +466,10 @@ function UsersPage() {
       <Tabs defaultValue="users">
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="roles">System Roles</TabsTrigger>
           <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>
         </TabsList>
+
+
 
         <TabsContent value="users">
           <Card>
