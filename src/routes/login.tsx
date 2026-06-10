@@ -2,10 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { resetPasswordByUserId } from "@/utils/auth-reset.functions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Eye, EyeOff, Loader2, Smartphone, User, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
