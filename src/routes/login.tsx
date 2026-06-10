@@ -511,6 +511,3 @@ function LoginPage() {
     </div>
   );
 }
-
-  );
-}
