@@ -56,6 +56,51 @@ function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<UserWithRoles | null>(null);
   const [deleting, setDeleting] = useState(false);
   const deleteUserFn = useServerFn(adminDeleteUser);
+  const updateUserFn = useServerFn(adminUpdateUser);
+
+  const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = (u: UserWithRoles) => {
+    setEditTarget(u);
+    setEditDisplayName(u.display_name || "");
+    setEditPassword("");
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTarget) return;
+    const trimmedName = editDisplayName.trim();
+    const newPwd = editPassword.trim();
+    if (trimmedName === (editTarget.display_name || "") && !newPwd) {
+      toast.info("No changes to save");
+      return;
+    }
+    if (newPwd && newPwd.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await updateUserFn({
+        data: {
+          userId: editTarget.user_id,
+          displayName: trimmedName,
+          ...(newPwd ? { password: newPwd } : {}),
+        },
+      });
+      toast.success("User updated");
+      setEditTarget(null);
+      setEditPassword("");
+      await fetchAll();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update user");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleDeleteUser = async () => {
     if (!deleteTarget) return;
