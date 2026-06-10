@@ -560,38 +560,6 @@ function UsersPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="roles">
-          <Card>
-            <CardHeader><CardTitle>System Role Management</CardTitle></CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Current System Roles</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.user_id}>
-                      <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 flex-wrap">
-                          {u.roles.length === 0 && <span className="text-muted-foreground text-sm">No role</span>}
-                          {u.roles.map((r) => (
-                            <Badge key={r} variant={r === "admin" ? "default" : "secondary"} className="capitalize group cursor-pointer" onClick={() => handleRemoveRole(u.user_id, r)}>
-                              {r}<Trash2 className="h-3 w-3 ml-1 opacity-60 group-hover:opacity-100" />
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="custom-roles">
           <Card>
