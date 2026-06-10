@@ -483,7 +483,6 @@ function UsersPage() {
                     <TableRow>
                       <TableHead>User ID</TableHead>
                       <TableHead>Display Name</TableHead>
-                      <TableHead>System Roles</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Projects</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
