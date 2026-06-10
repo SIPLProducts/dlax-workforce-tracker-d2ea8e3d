@@ -1,32 +1,31 @@
-## Plan: Delete user from User Management
+## Goal
+On the User Management screen: (1) remove the "System" button from each row, (2) add an "Edit" button that opens a dialog to update the user's Display Name and/or Password, with the changes persisted server-side.
 
-### Scope
-Add a per-row Delete button on the Users tab (`/users`) that permanently removes a user (auth account + profile + role/project assignments) after a confirmation dialog.
+## Backend — `src/utils/admin-users.functions.ts`
+Add a new server function `adminUpdateUser`:
+- Input: `{ userId: string; displayName?: string; password?: string }`
+- Validation: at least one of `displayName` or `password` provided; if password present, min 6 chars
+- Permission check (same pattern as `adminCreateUser`/`adminDeleteUser`): allow if caller is system `admin` OR has `edit` on `user_management`
+- Uses `supabaseAdmin` (service role) to:
+  - If `password` provided → `auth.admin.updateUserById(userId, { password })`
+  - If `displayName` provided → update `profiles.display_name` and also mirror into `auth.users.user_metadata.display_name`
+- Returns `{ userId, displayName }`
 
-### Backend — new server function
-Add `adminDeleteUser` in `src/utils/admin-users.functions.ts`:
-- Uses `requireSupabaseAuth` middleware.
-- Input: `{ userId: string }`.
-- Permission check (same pattern as `adminCreateUser`): allow if caller is system `admin` OR has `edit` on `user_management` (via `has_role` / `has_screen_edit` RPCs).
-- Safety guards:
-  - Reject if `userId === context.userId` (can't delete self).
-  - Reject if target user has the `admin` system role AND is the last remaining admin (count from `user_roles` where role='admin').
-- Uses `supabaseAdmin` (service role) to call `auth.admin.deleteUser(userId)`. The existing `ON DELETE CASCADE` on `auth.users` cleans up `profiles`, `user_roles`, `user_custom_roles`, `user_projects`.
+## Frontend — `src/routes/users.tsx`
+- Remove the "System" button (lines 484–486) from the row Actions cell. System role management is still reachable via the existing "System Roles" tab, so no functionality is lost.
+- Add a new "Edit" button (Pencil icon) in the Actions cell, before "Custom".
+- Add an Edit dialog with two fields:
+  - Display Name (text, prefilled with current value)
+  - New Password (password, optional, placeholder "Leave blank to keep current", min 6 if filled)
+  - Save / Cancel buttons; Save calls `adminUpdateUser` via `useServerFn`
+- On success: toast, close dialog, `fetchAll()` to refresh the row.
+- On error: toast the server message.
 
-### Frontend — `src/routes/users.tsx`
-1. Import `adminDeleteUser` + `useServerFn`; add an `AlertDialog` (already in the codebase) for confirmation.
-2. Add a red outline "Delete" button (Trash2 icon) in the Actions cell of the Users table, after the Projects button.
-3. Disable the Delete button for the currently signed-in user's own row.
-4. On click → open AlertDialog showing the user's `login_id` / `display_name` and a warning that the action is permanent.
-5. On confirm → call `adminDeleteUser({ data: { userId } })`, show toast, refresh the users list (re-run the existing `loadData()`), close dialog.
-6. Handle and toast server errors (last-admin, forbidden, etc.).
+## Out of scope
+- Editing User ID (login_id) — not requested, and changing it would affect login lookups.
+- Editing email / system roles — system roles still managed via the existing tab and "Custom" button.
 
-### Verification
-- Sign in as admin, delete a non-admin test user → row disappears, no orphan rows in `profiles` / `user_roles` / `user_projects`.
-- Try to delete own account → button disabled.
-- Try to delete the only admin → server returns error, toast shown, user not deleted.
-- Cancel in the confirmation dialog → nothing happens.
-
-### Out of scope
-- Bulk multi-select delete (current request is per-user with confirmation).
-- Soft-delete / archive (this is a permanent delete as requested).
+## Verification
+- As admin, click Edit on a user, change display name only → row updates, no password change needed.
+- Edit and set a new password → toast success; sign in as that user with the new password.
+- "System" button no longer appears in the row; "System Roles" tab still works.
