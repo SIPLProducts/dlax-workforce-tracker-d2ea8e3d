@@ -626,25 +626,6 @@ function UsersPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Add system role dialog */}
-      <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add System Role to {selectedUser?.login_id || selectedUser?.email}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <Select value={selectedRole} onValueChange={setSelectedRole}>
-              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-              <SelectContent>
-                {ALL_ROLES.filter((r) => !selectedUser?.roles.includes(r)).map((r) => (
-                  <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleAddRole} className="w-full" disabled={!selectedRole || savingRole}>
-              {savingRole ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Add Role"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Assign custom role dialog */}
       <Dialog open={customAssignOpen} onOpenChange={setCustomAssignOpen}>
