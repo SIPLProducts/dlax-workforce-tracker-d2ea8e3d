@@ -370,6 +370,18 @@ function LoginPage() {
               </div>
             </div>
 
+            <div className="flex justify-end -mt-1">
+              <button
+                type="button"
+                onClick={() => setForgotOpen(true)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+
+
             <Button
               type="submit"
               className="group relative w-full h-12 rounded-xl font-semibold text-sm tracking-wide text-white border-0 bg-gradient-to-r from-indigo-500 via-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 shadow-[0_10px_30px_-8px_rgba(99,102,241,0.6)] hover:shadow-[0_14px_36px_-8px_rgba(99,102,241,0.75)] transition-all hover:-translate-y-0.5"
