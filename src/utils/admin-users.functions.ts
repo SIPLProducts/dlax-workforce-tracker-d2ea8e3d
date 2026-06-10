@@ -151,3 +151,55 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
 
     return { userId: data.userId };
   });
+
+export const adminUpdateUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string; displayName?: string; password?: string }) => {
+    if (!input.userId || typeof input.userId !== "string") {
+      throw new Error("userId is required");
+    }
+    const displayName = input.displayName !== undefined ? String(input.displayName).trim() : undefined;
+    const password = input.password !== undefined && input.password !== "" ? String(input.password) : undefined;
+    if (displayName === undefined && password === undefined) {
+      throw new Error("Provide a display name or password to update");
+    }
+    if (password !== undefined && password.length < 6) {
+      throw new Error("Password must be at least 6 characters");
+    }
+    return { userId: input.userId, displayName, password };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const [{ data: isAdmin, error: roleErr }, { data: canEdit, error: permErr }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_screen_edit", { _user_id: userId, _screen_key: "user_management" }),
+    ]);
+    if (roleErr || permErr) throw new Error("Failed to verify permissions");
+    if (!isAdmin && !canEdit) throw new Error("Forbidden: requires User Management edit permission");
+
+    const SUPABASE_URL = process.env.SUPABASE_URL!;
+    const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const admin = createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const authUpdate: { password?: string; user_metadata?: Record<string, unknown> } = {};
+    if (data.password) authUpdate.password = data.password;
+    if (data.displayName !== undefined) authUpdate.user_metadata = { display_name: data.displayName || null };
+
+    if (Object.keys(authUpdate).length > 0) {
+      const { error } = await admin.auth.admin.updateUserById(data.userId, authUpdate);
+      if (error) throw new Error(error.message || "Failed to update user");
+    }
+
+    if (data.displayName !== undefined) {
+      const { error: profErr } = await admin
+        .from("profiles")
+        .update({ display_name: data.displayName || null })
+        .eq("user_id", data.userId);
+      if (profErr) throw new Error(profErr.message || "Failed to update profile");
+    }
+
+    return { userId: data.userId, displayName: data.displayName ?? null };
+  });

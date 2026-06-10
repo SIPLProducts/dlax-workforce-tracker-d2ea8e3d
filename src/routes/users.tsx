@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { RolePermissionsDialog } from "@/components/RolePermissionsDialog";
 import { APP_SCREENS } from "@/lib/screens";
 import { useServerFn } from "@tanstack/react-start";
-import { adminCreateUser, adminDeleteUser } from "@/utils/admin-users.functions";
+import { adminCreateUser, adminDeleteUser, adminUpdateUser } from "@/utils/admin-users.functions";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -56,6 +56,51 @@ function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<UserWithRoles | null>(null);
   const [deleting, setDeleting] = useState(false);
   const deleteUserFn = useServerFn(adminDeleteUser);
+  const updateUserFn = useServerFn(adminUpdateUser);
+
+  const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = (u: UserWithRoles) => {
+    setEditTarget(u);
+    setEditDisplayName(u.display_name || "");
+    setEditPassword("");
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTarget) return;
+    const trimmedName = editDisplayName.trim();
+    const newPwd = editPassword.trim();
+    if (trimmedName === (editTarget.display_name || "") && !newPwd) {
+      toast.info("No changes to save");
+      return;
+    }
+    if (newPwd && newPwd.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await updateUserFn({
+        data: {
+          userId: editTarget.user_id,
+          displayName: trimmedName,
+          ...(newPwd ? { password: newPwd } : {}),
+        },
+      });
+      toast.success("User updated");
+      setEditTarget(null);
+      setEditPassword("");
+      await fetchAll();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update user");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleDeleteUser = async () => {
     if (!deleteTarget) return;
@@ -481,8 +526,8 @@ function UsersPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right space-x-2 whitespace-nowrap">
-                          <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setRoleOpen(true); }}>
-                            <Shield className="h-3 w-3 mr-1" />System
+                          <Button variant="outline" size="sm" onClick={() => openEdit(u)}>
+                            <Pencil className="h-3 w-3 mr-1" />Edit
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setCustomAssignOpen(true); }}>
                             <Key className="h-3 w-3 mr-1" />Custom
@@ -737,6 +782,42 @@ function UsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o && !savingEdit) { setEditTarget(null); setEditPassword(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit user {editTarget?.login_id || editTarget?.email}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input
+                value={editDisplayName}
+                onChange={(e) => setEditDisplayName(e.target.value)}
+                placeholder="Full name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                placeholder="Leave blank to keep current"
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">Min 6 characters. Leave blank to keep the existing password.</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => { setEditTarget(null); setEditPassword(""); }} disabled={savingEdit}>Cancel</Button>
+              <Button type="submit" disabled={savingEdit}>
+                {savingEdit ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
