@@ -575,7 +575,7 @@ function OtEntryPage() {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, cells: { ...curr.cells, [key]: val } } };
     });
-  const updateField = (cid: string, key: "remarks" | "weather", val: any) =>
+  const updateField = (cid: string, key: "remarks" | "weather" | "otHours", val: any) =>
     setRows((prev) => {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, [key]: val } };
