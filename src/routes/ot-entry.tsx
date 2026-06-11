@@ -381,6 +381,7 @@ function OtEntryPage() {
       const r = next[rec.contractor_id] || emptyRow();
       // Header-level fields (kept on every row server-side; first non-empty wins)
       r.weather = r.weather || rec.weather_condition || "";
+      if (!r.otHours && rec.ot_hours != null) r.otHours = String(rec.ot_hours);
 
       // Try legacy JSON-blob remarks first
       let isLegacyBlob = false;
