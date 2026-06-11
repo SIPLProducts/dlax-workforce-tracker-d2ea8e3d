@@ -744,7 +744,6 @@ function OtEntryPage() {
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
-    setOtPromptOpen(true);
   };
 
 
