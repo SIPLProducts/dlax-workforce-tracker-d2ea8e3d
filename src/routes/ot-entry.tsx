@@ -927,9 +927,9 @@ function OtEntryPage() {
 
 
               <tbody>
-                {loading && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {!loading && contractors.length > 0 && displayCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {loading && (<tr><td colSpan={5 + displayCells.length + 4} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + displayCells.length + 4} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && displayCells.length === 0 && (<tr><td colSpan={5 + 4} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
                 {displayCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
