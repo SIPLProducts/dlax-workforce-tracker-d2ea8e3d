@@ -27,8 +27,18 @@ export const Route = createFileRoute("/ot-entry")({
     project: typeof search.project === "string" ? search.project : undefined,
     from: search.from === "daily" ? ("daily" as const) : undefined,
   }),
-  component: () => <ScreenGuard screen="ot_entry"><OtEntryPage /></ScreenGuard>,
+  component: () => (
+    <ScreenGuard screen="ot_entry">
+      <OtEntryRoot />
+    </ScreenGuard>
+  ),
 });
+
+function OtEntryRoot() {
+  const search = Route.useSearch();
+  if (search.from !== "daily") return <OtEntryLanding />;
+  return <OtEntryPage />;
+}
 
 function OtEntryLanding() {
   const navigate = useNavigate();
@@ -208,17 +218,14 @@ function OtEntryPage() {
   }, []);
 
   // OT page is always locked to yesterday — only support deep-link of project.
-  const triggered = search.from === "daily";
   useEffect(() => {
     if (search.project) setProjectId(search.project);
     if (search.project) {
-      pendingModeRef.current = triggered ? "edit" : "view";
+      pendingModeRef.current = "edit";
       setActiveTab("entry");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.project, triggered]);
-
-  if (!triggered) return <OtEntryLanding />;
+  }, [search.project]);
 
   useEffect(() => {
     const fetchContractors = async () => {
