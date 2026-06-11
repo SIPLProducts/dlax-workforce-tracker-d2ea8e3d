@@ -152,7 +152,7 @@ function Page() {
             <TableCell>{statusBadge(s.status, s.current_level, s.total_levels)}</TableCell>
             <TableCell className="text-right">
               <div className="flex justify-end gap-1">
-                <Button size="sm" variant="ghost" onClick={() => navigate({ to: "/daily-entry", search: { project: s.project_id, date: s.entry_date } })}><Eye className="w-4 h-4" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => navigate(s.sheet_type === "ot" ? { to: "/ot-entry", search: { project: s.project_id, date: s.entry_date, from: "daily" } } : { to: "/daily-entry", search: { project: s.project_id, date: s.entry_date } })}><Eye className="w-4 h-4" /></Button>
                 {showActions && s.status === "pending" && (isCurrentApprover(s) || isAdmin) && (
                   <>
                     <Button size="sm" variant="default" onClick={() => approve(s)} disabled={actioning}>
