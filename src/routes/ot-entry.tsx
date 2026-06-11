@@ -101,9 +101,9 @@ function statusMeta(s: string) {
 
 function OtEntryPage() {
   const { user } = useAuth();
-  const [date, setDate] = useState<Date>(new Date());
-  const [dateText, setDateText] = useState(format(new Date(), "dd/MM/yyyy"));
-  const [dateError, setDateError] = useState(false);
+  const [date] = useState<Date>(() => yesterdayDate());
+  const dateText = format(date, "dd/MM/yyyy");
+  const dateError = false;
 
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [projectId, setProjectId] = useState<string>("");
