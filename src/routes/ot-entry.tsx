@@ -640,7 +640,8 @@ function OtEntryPage() {
       const cellEntries = allCells
         .map((cell) => ({ cell, n: Number(r.cells[cell.key]) || 0 }))
         .filter((x) => x.n > 0);
-      const hasHeader = ((r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()));
+      const otHoursNum = r.otHours && r.otHours.trim() !== "" ? Number(r.otHours) : null;
+      const hasHeader = ((r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()) || (otHoursNum != null && !Number.isNaN(otHoursNum)));
       if (cellEntries.length === 0 && !hasHeader) return;
 
       // If only header-level data exists, anchor it to the first available cell (real dept, not "__other__")
