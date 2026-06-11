@@ -992,7 +992,7 @@ function OtEntryPage() {
                     {displayCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
-
+                    <td className="border"></td>
                     <td className="border"></td>
                   </tr>
                 </tfoot>
