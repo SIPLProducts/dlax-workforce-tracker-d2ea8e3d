@@ -1068,6 +1068,22 @@ function DailyEntryPage() {
       </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={otPromptOpen} onOpenChange={setOtPromptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter OT?</DialogTitle>
+            <DialogDescription>Do you want to enter OT?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOtPromptOpen(false)}>No</Button>
+            <Button onClick={() => {
+              setOtPromptOpen(false);
+              navigate({ to: "/ot-entry", search: { project: projectId || undefined } });
+            }}>Yes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </TooltipProvider>
   );
