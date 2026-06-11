@@ -188,17 +188,15 @@ function OtEntryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Deep-link support: when arriving with ?project=&date=, preselect them and force View mode.
+  // OT page is always locked to yesterday — only support deep-link of project.
   useEffect(() => {
     if (search.project) setProjectId(search.project);
-    if (search.date) {
-      const d = parseDate(search.date, "yyyy-MM-dd", new Date());
-      if (isValid(d)) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
-    }
-    if (search.project || search.date) {
+    if (search.project) {
       pendingModeRef.current = "view";
       setActiveTab("entry");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.project]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.project, search.date]);
 
