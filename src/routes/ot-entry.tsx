@@ -27,7 +27,7 @@ export const Route = createFileRoute("/ot-entry")({
     project: typeof search.project === "string" ? search.project : undefined,
     date: typeof search.date === "string" ? search.date : undefined,
   }),
-  component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
+  component: () => <ScreenGuard screen="ot_entry"><OtEntryPage /></ScreenGuard>,
 });
 
 type Cell = { key: string; deptId: string; catId: string; deptName: string; catName: string };
@@ -93,7 +93,7 @@ function statusMeta(s: string) {
   return map[s] || { cls: "", label: s };
 }
 
-function DailyEntryPage() {
+function OtEntryPage() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date>(new Date());
   const [dateText, setDateText] = useState(format(new Date(), "dd/MM/yyyy"));
@@ -145,7 +145,7 @@ function DailyEntryPage() {
   const readOnly = mode === "view" || !canEdit;
 
   const { canEdit: canEditPerm } = usePermissions();
-  const canEditScreen = canEditPerm("daily_entry");
+  const canEditScreen = canEditPerm("ot_entry");
   const requireEdit = () => {
     if (!canEditScreen) {
       toast.error("You are in View mode, not in Edit mode.");
@@ -216,7 +216,7 @@ function DailyEntryPage() {
       setContractorsReady(true);
     };
     fetchContractors();
-    const channel = supabase.channel("contractors-daily-entry")
+    const channel = supabase.channel("contractors-ot-entry")
       .on("postgres_changes", { event: "*", schema: "public", table: "contractors" }, () => fetchContractors())
       .on("postgres_changes", { event: "*", schema: "public", table: "project_contractors" }, () => fetchContractors())
       .subscribe();
@@ -249,7 +249,7 @@ function DailyEntryPage() {
       setAssignmentsReady(true);
     };
     fetchAssignments();
-    const channel = supabase.channel("assignments-daily-entry")
+    const channel = supabase.channel("assignments-ot-entry")
       .on("postgres_changes", { event: "*", schema: "public", table: "project_departments" }, () => fetchAssignments())
       .on("postgres_changes", { event: "*", schema: "public", table: "project_categories" }, () => fetchAssignments())
       .on("postgres_changes", { event: "*", schema: "public", table: "department_categories" }, () => fetchAssignments())
@@ -677,7 +677,7 @@ function DailyEntryPage() {
       merged.forEach((row) => inserts.push(row));
     });
 
-    console.debug("[daily-entry] save", {
+    console.debug("[ot-entry] save", {
       projectId,
       entry_date,
       canEdit,
@@ -704,7 +704,7 @@ function DailyEntryPage() {
     const { error: delErr } = await delQ;
     if (delErr) {
       setSaving(false);
-      console.error("[daily-entry] delete failed", delErr);
+      console.error("[ot-entry] delete failed", delErr);
       return toast.error(delErr.message);
     }
 
@@ -726,7 +726,7 @@ function DailyEntryPage() {
 
     setSaving(false);
     if (error) {
-      console.error("[daily-entry] insert failed", error);
+      console.error("[ot-entry] insert failed", error);
       return toast.error(error.message);
     }
     await loadEntries(); await loadAllSheets();
