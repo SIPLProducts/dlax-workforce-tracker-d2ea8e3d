@@ -31,6 +31,7 @@ type Sheet = {
   submitted_at: string | null;
   rejection_remarks: string | null;
   total_headcount: number;
+  sheet_type: string | null;
 };
 
 type Level = { project_id: string; level_no: number; approver_user_id: string; label: string | null };
