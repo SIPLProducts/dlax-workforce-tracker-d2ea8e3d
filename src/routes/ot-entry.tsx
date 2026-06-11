@@ -660,11 +660,13 @@ function OtEntryPage() {
         const key = `${did}|${x.cell.catId}`;
         const remarks = idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null;
         const weather = idx === 0 ? (r.weather || null) : null;
+        const otVal = idx === 0 ? (otHoursNum != null && !Number.isNaN(otHoursNum) ? otHoursNum : null) : null;
         const existing = merged.get(key);
         if (existing) {
           existing.headcount += x.n;
           if (!existing.remarks && remarks) existing.remarks = remarks;
           if (!existing.weather_condition && weather) existing.weather_condition = weather;
+          if (existing.ot_hours == null && otVal != null) existing.ot_hours = otVal;
           return;
         }
         merged.set(key, {
@@ -676,6 +678,8 @@ function OtEntryPage() {
           headcount: x.n,
           remarks,
           weather_condition: weather,
+          ot_hours: otVal,
+          sheet_type: 'ot',
           status: 'draft',
           created_by: user.id,
           submitted_by: user.id,
