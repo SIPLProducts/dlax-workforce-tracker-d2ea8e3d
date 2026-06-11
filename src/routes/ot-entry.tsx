@@ -213,7 +213,6 @@ function OtEntryPage() {
     if (parsed) { setDate(parsed); setDateError(false); } else { setDateError(raw.length > 0); }
   };
 
-  const search = Route.useSearch();
 
   useEffect(() => {
     (async () => {
