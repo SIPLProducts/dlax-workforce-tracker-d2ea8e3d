@@ -807,8 +807,8 @@ function OtEntryPage() {
     <TooltipProvider>
     <div className="space-y-4 max-w-[100vw]">
       <PageHeader
-        title="Daily Manpower Entry"
-        subtitle="Daily Labour Attendance Register"
+        title="OT Entry Sheet"
+        subtitle="Overtime register for the previous day"
         actions={
           <>
             {!isEmpty && (
