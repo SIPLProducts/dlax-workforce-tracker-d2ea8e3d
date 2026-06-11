@@ -197,8 +197,6 @@ function OtEntryPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.project]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.project, search.date]);
 
   useEffect(() => {
     const fetchContractors = async () => {
