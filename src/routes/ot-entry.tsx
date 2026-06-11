@@ -357,14 +357,16 @@ function OtEntryPage() {
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
-        .select("id,contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
+        .select("id,contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status,ot_hours")
         .eq("project_id", projectId)
-        .eq("entry_date", format(date, "yyyy-MM-dd")),
+        .eq("entry_date", format(date, "yyyy-MM-dd"))
+        .eq("sheet_type", "ot"),
 
       supabase.from("daily_manpower_sheets")
         .select("id, sheet_code, status, current_level, total_levels, submitted_by")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"))
+        .eq("sheet_type", "ot")
         .maybeSingle(),
       supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
       supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
