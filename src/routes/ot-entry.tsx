@@ -25,6 +25,7 @@ import { ProjectCombobox } from "@/components/ProjectCombobox";
 export const Route = createFileRoute("/ot-entry")({
   validateSearch: (search: Record<string, unknown>) => ({
     project: typeof search.project === "string" ? search.project : undefined,
+    date: typeof search.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.date) ? search.date : undefined,
     from: search.from === "daily" ? ("daily" as const) : undefined,
   }),
   component: () => (
