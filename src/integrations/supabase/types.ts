@@ -97,12 +97,14 @@ export type Database = {
           l2_action_at: string | null
           l2_approver_id: string | null
           l2_remarks: string | null
+          ot_hours: number | null
           project_id: string
           rejected_by_level: number | null
           rejection_remarks: string | null
           remarks: string | null
           security_count: number
           sheet_id: string | null
+          sheet_type: string
           status: Database["public"]["Enums"]["approval_status"]
           submitted_at: string | null
           submitted_by: string | null
@@ -125,12 +127,14 @@ export type Database = {
           l2_action_at?: string | null
           l2_approver_id?: string | null
           l2_remarks?: string | null
+          ot_hours?: number | null
           project_id: string
           rejected_by_level?: number | null
           rejection_remarks?: string | null
           remarks?: string | null
           security_count?: number
           sheet_id?: string | null
+          sheet_type?: string
           status?: Database["public"]["Enums"]["approval_status"]
           submitted_at?: string | null
           submitted_by?: string | null
@@ -153,12 +157,14 @@ export type Database = {
           l2_action_at?: string | null
           l2_approver_id?: string | null
           l2_remarks?: string | null
+          ot_hours?: number | null
           project_id?: string
           rejected_by_level?: number | null
           rejection_remarks?: string | null
           remarks?: string | null
           security_count?: number
           sheet_id?: string | null
+          sheet_type?: string
           status?: Database["public"]["Enums"]["approval_status"]
           submitted_at?: string | null
           submitted_by?: string | null
@@ -212,6 +218,7 @@ export type Database = {
           project_id: string
           rejection_remarks: string | null
           sheet_code: string
+          sheet_type: string
           status: string
           submitted_at: string | null
           submitted_by: string | null
@@ -226,6 +233,7 @@ export type Database = {
           project_id: string
           rejection_remarks?: string | null
           sheet_code?: string
+          sheet_type?: string
           status?: string
           submitted_at?: string | null
           submitted_by?: string | null
@@ -240,6 +248,7 @@ export type Database = {
           project_id?: string
           rejection_remarks?: string | null
           sheet_code?: string
+          sheet_type?: string
           status?: string
           submitted_at?: string | null
           submitted_by?: string | null
@@ -794,6 +803,7 @@ export type Database = {
           project_id: string
           rejection_remarks: string | null
           sheet_code: string
+          sheet_type: string
           status: string
           submitted_at: string | null
           submitted_by: string | null
@@ -870,6 +880,7 @@ export type Database = {
           project_id: string
           rejection_remarks: string | null
           sheet_code: string
+          sheet_type: string
           status: string
           submitted_at: string | null
           submitted_by: string | null
@@ -893,6 +904,7 @@ export type Database = {
           project_id: string
           rejection_remarks: string | null
           sheet_code: string
+          sheet_type: string
           status: string
           submitted_at: string | null
           submitted_by: string | null
