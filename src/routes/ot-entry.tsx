@@ -958,6 +958,11 @@ function OtEntryPage() {
                       }))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotals[c.id] || ""}</td>
                       <td className="border">
+                        <input type="number" min={0} step="0.25" value={r.otHours} disabled={readOnly}
+                          onChange={(e) => updateField(c.id, "otHours", e.target.value)}
+                          className="w-full h-9 px-2 text-center text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-70" />
+                      </td>
+                      <td className="border">
                         <input value={r.remarks} disabled={readOnly}
                           onChange={(e) => updateField(c.id, "remarks", e.target.value)}
                           className="w-full h-9 px-2 text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-70" />
