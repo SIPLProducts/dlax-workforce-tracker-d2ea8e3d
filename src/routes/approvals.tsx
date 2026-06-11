@@ -66,7 +66,7 @@ function Page() {
     setLoading(true);
     const [sh, pr, lv] = await Promise.all([
       supabase.from("daily_manpower_sheets")
-        .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels, submitted_by, submitted_at, rejection_remarks")
+        .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels, submitted_by, submitted_at, rejection_remarks, sheet_type")
         .order("entry_date", { ascending: false })
         .limit(500),
       supabase.from("projects").select("id,name,code"),
