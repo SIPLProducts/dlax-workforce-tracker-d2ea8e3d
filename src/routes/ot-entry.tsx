@@ -52,8 +52,8 @@ const GROUP_PALETTE = [
 const OTHER_STYLE = { headerClass: "bg-slate-100 text-slate-900", cellClass: "bg-slate-50/40" };
 const cellKey = (d: string, c: string) => `${d}__${c}`;
 
-type RowData = { cells: Record<string, number>; remarks: string; weather: string };
-const emptyRow = (): RowData => ({ cells: {}, remarks: "", weather: "" });
+type RowData = { cells: Record<string, number>; remarks: string; weather: string; otHours: string };
+const emptyRow = (): RowData => ({ cells: {}, remarks: "", weather: "", otHours: "" });
 
 // Legacy JSON-blob keys → [department name, category name] for backward-compatible display
 const LEGACY_KEY_MAP: Record<string, [string, string]> = {
