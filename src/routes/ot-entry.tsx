@@ -25,9 +25,40 @@ import { ProjectCombobox } from "@/components/ProjectCombobox";
 export const Route = createFileRoute("/ot-entry")({
   validateSearch: (search: Record<string, unknown>) => ({
     project: typeof search.project === "string" ? search.project : undefined,
+    from: search.from === "daily" ? ("daily" as const) : undefined,
   }),
-  component: () => <ScreenGuard screen="ot_entry"><OtEntryPage /></ScreenGuard>,
+  component: () => (
+    <ScreenGuard screen="ot_entry">
+      <OtEntryRoot />
+    </ScreenGuard>
+  ),
 });
+
+function OtEntryRoot() {
+  const search = Route.useSearch();
+  if (search.from !== "daily") return <OtEntryLanding />;
+  return <OtEntryPage />;
+}
+
+function OtEntryLanding() {
+  const navigate = useNavigate();
+  return (
+    <div className="space-y-4 max-w-[100vw]">
+      <PageHeader title="OT Entry Sheet" subtitle="Overtime register for the previous day" />
+      <Card>
+        <CardContent className="py-12 flex flex-col items-center text-center gap-4">
+          <h2 className="text-lg font-semibold">No OT session active</h2>
+          <p className="text-sm text-muted-foreground max-w-md">
+            OT Entry opens from the Daily Entry Sheet. Save today's Daily Entry and choose
+            <span className="font-medium"> &ldquo;Yes&rdquo; </span>
+            on the OT prompt to begin entering overtime for the previous day.
+          </p>
+          <Button onClick={() => navigate({ to: "/daily-entry" })}>Go to Daily Entry</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 const yesterdayDate = () => {
   const d = new Date();
@@ -190,7 +221,7 @@ function OtEntryPage() {
   useEffect(() => {
     if (search.project) setProjectId(search.project);
     if (search.project) {
-      pendingModeRef.current = "view";
+      pendingModeRef.current = "edit";
       setActiveTab("entry");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
