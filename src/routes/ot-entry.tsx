@@ -913,6 +913,7 @@ function OtEntryPage() {
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-0 z-20", g.headerClass)}>{g.deptName}</th>
                   ))}
                   <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px] sticky top-0 z-20">Total</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[90px] sticky top-0 z-20">Time (OT Hrs)</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px] sticky top-0 z-20">Remarks</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px] sticky top-0 z-20">Weather</th>
                 </tr>
