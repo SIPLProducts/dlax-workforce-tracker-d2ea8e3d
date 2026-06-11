@@ -1,33 +1,42 @@
-
 ## Goal
 
-When clicking **View** on a record in Approvals (or anywhere a sheet list is shown), an OT sheet must open the OT Entry Sheet — not the Daily Entry Sheet — and the saved OT data for that project/date must render correctly. Daily Entry behavior is unchanged.
+Refresh `dlax-user-manual.docx` to reflect the current roles & screen access, swap the Daily Entry Sheet figure, and add a new Project Assignment figure — using screenshots captured directly from the live app, framed with a visible border.
 
-## Changes
+## Steps
 
-### 1. `src/routes/approvals.tsx` — route View by sheet type
-- Add `sheet_type` to the `Sheet` type and to the `daily_manpower_sheets` select.
-- In the View button handler, branch:
-  - `sheet_type === "ot"` → `navigate({ to: "/ot-entry", search: { project: s.project_id, date: s.entry_date, from: "daily" } })`
-  - otherwise → existing `/daily-entry` navigation (unchanged).
-- No other approvals logic changes.
+1. **Capture screenshots from the live app**
+   - Log in to the preview as an Admin user.
+   - Navigate to `/daily-entry` → take full screenshot → save to `/tmp/daily-entry.png`.
+   - Navigate to `/masters/assignments` → take full screenshot → save to `/tmp/project-assignments.png`.
+   - Add a thin grey border (1–2 px, #CCCCCC) around each PNG using Pillow so the figures stand out on the page.
 
-### 2. `src/routes/ot-entry.tsx` — accept a `date` deep-link and load that sheet
-- Extend `validateSearch` to also accept `date` as a `yyyy-MM-dd` string (optional).
-- `OtEntryRoot` gate stays the same (`from === "daily"` shows the page; direct visits still show the landing card).
-- In `OtEntryPage`:
-  - If `search.date` is a valid `yyyy-MM-dd`, initialize `date` / `dateText` from it instead of yesterday; otherwise keep the current "yesterday" default.
-  - Add a `useEffect` on `search.date` that, when present, sets `date` + `dateText` and keeps the date input read-only (so the "previous day fully locked" rule still holds for entry, and View-from-approvals lands on the correct day).
-  - Existing loaders already filter on `sheet_type='ot'` + `entry_date`, so the saved OT rows, header fields (OT Hrs, Weather, Remarks), status badge, and approver/submitter info render automatically once `date` and `projectId` are set.
-  - Mode resolution is unchanged: past-dated sheets open in `view` mode; the user can still click Edit if the sheet is editable and they have permission.
+2. **Rewrite Section 3 — "Your Role Decides What You See"**
+   - Replace the existing role table with the 5-role structure from the reference, with one short sentence per role:
+     - **Project End User** – Daily Entry Screen — creates, edits and sends the daily sheet for approval (project specific).
+     - **Project Manager** – Daily Entry Screen and Approval — enters data and gives final approval (project specific).
+     - **Project Coordinator 1 & 2** – Contractor, Department, Categories and Project Assignment — create/edit master data and assign masters to multiple projects.
+     - **Project Incharge** – Controls the entire flow — view-and-monitor across assigned projects.
+     - **Administrator** – Creates users & roles — full control across all projects.
 
-### 3. No DB or migration changes
-- `sheet_type` already exists on `daily_manpower_sheets` and `daily_manpower`.
-- Approval workflow, RLS, OT save flow, and the Daily Entry → OT prompt are untouched.
+3. **Swap Daily Entry figure (Section 4)**
+   - Replace the old Daily Entry image (`media/dacb87921fbe93b9e8255ba312320230b85942a6.png`) with the new bordered screenshot.
+   - Keep caption "Figure 3 — Daily Manpower Entry".
 
-## Acceptance
+4. **Add Project Assignment figure (Section 8.2)**
+   - Insert the new bordered screenshot as a new Figure under §8.2.
+   - Update §8.2 paragraph to explicitly say: *"The **Project Coordinator** can access and use the Project Assignment screen to link contractors, departments and worker categories to specific projects."*
+   - Renumber subsequent figures.
 
-- From **Approvals**, clicking the eye icon on a Daily sheet → opens `/daily-entry` for that project/date (unchanged).
-- From **Approvals**, clicking the eye icon on an OT sheet → opens `/ot-entry` for that project/date, populated with the saved contractor rows, OT Hrs, Weather, Remarks, totals, and the correct status badge.
-- Direct navigation to `/ot-entry` still shows the "No OT session active" landing card.
-- Daily Entry → OT "Yes" prompt continues to open OT Entry for yesterday in edit mode.
+5. **Rebuild the DOCX**
+   - Unpack original, inject new media, edit XML for the roles table, figure swap, and §8.2 text.
+   - Repack and validate.
+   - Output to `/mnt/documents/dlax-user-manual.docx` and present via `<presentation-artifact>`.
+
+6. **QA**
+   - Convert the DOCX to PDF → render pages as images → visually verify the new screenshots, borders, roles table, and Project Assignment text.
+
+## Notes
+
+- No code changes to the app itself — this is a documentation update only.
+- Screenshots will be captured at desktop viewport (≥1280 px wide) for legibility.
+- Borders applied via Pillow `ImageOps.expand(img, border=2, fill="#cccccc")`.
