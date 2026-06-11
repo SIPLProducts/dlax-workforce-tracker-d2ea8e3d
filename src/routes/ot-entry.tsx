@@ -22,13 +22,19 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
 
-export const Route = createFileRoute("/daily-entry")({
+export const Route = createFileRoute("/ot-entry")({
   validateSearch: (search: Record<string, unknown>) => ({
     project: typeof search.project === "string" ? search.project : undefined,
-    date: typeof search.date === "string" ? search.date : undefined,
   }),
-  component: () => <ScreenGuard screen="daily_entry"><DailyEntryPage /></ScreenGuard>,
+  component: () => <ScreenGuard screen="ot_entry"><OtEntryPage /></ScreenGuard>,
 });
+
+const yesterdayDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 type Cell = { key: string; deptId: string; catId: string; deptName: string; catName: string };
 type GroupView = { deptId: string; deptName: string; headerClass: string; cellClass: string; cells: Cell[] };
@@ -46,8 +52,8 @@ const GROUP_PALETTE = [
 const OTHER_STYLE = { headerClass: "bg-slate-100 text-slate-900", cellClass: "bg-slate-50/40" };
 const cellKey = (d: string, c: string) => `${d}__${c}`;
 
-type RowData = { cells: Record<string, number>; remarks: string; weather: string };
-const emptyRow = (): RowData => ({ cells: {}, remarks: "", weather: "" });
+type RowData = { cells: Record<string, number>; remarks: string; weather: string; otHours: string };
+const emptyRow = (): RowData => ({ cells: {}, remarks: "", weather: "", otHours: "" });
 
 // Legacy JSON-blob keys → [department name, category name] for backward-compatible display
 const LEGACY_KEY_MAP: Record<string, [string, string]> = {
@@ -93,10 +99,10 @@ function statusMeta(s: string) {
   return map[s] || { cls: "", label: s };
 }
 
-function DailyEntryPage() {
+function OtEntryPage() {
   const { user } = useAuth();
-  const [date, setDate] = useState<Date>(new Date());
-  const [dateText, setDateText] = useState(format(new Date(), "dd/MM/yyyy"));
+  const [date, setDate] = useState<Date>(() => yesterdayDate());
+  const [dateText, setDateText] = useState(format(yesterdayDate(), "dd/MM/yyyy"));
   const [dateError, setDateError] = useState(false);
 
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
@@ -121,8 +127,6 @@ function DailyEntryPage() {
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
   const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
-  const [otPromptOpen, setOtPromptOpen] = useState(false);
-  const navigate = useNavigate();
   // Cells from saved daily_manpower rows whose (dept, cat) is no longer in the
   // project's current assignments. Rendered read-only so totals reconcile and
   // historical data isn't silently dropped from the grid.
@@ -145,7 +149,7 @@ function DailyEntryPage() {
   const readOnly = mode === "view" || !canEdit;
 
   const { canEdit: canEditPerm } = usePermissions();
-  const canEditScreen = canEditPerm("daily_entry");
+  const canEditScreen = canEditPerm("ot_entry");
   const requireEdit = () => {
     if (!canEditScreen) {
       toast.error("You are in View mode, not in Edit mode.");
@@ -182,19 +186,15 @@ function DailyEntryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Deep-link support: when arriving with ?project=&date=, preselect them and force View mode.
+  // OT page is always locked to yesterday — only support deep-link of project.
   useEffect(() => {
     if (search.project) setProjectId(search.project);
-    if (search.date) {
-      const d = parseDate(search.date, "yyyy-MM-dd", new Date());
-      if (isValid(d)) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
-    }
-    if (search.project || search.date) {
+    if (search.project) {
       pendingModeRef.current = "view";
       setActiveTab("entry");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.project, search.date]);
+  }, [search.project]);
 
   useEffect(() => {
     const fetchContractors = async () => {
@@ -216,7 +216,7 @@ function DailyEntryPage() {
       setContractorsReady(true);
     };
     fetchContractors();
-    const channel = supabase.channel("contractors-daily-entry")
+    const channel = supabase.channel("contractors-ot-entry")
       .on("postgres_changes", { event: "*", schema: "public", table: "contractors" }, () => fetchContractors())
       .on("postgres_changes", { event: "*", schema: "public", table: "project_contractors" }, () => fetchContractors())
       .subscribe();
@@ -249,7 +249,7 @@ function DailyEntryPage() {
       setAssignmentsReady(true);
     };
     fetchAssignments();
-    const channel = supabase.channel("assignments-daily-entry")
+    const channel = supabase.channel("assignments-ot-entry")
       .on("postgres_changes", { event: "*", schema: "public", table: "project_departments" }, () => fetchAssignments())
       .on("postgres_changes", { event: "*", schema: "public", table: "project_categories" }, () => fetchAssignments())
       .on("postgres_changes", { event: "*", schema: "public", table: "department_categories" }, () => fetchAssignments())
@@ -355,14 +355,16 @@ function DailyEntryPage() {
     setLoading(true);
     const [{ data: dm }, { data: sh }, { data: cfg }, { data: lvs }] = await Promise.all([
       supabase.from("daily_manpower")
-        .select("id,contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
+        .select("id,contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status,ot_hours")
         .eq("project_id", projectId)
-        .eq("entry_date", format(date, "yyyy-MM-dd")),
+        .eq("entry_date", format(date, "yyyy-MM-dd"))
+        .eq("sheet_type", "ot"),
 
       supabase.from("daily_manpower_sheets")
         .select("id, sheet_code, status, current_level, total_levels, submitted_by")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"))
+        .eq("sheet_type", "ot")
         .maybeSingle(),
       supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
       supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
@@ -377,6 +379,7 @@ function DailyEntryPage() {
       const r = next[rec.contractor_id] || emptyRow();
       // Header-level fields (kept on every row server-side; first non-empty wins)
       r.weather = r.weather || rec.weather_condition || "";
+      if (!r.otHours && rec.ot_hours != null) r.otHours = String(rec.ot_hours);
 
       // Try legacy JSON-blob remarks first
       let isLegacyBlob = false;
@@ -539,6 +542,7 @@ function DailyEntryPage() {
     const { data: sheets } = await supabase
       .from("daily_manpower_sheets")
       .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels")
+      .eq("sheet_type", "ot")
       .order("entry_date", { ascending: false })
       .limit(500);
     const sheetIds = (sheets || []).map((s: any) => s.id);
@@ -569,7 +573,7 @@ function DailyEntryPage() {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, cells: { ...curr.cells, [key]: val } } };
     });
-  const updateField = (cid: string, key: "remarks" | "weather", val: any) =>
+  const updateField = (cid: string, key: "remarks" | "weather" | "otHours", val: any) =>
     setRows((prev) => {
       const curr = prev[cid] || emptyRow();
       return { ...prev, [cid]: { ...curr, [key]: val } };
@@ -634,7 +638,8 @@ function DailyEntryPage() {
       const cellEntries = allCells
         .map((cell) => ({ cell, n: Number(r.cells[cell.key]) || 0 }))
         .filter((x) => x.n > 0);
-      const hasHeader = ((r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()));
+      const otHoursNum = r.otHours && r.otHours.trim() !== "" ? Number(r.otHours) : null;
+      const hasHeader = ((r.remarks && r.remarks.trim()) || (r.weather && r.weather.trim()) || (otHoursNum != null && !Number.isNaN(otHoursNum)));
       if (cellEntries.length === 0 && !hasHeader) return;
 
       // If only header-level data exists, anchor it to the first available cell (real dept, not "__other__")
@@ -653,11 +658,13 @@ function DailyEntryPage() {
         const key = `${did}|${x.cell.catId}`;
         const remarks = idx === 0 ? (r.remarks?.trim() ? r.remarks : null) : null;
         const weather = idx === 0 ? (r.weather || null) : null;
+        const otVal = idx === 0 ? (otHoursNum != null && !Number.isNaN(otHoursNum) ? otHoursNum : null) : null;
         const existing = merged.get(key);
         if (existing) {
           existing.headcount += x.n;
           if (!existing.remarks && remarks) existing.remarks = remarks;
           if (!existing.weather_condition && weather) existing.weather_condition = weather;
+          if (existing.ot_hours == null && otVal != null) existing.ot_hours = otVal;
           return;
         }
         merged.set(key, {
@@ -669,6 +676,8 @@ function DailyEntryPage() {
           headcount: x.n,
           remarks,
           weather_condition: weather,
+          ot_hours: otVal,
+          sheet_type: 'ot',
           status: 'draft',
           created_by: user.id,
           submitted_by: user.id,
@@ -677,7 +686,7 @@ function DailyEntryPage() {
       merged.forEach((row) => inserts.push(row));
     });
 
-    console.debug("[daily-entry] save", {
+    console.debug("[ot-entry] save", {
       projectId,
       entry_date,
       canEdit,
@@ -696,7 +705,8 @@ function DailyEntryPage() {
       .from("daily_manpower")
       .delete()
       .eq("project_id", projectId)
-      .eq("entry_date", entry_date);
+      .eq("entry_date", entry_date)
+      .eq("sheet_type", "ot");
     if (orphanRowIdsRef.current.length > 0) {
       // Postgres `not.in` requires a parenthesised list
       delQ = delQ.not("id", "in", `(${orphanRowIdsRef.current.join(",")})`);
@@ -704,7 +714,7 @@ function DailyEntryPage() {
     const { error: delErr } = await delQ;
     if (delErr) {
       setSaving(false);
-      console.error("[daily-entry] delete failed", delErr);
+      console.error("[ot-entry] delete failed", delErr);
       return toast.error(delErr.message);
     }
 
@@ -726,13 +736,12 @@ function DailyEntryPage() {
 
     setSaving(false);
     if (error) {
-      console.error("[daily-entry] insert failed", error);
+      console.error("[ot-entry] insert failed", error);
       return toast.error(error.message);
     }
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
-    setOtPromptOpen(true);
   };
 
 
@@ -759,8 +768,7 @@ function DailyEntryPage() {
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
     pendingModeRef.current = asMode;
     setProjectId(s.project_id);
-    const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
-    if (isValid(d)) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
+    // OT page is locked to yesterday; ignore historical sheet date.
     setMode(asMode);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -797,8 +805,8 @@ function DailyEntryPage() {
     <TooltipProvider>
     <div className="space-y-4 max-w-[100vw]">
       <PageHeader
-        title="Daily Manpower Entry"
-        subtitle="Daily Labour Attendance Register"
+        title="OT Entry Sheet"
+        subtitle="Overtime register for the previous day"
         actions={
           <>
             {!isEmpty && (
@@ -850,20 +858,8 @@ function DailyEntryPage() {
       <Card className="sticky top-[112px] md:top-[120px] z-20 bg-background">
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <label className="text-xs font-medium">Date</label>
-            <div className="flex gap-1">
-              <Input value={dateText} onChange={(e) => handleDateTextChange(e.target.value)} placeholder="dd/MM/yyyy"
-                className={cn("w-36", dateError && "border-destructive")} />
-              <Popover>
-                <PopoverTrigger asChild><Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={date}
-                    onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }}
-                    disabled={(d) => d > new Date(new Date().setHours(23, 59, 59, 999))}
-                    initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
+            <label className="text-xs font-medium">Date (Previous Day)</label>
+            <Input value={dateText} readOnly disabled className="w-36" />
           </div>
           <div className="space-y-1 min-w-[240px]">
             <label className="text-xs font-medium">Project</label>
@@ -915,6 +911,7 @@ function DailyEntryPage() {
                     <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-0 z-20", g.headerClass)}>{g.deptName}</th>
                   ))}
                   <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px] sticky top-0 z-20">Total</th>
+                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[90px] sticky top-0 z-20">Time (OT Hrs)</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px] sticky top-0 z-20">Remarks</th>
                   <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px] sticky top-0 z-20">Weather</th>
                 </tr>
@@ -928,9 +925,9 @@ function DailyEntryPage() {
 
 
               <tbody>
-                {loading && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
-                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + displayCells.length + 3} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
-                {!loading && contractors.length > 0 && displayCells.length === 0 && (<tr><td colSpan={5 + 3} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
+                {loading && (<tr><td colSpan={5 + displayCells.length + 4} className="text-center py-6 text-muted-foreground">Loading…</td></tr>)}
+                {!loading && contractors.length === 0 && (<tr><td colSpan={5 + displayCells.length + 4} className="text-center py-6 text-muted-foreground">No contractors assigned to this project. Assign some in Masters → Project Assignments.</td></tr>)}
+                {!loading && contractors.length > 0 && displayCells.length === 0 && (<tr><td colSpan={5 + 4} className="text-center py-6 text-muted-foreground">No departments or categories assigned to this project. Assign them in Masters → Project Assignments.</td></tr>)}
                 {displayCells.length > 0 && contractors.map((c, idx) => {
                   const r = rows[c.id] || emptyRow();
                   return (
@@ -958,6 +955,11 @@ function DailyEntryPage() {
                         );
                       }))}
                       <td className="border bg-green-50 text-center font-semibold">{rowTotals[c.id] || ""}</td>
+                      <td className="border">
+                        <input type="number" min={0} step="0.25" value={r.otHours} disabled={readOnly}
+                          onChange={(e) => updateField(c.id, "otHours", e.target.value)}
+                          className="w-full h-9 px-2 text-center text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-70" />
+                      </td>
                       <td className="border">
                         <input value={r.remarks} disabled={readOnly}
                           onChange={(e) => updateField(c.id, "remarks", e.target.value)}
@@ -988,7 +990,7 @@ function DailyEntryPage() {
                     {displayCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
-
+                    <td className="border"></td>
                     <td className="border"></td>
                   </tr>
                 </tfoot>
@@ -1009,7 +1011,7 @@ function DailyEntryPage() {
               <h2 className="text-lg font-semibold">Saved Entries</h2>
               <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load in the Entry Sheet tab.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(new Date()); setDateText(format(new Date(), "dd/MM/yyyy")); setActiveTab("entry"); }}>
+            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(yesterdayDate()); setDateText(format(yesterdayDate(), "dd/MM/yyyy")); setActiveTab("entry"); }}>
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
@@ -1068,22 +1070,6 @@ function DailyEntryPage() {
       </Card>
         </TabsContent>
       </Tabs>
-
-      <Dialog open={otPromptOpen} onOpenChange={setOtPromptOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enter OT?</DialogTitle>
-            <DialogDescription>Do you want to enter OT?</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOtPromptOpen(false)}>No</Button>
-            <Button onClick={() => {
-              setOtPromptOpen(false);
-              navigate({ to: "/ot-entry", search: { project: projectId || undefined } });
-            }}>Yes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
     </TooltipProvider>
   );

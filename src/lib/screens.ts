@@ -3,6 +3,7 @@
 export const APP_SCREENS = [
   { key: "dashboard", label: "Dashboard", path: "/" },
   { key: "daily_entry", label: "Daily Entry", path: "/daily-entry" },
+  { key: "ot_entry", label: "OT Entry Sheet", path: "/ot-entry" },
   { key: "approvals", label: "Approvals", path: "/approvals" },
   { key: "reports", label: "Reports", path: "/reports" },
   { key: "masters_projects", label: "Projects (Master)", path: "/masters/projects" },

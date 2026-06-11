@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as OtEntryRouteImport } from './routes/ot-entry'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DailyEntryRouteImport } from './routes/daily-entry'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
@@ -30,6 +31,11 @@ const UsersRoute = UsersRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OtEntryRoute = OtEntryRouteImport.update({
+  id: '/ot-entry',
+  path: '/ot-entry',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
+  '/ot-entry': typeof OtEntryRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
+  '/ot-entry': typeof OtEntryRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
   '/login': typeof LoginRoute
+  '/ot-entry': typeof OtEntryRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/daily-entry'
     | '/login'
+    | '/ot-entry'
     | '/reports'
     | '/users'
     | '/masters/approvals'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/daily-entry'
     | '/login'
+    | '/ot-entry'
     | '/reports'
     | '/users'
     | '/masters/approvals'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/daily-entry'
     | '/login'
+    | '/ot-entry'
     | '/reports'
     | '/users'
     | '/masters/approvals'
@@ -176,6 +188,7 @@ export interface RootRouteChildren {
   ApprovalsRoute: typeof ApprovalsRoute
   DailyEntryRoute: typeof DailyEntryRoute
   LoginRoute: typeof LoginRoute
+  OtEntryRoute: typeof OtEntryRoute
   ReportsRoute: typeof ReportsRoute
   UsersRoute: typeof UsersRoute
   MastersApprovalsRoute: typeof MastersApprovalsRoute
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ot-entry': {
+      id: '/ot-entry'
+      path: '/ot-entry'
+      fullPath: '/ot-entry'
+      preLoaderRoute: typeof OtEntryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -280,6 +300,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApprovalsRoute: ApprovalsRoute,
   DailyEntryRoute: DailyEntryRoute,
   LoginRoute: LoginRoute,
+  OtEntryRoute: OtEntryRoute,
   ReportsRoute: ReportsRoute,
   UsersRoute: UsersRoute,
   MastersApprovalsRoute: MastersApprovalsRoute,

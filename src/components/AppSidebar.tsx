@@ -35,6 +35,7 @@ import { KpcLogo } from "@/components/KpcLogo";
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, screen: "dashboard" },
   { to: "/daily-entry", label: "Daily Entry", icon: ClipboardList, screen: "daily_entry" },
+  { to: "/ot-entry", label: "OT Entry Sheet", icon: ClipboardList, screen: "ot_entry" },
   { to: "/approvals", label: "Approvals", icon: CheckCircle2, screen: "approvals" },
 ];
 
