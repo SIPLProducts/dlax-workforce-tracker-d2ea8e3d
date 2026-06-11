@@ -121,6 +121,8 @@ function DailyEntryPage() {
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
   const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
+  const [otPromptOpen, setOtPromptOpen] = useState(false);
+  const navigate = useNavigate();
   // Cells from saved daily_manpower rows whose (dept, cat) is no longer in the
   // project's current assignments. Rendered read-only so totals reconcile and
   // historical data isn't silently dropped from the grid.
