@@ -25,10 +25,16 @@ import { ProjectCombobox } from "@/components/ProjectCombobox";
 export const Route = createFileRoute("/ot-entry")({
   validateSearch: (search: Record<string, unknown>) => ({
     project: typeof search.project === "string" ? search.project : undefined,
-    date: typeof search.date === "string" ? search.date : undefined,
   }),
   component: () => <ScreenGuard screen="ot_entry"><OtEntryPage /></ScreenGuard>,
 });
+
+const yesterdayDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 type Cell = { key: string; deptId: string; catId: string; deptName: string; catName: string };
 type GroupView = { deptId: string; deptName: string; headerClass: string; cellClass: string; cells: Cell[] };
