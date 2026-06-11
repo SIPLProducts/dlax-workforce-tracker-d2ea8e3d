@@ -9,6 +9,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { APP_SCREENS, type PermissionLevel } from "@/lib/screens";
+import { useServerFn } from "@tanstack/react-start";
+import { adminSaveRole } from "@/utils/admin-roles.functions";
 
 type Props = {
   open: boolean;
@@ -24,6 +26,7 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [currentRoleId, setCurrentRoleId] = useState<string | null>(null);
+  const saveRoleFn = useServerFn(adminSaveRole);
 
   useEffect(() => {
     if (!open) return;
@@ -70,53 +73,24 @@ export function RolePermissionsDialog({ open, onOpenChange, roleId, onSaved }: P
     }
     setSaving(true);
     try {
-      const lockedId = currentRoleId;
-      // Pre-check for duplicate name (case-insensitive)
-      const { data: dup } = await supabase
-        .from("custom_roles")
-        .select("id")
-        .ilike("name", trimmed)
-        .limit(1);
-      const duplicate = (dup || []).find((r: any) => r.id !== lockedId);
-      if (duplicate) {
-        toast.error(`A role named "${trimmed}" already exists`);
-        setSaving(false);
-        return;
-      }
-
-      let id = lockedId;
-      if (id) {
-        const { error } = await supabase
-          .from("custom_roles")
-          .update({ name: trimmed, description: description.trim() || null })
-          .eq("id", id);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("custom_roles")
-          .insert({ name: trimmed, description: description.trim() || null })
-          .select("id")
-          .single();
-        if (error) throw error;
-        id = data.id;
-      }
-
-      // Replace permissions
-      await supabase.from("role_screen_permissions").delete().eq("role_id", id!);
-      const rows = APP_SCREENS.map((s) => ({
-        role_id: id!,
-        screen_key: s.key,
-        permission: perms[s.key] || "none",
-      }));
-      const { error: insErr } = await supabase.from("role_screen_permissions").insert(rows);
-      if (insErr) throw insErr;
-
-      toast.success(lockedId ? "Role updated" : "Role created");
+      const permissions: Record<string, PermissionLevel> = {};
+      APP_SCREENS.forEach((s) => {
+        permissions[s.key] = perms[s.key] || "none";
+      });
+      await saveRoleFn({
+        data: {
+          id: currentRoleId,
+          name: trimmed,
+          description: description.trim() || null,
+          permissions,
+        },
+      });
+      toast.success(currentRoleId ? "Role updated" : "Role created");
       onSaved();
       onOpenChange(false);
     } catch (err: any) {
       const msg = err?.message || "Failed to save role";
-      if (/custom_roles_name_key|duplicate key/i.test(msg)) {
+      if (/already exists|duplicate key|custom_roles_name_key/i.test(msg)) {
         toast.error(`A role named "${trimmed}" already exists`);
       } else {
         toast.error(msg);
