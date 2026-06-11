@@ -31,6 +31,7 @@ type Sheet = {
   submitted_at: string | null;
   rejection_remarks: string | null;
   total_headcount: number;
+  sheet_type: string | null;
 };
 
 type Level = { project_id: string; level_no: number; approver_user_id: string; label: string | null };
@@ -65,7 +66,7 @@ function Page() {
     setLoading(true);
     const [sh, pr, lv] = await Promise.all([
       supabase.from("daily_manpower_sheets")
-        .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels, submitted_by, submitted_at, rejection_remarks")
+        .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels, submitted_by, submitted_at, rejection_remarks, sheet_type")
         .order("entry_date", { ascending: false })
         .limit(500),
       supabase.from("projects").select("id,name,code"),
@@ -151,7 +152,7 @@ function Page() {
             <TableCell>{statusBadge(s.status, s.current_level, s.total_levels)}</TableCell>
             <TableCell className="text-right">
               <div className="flex justify-end gap-1">
-                <Button size="sm" variant="ghost" onClick={() => navigate({ to: "/daily-entry", search: { project: s.project_id, date: s.entry_date } })}><Eye className="w-4 h-4" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => navigate(s.sheet_type === "ot" ? { to: "/ot-entry", search: { project: s.project_id, date: s.entry_date, from: "daily" } } : { to: "/daily-entry", search: { project: s.project_id, date: s.entry_date } })}><Eye className="w-4 h-4" /></Button>
                 {showActions && s.status === "pending" && (isCurrentApprover(s) || isAdmin) && (
                   <>
                     <Button size="sm" variant="default" onClick={() => approve(s)} disabled={actioning}>

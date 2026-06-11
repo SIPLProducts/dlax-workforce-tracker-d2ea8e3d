@@ -25,6 +25,7 @@ import { ProjectCombobox } from "@/components/ProjectCombobox";
 export const Route = createFileRoute("/ot-entry")({
   validateSearch: (search: Record<string, unknown>) => ({
     project: typeof search.project === "string" ? search.project : undefined,
+    date: typeof search.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.date) ? search.date : undefined,
     from: search.from === "daily" ? ("daily" as const) : undefined,
   }),
   component: () => (
@@ -132,8 +133,16 @@ function statusMeta(s: string) {
 
 function OtEntryPage() {
   const { user } = useAuth();
-  const [date, setDate] = useState<Date>(() => yesterdayDate());
-  const [dateText, setDateText] = useState(format(yesterdayDate(), "dd/MM/yyyy"));
+  const search = Route.useSearch();
+  const initialDate = (() => {
+    if (search.date) {
+      const d = parseDate(search.date, "yyyy-MM-dd", new Date());
+      if (isValid(d)) { d.setHours(0, 0, 0, 0); return d; }
+    }
+    return yesterdayDate();
+  })();
+  const [date, setDate] = useState<Date>(() => initialDate);
+  const [dateText, setDateText] = useState(format(initialDate, "dd/MM/yyyy"));
   const [dateError, setDateError] = useState(false);
 
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
@@ -204,7 +213,6 @@ function OtEntryPage() {
     if (parsed) { setDate(parsed); setDateError(false); } else { setDateError(raw.length > 0); }
   };
 
-  const search = Route.useSearch();
 
   useEffect(() => {
     (async () => {
@@ -217,15 +225,26 @@ function OtEntryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // OT page is always locked to yesterday — only support deep-link of project.
+  // Deep-link: project + optional date (View from Approvals passes a specific date).
   useEffect(() => {
     if (search.project) setProjectId(search.project);
+    if (search.date) {
+      const d = parseDate(search.date, "yyyy-MM-dd", new Date());
+      if (isValid(d)) {
+        d.setHours(0, 0, 0, 0);
+        setDate(d);
+        setDateText(format(d, "dd/MM/yyyy"));
+      }
+    }
     if (search.project) {
-      pendingModeRef.current = "edit";
+      // When opened with an explicit date (View from Approvals) default to view;
+      // otherwise (Daily Entry → OT prompt) default to edit.
+      pendingModeRef.current = search.date ? "view" : "edit";
       setActiveTab("entry");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.project]);
+  }, [search.project, search.date]);
+
 
   useEffect(() => {
     const fetchContractors = async () => {

@@ -1,37 +1,33 @@
-# Fix OT Entry Sheet — disabled-on-direct-open
 
-## Problem
+## Goal
 
-Opening `/ot-entry` from the sidebar shows the full grid in read-only/disabled state with no way to enter data. The screen should only load contractor data and become editable when the user clicked **Yes** on the Daily Entry OT popup.
-
-Root cause in `src/routes/ot-entry.tsx`:
-- `mode` defaults to `"view"`, so `readOnly = mode === "view" || !canEdit` → grid renders disabled.
-- The Edit button is gated by `canEdit` (sheet status); for a fresh empty sheet that's fine, but no `from=daily` signal currently switches it to edit automatically.
-- Data loads unconditionally as soon as the route mounts.
+When clicking **View** on a record in Approvals (or anywhere a sheet list is shown), an OT sheet must open the OT Entry Sheet — not the Daily Entry Sheet — and the saved OT data for that project/date must render correctly. Daily Entry behavior is unchanged.
 
 ## Changes
 
-### 1. `src/routes/daily-entry.tsx`
-On the OT popup "Yes" navigation, pass an extra flag:
-```ts
-navigate({ to: "/ot-entry", search: { project: projectId || undefined, from: "daily" } });
-```
+### 1. `src/routes/approvals.tsx` — route View by sheet type
+- Add `sheet_type` to the `Sheet` type and to the `daily_manpower_sheets` select.
+- In the View button handler, branch:
+  - `sheet_type === "ot"` → `navigate({ to: "/ot-entry", search: { project: s.project_id, date: s.entry_date, from: "daily" } })`
+  - otherwise → existing `/daily-entry` navigation (unchanged).
+- No other approvals logic changes.
 
-### 2. `src/routes/ot-entry.tsx`
-- Extend `validateSearch` to also read `from: "daily" | undefined`.
-- Add a `triggered = search.from === "daily"` gate.
-- **Direct open (no `from=daily`)**: render an empty landing state — header + a centered Card saying *"OT Entry opens from the Daily Entry Sheet. Save today's Daily Entry and choose 'Yes' on the OT prompt to begin."* with a button **Go to Daily Entry** (`navigate({ to: "/daily-entry" })`). Skip all data fetching (contractors / assignments / sheet load) when `!triggered`.
-- **Triggered open (`from=daily`)**: keep current behaviour, but:
-  - Set initial `mode` to `"edit"` (instead of view) so fields are immediately editable.
-  - Keep the previous-day date locked (unchanged).
-  - All approval/save flow (`Send to Approval`, totals, Saved Entries tab) stays identical.
+### 2. `src/routes/ot-entry.tsx` — accept a `date` deep-link and load that sheet
+- Extend `validateSearch` to also accept `date` as a `yyyy-MM-dd` string (optional).
+- `OtEntryRoot` gate stays the same (`from === "daily"` shows the page; direct visits still show the landing card).
+- In `OtEntryPage`:
+  - If `search.date` is a valid `yyyy-MM-dd`, initialize `date` / `dateText` from it instead of yesterday; otherwise keep the current "yesterday" default.
+  - Add a `useEffect` on `search.date` that, when present, sets `date` + `dateText` and keeps the date input read-only (so the "previous day fully locked" rule still holds for entry, and View-from-approvals lands on the correct day).
+  - Existing loaders already filter on `sheet_type='ot'` + `entry_date`, so the saved OT rows, header fields (OT Hrs, Weather, Remarks), status badge, and approver/submitter info render automatically once `date` and `projectId` are set.
+  - Mode resolution is unchanged: past-dated sheets open in `view` mode; the user can still click Edit if the sheet is editable and they have permission.
 
-### 3. Sidebar (`src/components/AppSidebar.tsx`)
-Leave the "OT Entry Sheet" link in place — clicking it now lands on the empty informational screen, which matches the requested "initially empty" behaviour.
+### 3. No DB or migration changes
+- `sheet_type` already exists on `daily_manpower_sheets` and `daily_manpower`.
+- Approval workflow, RLS, OT save flow, and the Daily Entry → OT prompt are untouched.
 
-## Technical notes
+## Acceptance
 
-- No DB / migration changes.
-- `from` is a transient UI flag only; not persisted.
-- Approval workflow, `sheet_type='ot'` scoping, and the Time (OT Hrs) column are untouched.
-- Permission checks (`canEditPerm("ot_entry")`) still apply on top of the new mode default.
+- From **Approvals**, clicking the eye icon on a Daily sheet → opens `/daily-entry` for that project/date (unchanged).
+- From **Approvals**, clicking the eye icon on an OT sheet → opens `/ot-entry` for that project/date, populated with the saved contractor rows, OT Hrs, Weather, Remarks, totals, and the correct status badge.
+- Direct navigation to `/ot-entry` still shows the "No OT session active" landing card.
+- Daily Entry → OT "Yes" prompt continues to open OT Entry for yesterday in edit mode.
