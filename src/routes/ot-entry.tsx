@@ -133,8 +133,16 @@ function statusMeta(s: string) {
 
 function OtEntryPage() {
   const { user } = useAuth();
-  const [date, setDate] = useState<Date>(() => yesterdayDate());
-  const [dateText, setDateText] = useState(format(yesterdayDate(), "dd/MM/yyyy"));
+  const search = Route.useSearch();
+  const initialDate = (() => {
+    if (search.date) {
+      const d = parseDate(search.date, "yyyy-MM-dd", new Date());
+      if (isValid(d)) { d.setHours(0, 0, 0, 0); return d; }
+    }
+    return yesterdayDate();
+  })();
+  const [date, setDate] = useState<Date>(() => initialDate);
+  const [dateText, setDateText] = useState(format(initialDate, "dd/MM/yyyy"));
   const [dateError, setDateError] = useState(false);
 
   const [projects, setProjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
