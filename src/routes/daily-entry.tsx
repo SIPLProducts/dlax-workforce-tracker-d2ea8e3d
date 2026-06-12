@@ -541,6 +541,7 @@ function DailyEntryPage() {
     const { data: sheets } = await supabase
       .from("daily_manpower_sheets")
       .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels")
+      .eq("sheet_type", "daily")
       .order("entry_date", { ascending: false })
       .limit(500);
     const sheetIds = (sheets || []).map((s: any) => s.id);
