@@ -246,8 +246,13 @@ export function GlobalSearch() {
     };
   }, [open, results.length]);
 
-  // Debounced query
+  // Debounced query (data mode only)
   useEffect(() => {
+    if (mode !== "data") {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
     const term = query.trim();
     if (term.length < 2) {
       setResults([]);
@@ -265,7 +270,18 @@ export function GlobalSearch() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, mode]);
+
+  const menuResults = useMemo(() => {
+    if (mode !== "menu") return [];
+    const allowed = APP_SCREENS.filter((s) => canView(s.key as ScreenKey));
+    const q = query.trim().toLowerCase();
+    if (!q) return allowed;
+    return allowed.filter(
+      (s) => s.label.toLowerCase().includes(q) || s.key.toLowerCase().includes(q)
+    );
+  }, [mode, query, canView]);
+
 
   const groups = useMemo(() => {
     return {
