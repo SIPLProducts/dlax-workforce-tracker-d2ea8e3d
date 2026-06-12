@@ -183,8 +183,18 @@ async function searchAll(term: string): Promise<Result[]> {
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<"data" | "menu">(() => {
+    if (typeof window === "undefined") return "data";
+    return (localStorage.getItem("globalSearchMode") as "data" | "menu") || "data";
+  });
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
+  const { canView } = usePermissions();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem("globalSearchMode", mode);
+  }, [mode]);
+
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const navigate = useNavigate();
   const reqId = useRef(0);
