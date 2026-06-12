@@ -343,7 +343,7 @@ export function GlobalSearch() {
               inputRef.current?.blur();
             }
           }}
-          placeholder="Search anything…"
+          placeholder={mode === "menu" ? "Search menus…" : "Search anything…"}
           aria-label="Global search"
           className="h-9 pl-8 pr-12"
         />
