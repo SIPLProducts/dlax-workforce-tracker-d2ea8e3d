@@ -232,6 +232,9 @@ function OtEntryPage() {
       pendingModeRef.current = search.date ? "view" : "edit";
       setActiveTab("entry");
     }
+    if (search.from === "daily" || !!search.date) {
+      setEditorMode(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.project, search.date]);
 
