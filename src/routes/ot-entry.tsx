@@ -961,7 +961,7 @@ function OtEntryPage() {
           </div>
           <div className="space-y-1 min-w-[240px]">
             <label className="text-xs font-medium">Project</label>
-            <ProjectCombobox value={projectId} onChange={setProjectId} projects={projects} placeholder="Select project" />
+            <ProjectCombobox value={projectId} onChange={(v) => { openedSheetRef.current = false; setProjectId(v); }} projects={projects} placeholder="Select project" />
           </div>
           <div className="ml-auto flex items-center gap-2 flex-wrap">
             {sheet?.sheet_code && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheet.sheet_code}</span></div>}
