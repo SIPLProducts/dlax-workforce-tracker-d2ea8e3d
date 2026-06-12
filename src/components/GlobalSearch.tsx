@@ -10,8 +10,11 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
-import { Search, Briefcase, HardHat, Layers, Tag, FileText, User } from "lucide-react";
+import { Search, Briefcase, HardHat, Layers, Tag, FileText, User, LayoutGrid } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { APP_SCREENS, type ScreenKey } from "@/lib/screens";
+import { usePermissions } from "@/hooks/use-permissions";
+
 
 type Result =
   | { kind: "project"; id: string; title: string; subtitle?: string }
