@@ -403,6 +403,31 @@ function OtEntryPage() {
     if (!projectId) return;
     const loadSeq = ++loadSeqRef.current;
     if (!contractorsReady || !assignmentsReady) return;
+
+    // Fresh OT session: keep grid blank until the user explicitly opens a
+    // saved sheet via Saved Entries → View/Edit (or a deep-link with date).
+    if (!openedSheetRef.current) {
+      setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
+      setOrphanCells([]);
+      orphanRowIdsRef.current = [];
+      setRowCount(0);
+      setSheet(null);
+      setSubmitterName("");
+      // Still load approval config/levels so the action buttons reflect the project.
+      const [{ data: cfg }, { data: lvs }] = await Promise.all([
+        supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
+        supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
+      ]);
+      if (loadSeq !== loadSeqRef.current) return;
+      setApprovalEnabled(!!(cfg as any)?.approval_enabled);
+      setLevels((lvs || []) as any[]);
+      setApproverNames({});
+      pendingModeRef.current = null;
+      setMode("edit");
+      setLoading(false);
+      return;
+    }
+
     if (contractors.length > 0 && allCells.length === 0) {
       setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
       setOrphanCells([]);
