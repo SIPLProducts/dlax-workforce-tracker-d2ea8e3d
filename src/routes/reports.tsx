@@ -19,6 +19,9 @@ import { ClientOnly } from "@tanstack/react-router";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
+import { DlrDailyPreview } from "@/components/DlrDailyPreview";
+import { getDlrDailyMatrix, downloadDlrXlsx, downloadDlrCsv } from "@/lib/dlr-daily";
+import { FileSpreadsheet, FileText } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
@@ -265,11 +268,21 @@ function ReportsPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-4 sm:flex">
           <TabsTrigger value="daily">Daily</TabsTrigger>
           <TabsTrigger value="project">Project</TabsTrigger>
           <TabsTrigger value="contractor">Contractor</TabsTrigger>
+          <TabsTrigger value="dlr">Daily Labour Report</TabsTrigger>
         </TabsList>
+
+        {tab === "dlr" ? (
+          <DlrTab projects={projects} />
+        ) : (
+          <></>
+        )}
+        {tab !== "dlr" && (
+        <>
+
 
         {/* Filters */}
         <Card>
@@ -463,6 +476,8 @@ function ReportsPage() {
             </div>
           </CardContent>
         </Card>
+        </>
+        )}
       </Tabs>
 
       <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
@@ -592,6 +607,102 @@ function ReportsPage() {
           })()}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function DlrTab({ projects }: { projects: any[] }) {
+  const [projectId, setProjectId] = useState<string>("");
+  const [date, setDate] = useState<Date>(new Date());
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
+
+  useEffect(() => {
+    if (!projectId) { setRows([]); return; }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("daily_manpower")
+        .select("*, contractors(company_name, nature_of_work), departments(name), worker_categories(name)")
+        .eq("project_id", projectId)
+        .eq("entry_date", format(date, "yyyy-MM-dd"));
+      if (cancelled) return;
+      if (error) { console.error(error); setRows([]); }
+      else setRows(data || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, date]);
+
+  const matrix = useMemo(() => {
+    if (!project) return null;
+    return getDlrDailyMatrix({ project, date, rows });
+  }, [project, date, rows]);
+
+  const fileBase = project
+    ? `DLR-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(date, "dd-MM-yyyy")}`
+    : "DLR";
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Daily Labour Report</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <div className="space-y-1 min-w-0">
+              <Label>Project</Label>
+              <ProjectCombobox
+                value={projectId}
+                onChange={setProjectId}
+                projects={projects}
+                className="w-full"
+                formatLabel={(p) => [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
+              />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <Label>Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(date, "dd MMM yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex gap-2 sm:col-span-2 lg:col-span-2">
+              <Button
+                onClick={() => matrix && downloadDlrXlsx(matrix, `${fileBase}.xlsx`)}
+                disabled={!matrix}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Download Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => matrix && downloadDlrCsv(matrix, `${fileBase}.csv`)}
+                disabled={!matrix}
+              >
+                <FileText className="mr-2 h-4 w-4" /> Download CSV
+              </Button>
+            </div>
+          </div>
+          {!projectId && (
+            <p className="text-sm text-muted-foreground">Select a project and date to preview and download the report.</p>
+          )}
+          {projectId && loading && (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          )}
+          {projectId && !loading && matrix && <DlrDailyPreview matrix={matrix} />}
+        </CardContent>
+      </Card>
     </div>
   );
 }
