@@ -215,26 +215,45 @@ function OtEntryPage() {
 
   // Deep-link: project + optional date (View from Approvals passes a specific date).
   useEffect(() => {
-    if (search.project) setProjectId(search.project);
-    if (search.date) {
-      const d = parseDate(search.date, "yyyy-MM-dd", new Date());
-      if (isValid(d)) {
-        d.setHours(0, 0, 0, 0);
-        setDate(d);
-        setDateText(format(d, "dd/MM/yyyy"));
+    (async () => {
+      if (search.project) setProjectId(search.project);
+      if (search.date) {
+        const d = parseDate(search.date, "yyyy-MM-dd", new Date());
+        if (isValid(d)) {
+          d.setHours(0, 0, 0, 0);
+          setDate(d);
+          setDateText(format(d, "dd/MM/yyyy"));
+        }
       }
-    }
-    if (search.project) {
-      // When opened with an explicit date (View from Approvals, or Daily
-      // Entry → OT prompt) we treat it as opening that specific sheet.
-      // Without a date, this is a fresh blank OT session.
-      openedSheetRef.current = !!search.date;
-      pendingModeRef.current = search.date ? "view" : "edit";
-      setActiveTab("entry");
-    }
-    if (search.from === "daily" || !!search.date) {
-      setEditorMode(true);
-    }
+      if (search.project) {
+        // When opened from Daily Entry → OT prompt, only treat as opening an
+        // existing sheet if one actually exists for that project+date.
+        // Otherwise start a blank editor so a new OT sheet can be created.
+        if (search.from === "daily" && search.date) {
+          const { data: existing } = await supabase
+            .from("daily_manpower_sheets")
+            .select("id")
+            .eq("project_id", search.project)
+            .eq("entry_date", search.date)
+            .eq("sheet_type", "ot")
+            .maybeSingle();
+          if (existing) {
+            openedSheetRef.current = true;
+            pendingModeRef.current = "view";
+          } else {
+            openedSheetRef.current = false;
+            pendingModeRef.current = "edit";
+          }
+        } else {
+          openedSheetRef.current = !!search.date;
+          pendingModeRef.current = search.date ? "view" : "edit";
+        }
+        setActiveTab("entry");
+      }
+      if (search.from === "daily" || !!search.date) {
+        setEditorMode(true);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.project, search.date]);
 
