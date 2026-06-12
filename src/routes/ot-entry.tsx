@@ -877,7 +877,7 @@ function OtEntryPage() {
     <div className="space-y-4 max-w-[100vw]">
       <PageHeader
         title="OT Entry Sheet"
-        subtitle="Overtime register for the previous day"
+        subtitle={editorMode ? "Overtime register for the previous day" : "Saved overtime entries"}
         actions={
           editorMode ? (
           <>
