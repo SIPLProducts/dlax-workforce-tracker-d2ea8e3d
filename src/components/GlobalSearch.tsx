@@ -358,8 +358,60 @@ export function GlobalSearch() {
           style={{ position: "fixed", top: panelPos.top, left: panelPos.left, width: panelPos.width }}
           className="z-[1000] rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden"
         >
+          <div className="flex items-center gap-1 border-b bg-muted/40 p-1.5">
+            <button
+              type="button"
+              onClick={() => setMode("menu")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                mode === "menu"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Menu
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("data")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                mode === "data"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Data
+            </button>
+          </div>
           <Command shouldFilter={false} className="bg-popover">
             <CommandList className="max-h-[55vh] bg-popover">
+              {mode === "menu" ? (
+                menuResults.length === 0 ? (
+                  <CommandEmpty>No matching screens.</CommandEmpty>
+                ) : (
+                  <CommandGroup heading="Screens">
+                    {menuResults.map((s) => (
+                      <CommandItem
+                        key={`m-${s.key}`}
+                        value={`menu ${s.label} ${s.key}`}
+                        onSelect={() => {
+                          setOpen(false);
+                          setQuery("");
+                          navigate({ to: s.path as any });
+                        }}
+                      >
+                        <LayoutGrid className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{s.label}</span>
+                          <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">
+                            {s.path}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )
+              ) : (
+                <>
               {query.trim().length < 2 ? (
                 <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>
               ) : loading ? (
@@ -367,6 +419,7 @@ export function GlobalSearch() {
               ) : results.length === 0 ? (
                 <CommandEmpty>No results found.</CommandEmpty>
               ) : null}
+
 
               {groups.project.length > 0 && (
                 <CommandGroup heading="Projects">
