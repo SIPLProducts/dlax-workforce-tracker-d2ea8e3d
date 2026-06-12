@@ -1,24 +1,27 @@
 ## Problem
 
-In **OT Entry Sheet**, after saving, the saved data does not reliably appear back in the grid because the date input is hard-locked to yesterday and the "Saved Entries → View/Edit" action deliberately ignores the saved sheet's actual date. Any OT sheet that isn't literally yesterday's becomes invisible in the entry grid. The Daily Entry sheet does not have this restriction — it loads whatever (project, date) the user opens.
+The OT Entry Sheet already filters by `sheet_type='ot'` everywhere, but **Daily Entry** does not filter at all. Because `daily_manpower` holds both daily and OT rows in one table, Daily Entry currently:
 
-## Fix
+- Loads OT rows into the daily grid → headcounts and totals are inflated (e.g. shows 16 instead of the daily-only value).
+- Lists OT sheets in its "Saved Entries" table and lets them open inside Daily Entry → looks like OT data is "in" Daily Entry, and clicking View doesn't go to the OT screen.
+- On Save, its delete-then-insert deletes OT rows for the same (project, date) → silently destroys saved OT data.
+- Inserts new rows without setting `sheet_type`, relying on a default.
 
-Bring OT Entry Sheet in line with Daily Entry's loading behaviour, while keeping its default-to-yesterday convenience for fresh entries.
+OT Entry Sheet itself is already correct; the visible symptom (saved 3 in OT, but Daily Entry shows 16) comes entirely from Daily Entry mixing the two.
 
-### Changes in `src/routes/ot-entry.tsx`
+## Fix — `src/routes/daily-entry.tsx` only
 
-1. **Unlock the date field** in the sticky filter card so the user can pick any date and the grid reloads for that (project, date) — same control style as Daily Entry (`Input` + calendar popover, with the same dd/MM/yyyy parsing already present).
-2. **Saved Entries → View/Edit** (`loadSheetIntoEditor`): also set `date` and `dateText` from `s.entry_date` (currently it explicitly skips this). This lets the grid populate with the chosen sheet's saved rows.
-3. **Saved Entries → Send to Approval** (`sendFromList`): keep the existing same-day reload guard — it already compares `s.entry_date` with the current `date`, which will now work correctly once the date can change.
-4. **`handleSave` reload**: no behavioural change needed — `loadEntries()` already runs with the just-saved (project, date) and will now show the data because the date won't be silently overridden anywhere.
-5. **Default behaviour preserved**: opening OT Entry Sheet fresh still defaults to yesterday; "New Entry" button still resets to yesterday.
+No DB / RLS / schema changes. OT Entry Sheet code is untouched.
 
-No DB, RLS, schema or server-function changes. Daily Entry Sheet is untouched.
+1. **`loadEntries` (daily grid)** — add `.eq("sheet_type", "daily")` to the `daily_manpower` and `daily_manpower_sheets` queries, so the grid, totals and the header sheet badge reflect only daily rows.
+2. **`loadAllSheets` (Saved Entries table)** — add `.eq("sheet_type", "daily")` to the `daily_manpower_sheets` query so OT sheets no longer appear in the Daily Entry saved list. They will continue to appear in OT Entry Sheet's own saved list.
+3. **`handleSave` delete** — add `.eq("sheet_type", "daily")` to the delete query so saving a daily sheet never removes OT rows for the same (project, date).
+4. **`handleSave` insert** — set `sheet_type: 'daily'` explicitly on every inserted row (mirrors what OT entry does for `'ot'`).
+5. **`loadSheetIntoEditor` safety net** — if a sheet with `sheet_type === 'ot'` is ever passed in (e.g. from a stale cache), redirect to `/ot-entry` with the same `{ project, date }` search params instead of loading it into the daily grid.
 
 ## Verification
 
-- Save a new OT sheet for yesterday → rows remain visible in the grid in view mode.
-- From **Saved Entries**, click View on an older OT sheet → date switches to that sheet's date and the grid shows its saved headcounts, OT hours, remarks and weather.
-- Click Edit on a draft/rejected OT sheet from Saved Entries → grid loads in edit mode for the correct date.
-- Change the date manually to a date with no OT data → grid shows empty editable state (as today).
+- Save a Daily Entry with headcount 3, then save an OT Entry with headcount 3 for the same project/date → Daily grid total stays 3, OT grid total stays 3, neither overwrites the other.
+- Daily Entry "Saved Entries" list shows only DE-* daily sheets; OT Entry "Saved Entries" list shows only OT-* sheets.
+- From Approvals, clicking View on an OT sheet still opens OT Entry Sheet with the saved OT data (already works; unchanged).
+- Existing daily-only and OT-only flows behave exactly as before.
