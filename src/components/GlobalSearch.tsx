@@ -207,7 +207,7 @@ function usePanelPos(open: boolean, dep: any) {
   return { wrapperRef, pos };
 }
 
-function useOutsideClose(open: boolean, setOpen: (v: boolean) => void, wrapperRef: React.RefObject<HTMLDivElement>, panelId: string) {
+function useOutsideClose(open: boolean, setOpen: (v: boolean) => void, wrapperRef: React.RefObject<HTMLDivElement | null>, panelId: string) {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
