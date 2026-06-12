@@ -9,24 +9,24 @@ export type DlrInput = {
   date: Date;
   rows: any[]; // daily_manpower joined to contractors, departments, worker_categories
   departments: DlrDept[]; // dynamic per-project structure
+  natureOfWorkValues: string[]; // distinct values from contractors for this project
+  contractorNatureMap: Record<string, string>; // contractor_id -> nature_of_work
 };
 
 export type HeaderBands = {
-  subDepts: DlrDept[];
-  nmrDepts: DlrDept[];
+  depts: DlrDept[]; // ordered department bands
   catCols: { id: string; name: string; deptName: string }[]; // ordered category leaf columns
-  subStart: number;   // first dynamic col index (always 2)
-  subWidth: number;   // colspan for "Sub Contractors/Job Works" band
-  nmrStart: number;
-  nmrWidth: number;
+  catStart: number; // first category col index (2)
+  catWidth: number;
+  natureValues: string[]; // ordered Total Labour sub-columns
   totalLabourStart: number;
+  totalLabourWidth: number;
   totalCol: number;
-  pctTotalCol: number;
-  budgetCol: number;
-  pctBudgetCol: number;
-  securityCol: number;
+  pctTotalCol: number | null; // only if NMR present in natureValues
   remarksCol: number;
   numCols: number;
+  hasNmr: boolean;
+  nmrIndex: number; // index within natureValues that is NMR, -1 if none
 };
 
 export type DlrMatrix = {
@@ -39,79 +39,73 @@ export type DlrMatrix = {
   dataRow: number;
 };
 
-const HEADER_ROWS = 4;
+const HEADER_ROWS = 3;
 
-function buildBands(departments: DlrDept[]): HeaderBands {
-  const subDepts = departments.filter((d) => !d.isNmr && d.categories.length > 0);
-  const nmrDepts = departments.filter((d) => d.isNmr && d.categories.length > 0);
+function buildBands(departments: DlrDept[], natureOfWorkValues: string[]): HeaderBands {
+  const depts = departments.filter((d) => d.categories.length > 0);
   const catCols: HeaderBands["catCols"] = [];
-  for (const d of [...subDepts, ...nmrDepts]) {
-    for (const c of d.categories) catCols.push({ id: c.id, name: c.name, deptName: d.name });
-  }
-  const subWidth = subDepts.reduce((s, d) => s + d.categories.length, 0);
-  const nmrWidth = nmrDepts.reduce((s, d) => s + d.categories.length, 0);
-  const subStart = 2;
-  const nmrStart = subStart + subWidth;
-  const totalLabourStart = nmrStart + nmrWidth;
-  const totalCol = totalLabourStart + 2;
-  const pctTotalCol = totalCol + 1;
-  const budgetCol = pctTotalCol + 1;
-  const pctBudgetCol = budgetCol + 1;
-  const securityCol = pctBudgetCol + 1;
-  const remarksCol = securityCol + 1;
+  for (const d of depts) for (const c of d.categories) catCols.push({ id: c.id, name: c.name, deptName: d.name });
+  const catStart = 2;
+  const catWidth = catCols.length;
+  const natureValues = [...natureOfWorkValues].sort((a, b) => a.localeCompare(b));
+  const nmrIndex = natureValues.findIndex((v) => /^nmr$/i.test(v.trim()));
+  const hasNmr = nmrIndex >= 0;
+  const totalLabourStart = catStart + catWidth;
+  const totalLabourWidth = Math.max(natureValues.length, 1);
+  const totalCol = totalLabourStart + totalLabourWidth;
+  const pctTotalCol = hasNmr ? totalCol + 1 : null;
+  const remarksCol = (pctTotalCol ?? totalCol) + 1;
   const numCols = remarksCol + 1;
-  return { subDepts, nmrDepts, catCols, subStart, subWidth, nmrStart, nmrWidth, totalLabourStart, totalCol, pctTotalCol, budgetCol, pctBudgetCol, securityCol, remarksCol, numCols };
+  return { depts, catCols, catStart, catWidth, natureValues, totalLabourStart, totalLabourWidth, totalCol, pctTotalCol, remarksCol, numCols, hasNmr, nmrIndex };
 }
 
-export function getDlrDailyMatrix({ project, date, rows, departments }: DlrInput): DlrMatrix {
+export function getDlrDailyMatrix({ project, date, rows, departments, natureOfWorkValues, contractorNatureMap }: DlrInput): DlrMatrix {
   const dateLabel = format(date, "dd-MM-yyyy");
-  const title = `DAILY LABOUR REPORT\n${dateLabel}`;
-  const bands = buildBands(departments);
+  const title = `${project.name}${project.code ? ` [${project.code}]` : ""}\nDAILY LABOUR REPORT — ${dateLabel}`;
+  const bands = buildBands(departments, natureOfWorkValues);
   const NUM = bands.numCols;
   const blank = (): (string | number | null)[] => Array(NUM).fill(null);
 
   // Aggregate
   const catTotals: Record<string, number> = {};
-  let itemRateTotal = 0;
-  let nmrTotal = 0;
+  const natureTotals: Record<string, number> = {};
+  for (const v of bands.natureValues) natureTotals[v] = 0;
   const remarksSet = new Set<string>();
   for (const r of rows) {
     const hc = Number(r.headcount || 0);
-    const nature = (r.contractors?.nature_of_work || "").toString().trim().toLowerCase();
-    if (nature === "nmr") nmrTotal += hc;
-    else itemRateTotal += hc;
     if (r.category_id) catTotals[r.category_id] = (catTotals[r.category_id] || 0) + hc;
+    const nature = (contractorNatureMap[r.contractor_id] || r.contractors?.nature_of_work || "").toString().trim();
+    if (nature && nature in natureTotals) natureTotals[nature] += hc;
     if (r.remarks && String(r.remarks).trim()) remarksSet.add(String(r.remarks).trim());
   }
-  const total = itemRateTotal + nmrTotal;
-  const pctOnTotal = total > 0 ? nmrTotal / total : null;
+  const total = bands.natureValues.reduce((s, v) => s + (natureTotals[v] || 0), 0);
+  const nmrTotal = bands.hasNmr ? natureTotals[bands.natureValues[bands.nmrIndex]] || 0 : 0;
+  const pctOnTotal = bands.hasNmr && total > 0 ? nmrTotal / total : null;
 
-  // Header rows
-  const r1 = blank(); r1[0] = title;
+  // r0 title
+  const r0 = blank(); r0[0] = title;
+
+  // r1: Sl.No | Name | dept names | Total Labour | Total | [NMR % on Total] | Remarks
+  const r1 = blank();
+  r1[0] = "Sl.No.";
+  r1[1] = "Name of the Project";
+  let cur = bands.catStart;
+  for (const d of bands.depts) { r1[cur] = d.name; cur += d.categories.length; }
+  r1[bands.totalLabourStart] = "Total Labour";
+  r1[bands.totalCol] = "Total";
+  if (bands.pctTotalCol !== null) r1[bands.pctTotalCol] = "NMR % on Total";
+  r1[bands.remarksCol] = "Remarks";
+
+  // r2: category leaves | nature_of_work leaves
   const r2 = blank();
-  r2[0] = "Sl.No.";
-  r2[1] = "Name of the Project";
-  if (bands.subWidth > 0) r2[bands.subStart] = "Sub Contractors/Job Works";
-  if (bands.nmrWidth > 0) r2[bands.nmrStart] = "NMR";
-  r2[bands.totalLabourStart] = "Total Labour";
-  r2[bands.totalCol] = "Total";
-  r2[bands.pctTotalCol] = "NMR % on Total";
-  r2[bands.budgetCol] = "Budget NMR";
-  r2[bands.pctBudgetCol] = "NMR % on Budget";
-  r2[bands.securityCol] = "Security";
-  r2[bands.remarksCol] = "Remarks";
+  bands.catCols.forEach((c, i) => { r2[bands.catStart + i] = c.name; });
+  if (bands.natureValues.length === 0) {
+    r2[bands.totalLabourStart] = "Total";
+  } else {
+    bands.natureValues.forEach((v, i) => { r2[bands.totalLabourStart + i] = v; });
+  }
 
-  const r3 = blank();
-  let cursor = bands.subStart;
-  for (const d of bands.subDepts) { r3[cursor] = d.name; cursor += d.categories.length; }
-  for (const d of bands.nmrDepts) { r3[cursor] = d.name; cursor += d.categories.length; }
-
-  const r4 = blank();
-  bands.catCols.forEach((c, i) => { r4[bands.subStart + i] = c.name; });
-  r4[bands.totalLabourStart] = "Sub Contractors/Job Work";
-  r4[bands.totalLabourStart + 1] = "NMR";
-
-  const cells: (string | number | null)[][] = [r1, r2, r3, r4];
+  const cells: (string | number | null)[][] = [r0, r1, r2];
   const sectionRows: number[] = [];
 
   if (project.project_group) {
@@ -124,15 +118,15 @@ export function getDlrDailyMatrix({ project, date, rows, departments }: DlrInput
   const dataRow = cells.length;
   const d = blank();
   d[0] = 1;
-  d[1] = project.code || project.name;
-  bands.catCols.forEach((c, i) => { d[bands.subStart + i] = catTotals[c.id] || 0; });
-  d[bands.totalLabourStart] = itemRateTotal;
-  d[bands.totalLabourStart + 1] = nmrTotal;
+  d[1] = project.name;
+  bands.catCols.forEach((c, i) => { d[bands.catStart + i] = catTotals[c.id] || 0; });
+  if (bands.natureValues.length === 0) {
+    d[bands.totalLabourStart] = total;
+  } else {
+    bands.natureValues.forEach((v, i) => { d[bands.totalLabourStart + i] = natureTotals[v] || 0; });
+  }
   d[bands.totalCol] = total;
-  d[bands.pctTotalCol] = pctOnTotal;
-  d[bands.budgetCol] = 0;
-  d[bands.pctBudgetCol] = null;
-  d[bands.securityCol] = 0;
+  if (bands.pctTotalCol !== null) d[bands.pctTotalCol] = pctOnTotal;
   d[bands.remarksCol] = remarksSet.size ? Array.from(remarksSet).join("; ") : "";
   cells.push(d);
 
@@ -147,37 +141,36 @@ export function buildDlrDailyWorkbook(matrix: DlrMatrix): XLSX.WorkBook {
 
   const merges: XLSX.Range[] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: NUM - 1 } }, // title
-    { s: { r: 1, c: 0 }, e: { r: 3, c: 0 } },       // Sl.No
-    { s: { r: 1, c: 1 }, e: { r: 3, c: 1 } },       // Name
-    { s: { r: 1, c: b.totalLabourStart }, e: { r: 1, c: b.totalLabourStart + 1 } }, // Total Labour
-    { s: { r: 2, c: b.totalLabourStart }, e: { r: 2, c: b.totalLabourStart + 1 } }, // empty span row3
-    { s: { r: 1, c: b.totalCol }, e: { r: 3, c: b.totalCol } },
-    { s: { r: 1, c: b.pctTotalCol }, e: { r: 3, c: b.pctTotalCol } },
-    { s: { r: 1, c: b.budgetCol }, e: { r: 3, c: b.budgetCol } },
-    { s: { r: 1, c: b.pctBudgetCol }, e: { r: 3, c: b.pctBudgetCol } },
-    { s: { r: 1, c: b.securityCol }, e: { r: 3, c: b.securityCol } },
-    { s: { r: 1, c: b.remarksCol }, e: { r: 3, c: b.remarksCol } },
+    { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },       // Sl.No
+    { s: { r: 1, c: 1 }, e: { r: 2, c: 1 } },       // Name
+    { s: { r: 1, c: b.totalCol }, e: { r: 2, c: b.totalCol } },
+    { s: { r: 1, c: b.remarksCol }, e: { r: 2, c: b.remarksCol } },
   ];
-  if (b.subWidth > 0) merges.push({ s: { r: 1, c: b.subStart }, e: { r: 1, c: b.subStart + b.subWidth - 1 } });
-  if (b.nmrWidth > 0) merges.push({ s: { r: 1, c: b.nmrStart }, e: { r: 1, c: b.nmrStart + b.nmrWidth - 1 } });
-  // dept name spans in row 3
-  let cursor = b.subStart;
-  for (const d of [...b.subDepts, ...b.nmrDepts]) {
-    if (d.categories.length > 1) merges.push({ s: { r: 2, c: cursor }, e: { r: 2, c: cursor + d.categories.length - 1 } });
+  if (b.pctTotalCol !== null) merges.push({ s: { r: 1, c: b.pctTotalCol }, e: { r: 2, c: b.pctTotalCol } });
+  // Total Labour band over nature_of_work leaves
+  if (b.totalLabourWidth > 1) {
+    merges.push({ s: { r: 1, c: b.totalLabourStart }, e: { r: 1, c: b.totalLabourStart + b.totalLabourWidth - 1 } });
+  } else {
+    merges.push({ s: { r: 1, c: b.totalLabourStart }, e: { r: 2, c: b.totalLabourStart } });
+  }
+  // dept names in row 1 spanning their category leaves
+  let cursor = b.catStart;
+  for (const d of b.depts) {
+    if (d.categories.length > 1) merges.push({ s: { r: 1, c: cursor }, e: { r: 1, c: cursor + d.categories.length - 1 } });
     cursor += d.categories.length;
   }
-  // section rows
   for (const sr of matrix.sectionRows) merges.push({ s: { r: sr, c: 1 }, e: { r: sr, c: NUM - 1 } });
   ws["!merges"] = merges;
 
-  // Column widths
-  const cols: XLSX.ColInfo[] = [{ wch: 6 }, { wch: 26 }];
-  for (let i = 0; i < b.subWidth + b.nmrWidth; i++) cols.push({ wch: 12 });
-  cols.push({ wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 28 });
+  const cols: XLSX.ColInfo[] = [{ wch: 6 }, { wch: 28 }];
+  for (let i = 0; i < b.catWidth; i++) cols.push({ wch: 12 });
+  for (let i = 0; i < b.totalLabourWidth; i++) cols.push({ wch: 14 });
+  cols.push({ wch: 10 }); // Total
+  if (b.pctTotalCol !== null) cols.push({ wch: 14 });
+  cols.push({ wch: 28 }); // Remarks
   ws["!cols"] = cols;
-  ws["!rows"] = [{ hpt: 36 }, { hpt: 22 }, { hpt: 22 }, { hpt: 36 }];
+  ws["!rows"] = [{ hpt: 36 }, { hpt: 28 }, { hpt: 28 }];
 
-  // Number formats on data rows
   const intFmt = '#,##0;(#,##0);"-"';
   const pctFmt = "0%";
   for (let r = matrix.headerRows; r < matrix.cells.length; r++) {
@@ -186,7 +179,7 @@ export function buildDlrDailyWorkbook(matrix: DlrMatrix): XLSX.WorkBook {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = ws[addr];
       if (!cell) continue;
-      if (c === b.pctTotalCol || c === b.pctBudgetCol) { cell.t = "n"; cell.z = pctFmt; }
+      if (b.pctTotalCol !== null && c === b.pctTotalCol) { cell.t = "n"; cell.z = pctFmt; }
       else if (c === b.remarksCol) { /* text */ }
       else if (typeof cell.v === "number") { cell.t = "n"; cell.z = intFmt; }
     }
@@ -210,7 +203,7 @@ export function buildDlrDailyCsv(matrix: DlrMatrix): string {
         .map((v, ci) => {
           if (v === null || v === undefined) return "";
           const isData = ri >= matrix.headerRows && !matrix.sectionRows.includes(ri);
-          if (isData && (ci === b.pctTotalCol || ci === b.pctBudgetCol)) {
+          if (isData && b.pctTotalCol !== null && ci === b.pctTotalCol) {
             return typeof v === "number" ? csvEscape(`${Math.round(v * 100)}%`) : "";
           }
           if (isData && ci >= 2 && ci !== b.remarksCol && typeof v === "number" && v === 0) {

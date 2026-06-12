@@ -1,70 +1,47 @@
-
 ## Goal
-Make the **Daily Labour Report** headers dynamic per project: columns come from the categories assigned to the selected project (grouped by their department), instead of the hard-coded reference list. The overall framing (Sub Contractors/Job Works · NMR · Total Labour · Total · NMR% on Total · Budget NMR · NMR% on Budget · Security · Remarks) stays exactly like the reference.
+Remove all hardcoded labels from the Daily Labour Report. Every band, sub-column, and label is derived from project configuration and `contractors.nature_of_work` distinct values actually present.
 
-## Header structure (dynamic part)
+## Header structure (fully dynamic)
 
-For the selected project, build a category list from:
-- `project_categories` JOIN `worker_categories` JOIN `department_categories` JOIN `departments` for that project.
-- Fallback: if a project has no rows in `project_categories`, use all `worker_categories` linked via `department_categories` to a department (global fallback, consistent with current master-fallback behavior).
-- Sort: by `departments.name` then `worker_categories.display_order`, then `worker_categories.name`.
-
-Group the categories under their department. Each department becomes a second-row sub-band; each category becomes a leaf column.
-
-Resulting header band:
 ```text
-Row 1: "DAILY LABOUR REPORT\n<dd-mm-yyyy>"  (merged across all columns)
-Row 2: Sl.No | Name of the Project | Sub Contractors/Job Works (merged across all dynamic dept columns) | NMR (merged across NMR-tagged dept columns, if any) | Total Labour (Sub Contractors/Job Work | NMR) | Total | NMR % on Total | Budget NMR | NMR % on Budget | Security | Remarks
-Row 3: (under Sub Contractors/Job Works) <Dept A>  (merged across its categories) | <Dept B> (...) | ...
-        (under NMR) <NMR Dept> (if exists)
-Row 4: <Cat 1> | <Cat 2> | ... (one cell per category)
+Row 0: <project name> — DAILY LABOUR REPORT — <date>     [title]
+Row 1: Sl.No. | Name of the Project | <dept band 1..N> | Total Labour            | Total | NMR % on Total | Remarks
+Row 2:                              | <category leaves>  | <nature_of_work band>  |
+Row 3:                              |                    | <each nature_of_work>  |
 ```
 
-How "NMR" vs "Sub Contractors/Job Works" is decided per category column:
-- A category lives under "NMR" if its department is flagged as NMR (department name contains "NMR", case-insensitive) — easy heuristic, no schema change.
-- Otherwise it lives under "Sub Contractors/Job Works".
-- If a project has no NMR-tagged department, the "NMR" top band collapses to zero width and only "Sub Contractors/Job Works" spans the dynamic columns; the Total Labour `NMR` sub-column still appears (from contractor `nature_of_work = 'NMR'` aggregation).
+- **Dept bands (left side)**: from project's `departments` → `worker_categories` join. No "NMR" assumption. Each department becomes a band; each category a leaf column.
+- **Total Labour sub-columns**: built from `SELECT DISTINCT nature_of_work FROM contractors WHERE id IN (project contractors)` ordered alphabetically. Whatever values exist (e.g. "Item Rate", "NMR", "Daily Wage") become sub-columns. If only one value exists, single sub-column with that label. If none, single "Total Labour" leaf.
+- **Fixed right columns**: `Total`, `NMR % on Total`, `Remarks`. The `NMR % on Total` column is rendered only if a nature_of_work value literally equals `NMR` (case-insensitive); otherwise dropped (no fake placeholder).
+- **Removed**: `Budget NMR`, `NMR % on Budget`, `Security` (no DB backing).
 
-Right-side columns stay fixed (Total Labour · Total · NMR% on Total · Budget NMR · NMR% on Budget · Security · Remarks).
+## Data row aggregation
 
-## Cell values (data row)
+- Each category leaf: `SUM(headcount)` where `category_id = <leaf>` for project+date.
+- Each Total Labour leaf (one per distinct nature_of_work): `SUM(headcount)` joined to `contractors` filtered by that `nature_of_work`.
+- `Total` = sum of all Total Labour leaves.
+- `NMR % on Total` (only if NMR column present) = NMR sum / Total.
+- `Remarks` = unique concatenated remarks.
+- Zero → `-`.
 
-For the project + selected date, aggregate `daily_manpower` rows:
-- Per dynamic category column: sum of `headcount` where `category_id = <that category>`.
-- Total Labour → `Sub Contractors/Job Work` = sum where `contractors.nature_of_work = 'Item Rate'`.
-- Total Labour → `NMR` = sum where `contractors.nature_of_work = 'NMR'`.
-- `Total` = Sub Contractors/Job Work + NMR.
-- `NMR % on Total` = NMR / Total (blank if Total=0).
-- `Budget NMR` = 0 placeholder.
-- `NMR % on Budget` = blank (no budget field).
-- `Security` = 0 placeholder.
-- `Remarks` = concatenated unique remarks for that project+date.
-- Zero values render as `-` (Excel format `#,##0;(#,##0);"-"`).
-
-Section row (project_group label) above the project row stays as today.
+## Empty data behavior
+If no `daily_manpower` rows for the selected project+date: render the full dynamic header from project config + contractors' nature_of_work distinct values; data row shows `-` in every numeric cell, blank `Remarks`, Sl.No. `1`, Name of Project = project name.
 
 ## Files to change
 
-- `src/lib/dlr-daily.ts` — replace the hard-coded `DLR_CATEGORY_COLUMNS` / `ALIASES` matching with a dynamic builder:
-  - New input shape: `getDlrDailyMatrix({ project, date, rows, departments })` where `departments` is `Array<{ name: string; isNmr: boolean; categories: Array<{ id: string; name: string }> }>`.
-  - Recompute total column count, merges, and per-category data cells from this dynamic structure.
-  - Excel writer (`buildDlrDailyWorkbook`) and CSV writer (`buildDlrDailyCsv`) keep the same public API but consume the new matrix shape; merges are derived from the dynamic header structure (no hard-coded indexes).
-- `src/components/DlrDailyPreview.tsx` — render the same dynamic 3-row header band from the matrix metadata (the matrix now carries `headerBands` so preview and export stay in sync).
-- `src/routes/reports.tsx` (DlrTab) — load the project's department + category structure when `projectId` changes:
-  1. `select * from project_categories where project_id = $project` (with `worker_categories(*)`).
-  2. If empty, use all `worker_categories` (global fallback).
-  3. `select * from department_categories` to map category → department; `select * from departments` for names.
-  4. Pass the resulting `departments` structure to `getDlrDailyMatrix`.
+- `src/lib/dlr-daily.ts`
+  - Extend `DlrInput` with `natureOfWorkValues: string[]` (distinct values loaded by caller).
+  - Rebuild `buildBands()`: drop hardcoded "Sub Contractors/Job Works" / "NMR" / "Item Rate" branches. `totalLabourLeaves = natureOfWorkValues` (sorted). Conditionally include `nmrPctOnTotalCol` only if any leaf matches /^nmr$/i. Drop `budgetNmrCol`, `nmrPctOnBudgetCol`, `securityCol` from bands and indices.
+  - `getDlrDailyMatrix()`: aggregate per nature_of_work leaf instead of fixed Item Rate/NMR pair. Pass through `contractorNatureMap: Map<contractorId, nature_of_work>` for joining manpower rows.
+  - `buildDlrDailyWorkbook()` / `buildDlrDailyCsv()`: regenerate merges and cells from new band metadata; remove fixed-column literals.
 
-## Out of scope (untouched)
+- `src/routes/reports.tsx` (DlrTab)
+  - When `projectId` changes, additionally query:
+    - `project_contractors` → `contractors(id, nature_of_work)` for that project; build `natureOfWorkValues` = sorted distinct non-null trimmed values, and `contractorNatureMap`.
+  - Pass both into `getDlrDailyMatrix`.
 
-- Other Reports tabs (Daily / Project / Contractor) and their CSV export.
-- Daily Entry, Approvals, Masters UIs.
-- DB schema / RLS / migrations (no changes needed — uses existing `project_categories`, `department_categories`, `departments`, `worker_categories`).
-- The monthly DLR pivot layout.
+- `src/components/DlrDailyPreview.tsx`
+  - Render header from matrix metadata only. Compute `rowSpan`/`colSpan` from the dynamic band widths. No string literals for column names — all come from matrix.
 
-## Risks / notes
-
-- A category linked to multiple departments via `department_categories` will appear under the first department by sort order to avoid duplicate columns; we'll document this in code.
-- If a project has neither `project_categories` nor any `department_categories` mapping, the dynamic band renders empty and only the right-side fixed columns + Totals appear; data row still works because totals come from `contractors.nature_of_work`.
-- Excel merges are computed from runtime band widths, so the exported file's structure shifts per project, exactly as requested.
+## Out of scope
+Other Reports tabs, Daily Entry, Approvals, Masters, DB schema/RLS/migrations, monthly DLR pivot.
