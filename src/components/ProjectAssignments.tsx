@@ -249,6 +249,56 @@ async function autoAssignCategoriesForDepartments(
   return toInsert.length;
 }
 
+// Remove categories from project_categories that were only justified by the
+// removed departments (i.e. not mapped to any still-assigned department).
+async function autoRemoveCategoriesForDepartments(
+  projectId: string,
+  removedDepartmentIds: string[],
+): Promise<number> {
+  if (!projectId || removedDepartmentIds.length === 0) return 0;
+
+  const { data: removedMaps } = await supabase
+    .from("department_categories")
+    .select("category_id")
+    .in("department_id", removedDepartmentIds);
+  const removedCatIds = Array.from(
+    new Set((removedMaps || []).map((m: any) => m.category_id)),
+  ).filter(Boolean);
+  if (removedCatIds.length === 0) return 0;
+
+  const { data: remainingDepts } = await supabase
+    .from("project_departments")
+    .select("department_id")
+    .eq("project_id", projectId);
+  const remainingDeptIds = (remainingDepts || [])
+    .map((r: any) => r.department_id)
+    .filter((id: string) => id && !removedDepartmentIds.includes(id));
+
+  let stillJustified = new Set<string>();
+  if (remainingDeptIds.length > 0) {
+    const { data: stillMaps } = await supabase
+      .from("department_categories")
+      .select("category_id")
+      .in("department_id", remainingDeptIds)
+      .in("category_id", removedCatIds);
+    stillJustified = new Set((stillMaps || []).map((m: any) => m.category_id));
+  }
+
+  const orphanCatIds = removedCatIds.filter((id) => !stillJustified.has(id));
+  if (orphanCatIds.length === 0) return 0;
+
+  const { error, count } = await supabase
+    .from("project_categories")
+    .delete({ count: "exact" })
+    .eq("project_id", projectId)
+    .in("category_id", orphanCatIds);
+  if (error) {
+    toast.error(`Auto-remove categories failed: ${error.message}`);
+    return 0;
+  }
+  return count || 0;
+}
+
 function AssignmentSection({
   projectId,
   kind,
