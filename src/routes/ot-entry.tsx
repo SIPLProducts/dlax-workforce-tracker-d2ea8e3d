@@ -142,6 +142,13 @@ function OtEntryPage() {
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
   const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
+  // Editor mode shows the blank/saved OT entry grid + actions. Browse mode
+  // (sidebar landing) shows only the Saved Entries list. Editor mode is
+  // entered via the Daily Entry → OT popup (`from=daily`), a deep-link with
+  // an explicit date, or clicking View/Edit/New Entry from Saved Entries.
+  const [editorMode, setEditorMode] = useState<boolean>(
+    () => search.from === "daily" || !!search.date,
+  );
   // Cells from saved daily_manpower rows whose (dept, cat) is no longer in the
   // project's current assignments. Rendered read-only so totals reconcile and
   // historical data isn't silently dropped from the grid.
