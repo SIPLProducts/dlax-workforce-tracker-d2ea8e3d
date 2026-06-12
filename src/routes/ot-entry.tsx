@@ -243,8 +243,10 @@ function OtEntryPage() {
       }
     }
     if (search.project) {
-      // When opened with an explicit date (View from Approvals) default to view;
-      // otherwise (Daily Entry → OT prompt) default to edit.
+      // When opened with an explicit date (View from Approvals, or Daily
+      // Entry → OT prompt) we treat it as opening that specific sheet.
+      // Without a date, this is a fresh blank OT session.
+      openedSheetRef.current = !!search.date;
       pendingModeRef.current = search.date ? "view" : "edit";
       setActiveTab("entry");
     }
