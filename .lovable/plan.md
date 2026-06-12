@@ -1,22 +1,29 @@
-## Goal
-Replace the single Menu/Data toggle in the top bar with **two separate search fields side by side**: a Menu Search and a Data Search.
+## Problem
 
-## UX
-- Top bar shows two compact inputs:
-  - **Menu Search** — placeholder `Search menus…`, magnifying-glass + `LayoutGrid` accent icon.
-  - **Data Search** — placeholder `Search anything…`, with the existing ⌘K shortcut chip.
-- Each has its own dropdown panel (independent open/close, independent query state).
-- On mobile, stack them or keep the Data one visible and put Menu in a slimmer width — both remain usable.
-- ⌘K still focuses the **Data** input (preserves current shortcut behavior).
+On the Daily Entry sheet (`src/routes/daily-entry.tsx`):
 
-## Behavior
-- **Menu Search**: filters `APP_SCREENS` (from `src/lib/screens.ts`) by label/key, respects `usePermissions().canView`. Empty query shows all permitted screens. Selecting navigates via `navigate({ to: screen.path })`.
-- **Data Search**: unchanged — debounced `searchAll()`, 2-char minimum, all existing groups (Projects, Contractors, Category of Labour, Categories, Sheets, Users) and navigation behaviors.
+1. Horizontal lines between some contractor rows (e.g. between Sl.no 18 and 19) disappear.
+2. While scrolling vertically/horizontally, the sticky left columns (Sl.no, SC Code, Name, Contact, Work Place) and sticky header rows visually drift / overlap rows below.
 
-## Scope (files)
-- `src/components/GlobalSearch.tsx` — split the current component into two internal subcomponents (`MenuSearch`, `DataSearch`) and export a wrapper `GlobalSearch` that renders both in a flex row. Remove the Menu/Data toggle UI and the persisted `mode` state added previously.
-- `src/components/TopBar.tsx` — no API change needed (still imports `GlobalSearch`). Only adjust width/layout if the two fields need more room.
+Both come from the same root cause: the table uses `border-collapse: collapse` while several `<th>` / `<td>` cells are `position: sticky`. With collapsed borders, the border belongs to the table, not to the cell — so when a sticky cell paints over the scrolling area it covers the row's bottom border, leaving gaps that look random (more visible on rows whose content is empty/short, like row 18 in the screenshot). The same overlap is why headers/columns look misaligned mid-scroll.
+
+## Fix (scoped to `src/routes/daily-entry.tsx`, entry-sheet table only)
+
+Switch the entry-sheet table to a separated-border model so borders belong to each cell and stay attached to it while sticky:
+
+1. Change the `<table>` class from `border-collapse text-xs w-full min-w-[1600px]` to `border-separate border-spacing-0 text-xs w-full min-w-[1600px]`.
+2. Replace the per-cell `border` utility (which renders 4 sides and doubles up under `border-separate`) on `<th>` and `<td>` in this table with directional borders so each cell draws exactly one shared edge:
+   - Header cells (top row): `border-b border-r` (+ keep existing `border-r-2 border-r-slate-300` on Work Place divider).
+   - Second header row (categories): `border-b border-r`.
+   - Body cells: `border-b border-r`.
+   - Footer (TOTAL) row cells: `border-t border-r`.
+   - First column (`Sl.no` / index) also gets `border-l` so the left edge is visible.
+3. Keep all existing `sticky`, `z-*`, `bg-*`, `bg-clip-padding`, `box-border`, width, and `border-r-2 border-r-slate-300` classes untouched — only swap `border` → directional borders.
+4. Outer wrapper `<div className="overflow-auto rounded-md border" …>` already supplies the outer frame, so no double border appears.
+
+This guarantees every row keeps its bottom border even when a sticky cell paints over it, and sticky columns stay visually aligned with their rows during scroll. No logic, data, layout offsets, or other screens are touched.
 
 ## Out of scope
-- No changes to data search logic, route registry, or permissions.
-- No new screens or schema changes.
+
+- Saved Entries table, OT Entry, Reports, and any other screen.
+- Column widths, sticky offsets, header heights, business logic, data shape.
