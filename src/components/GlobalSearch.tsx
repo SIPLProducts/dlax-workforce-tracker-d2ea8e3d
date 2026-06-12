@@ -15,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { APP_SCREENS, type ScreenKey } from "@/lib/screens";
 import { usePermissions } from "@/hooks/use-permissions";
 
-
 type Result =
   | { kind: "project"; id: string; title: string; subtitle?: string }
   | { kind: "contractor"; id: string; title: string; subtitle?: string; projectId?: string }
@@ -80,7 +79,7 @@ async function searchAll(term: string): Promise<Result[]> {
   ]);
 
   const contractorRows = contractors.data || [];
-  let contractorProjectMap: Record<string, string> = {};
+  const contractorProjectMap: Record<string, string> = {};
   if (contractorRows.length) {
     const ids = contractorRows.map((c: any) => c.id);
     const { data: links } = await supabase
@@ -176,32 +175,149 @@ async function searchAll(term: string): Promise<Result[]> {
     });
   });
 
-
   return out;
 }
 
-export function GlobalSearch() {
+// Shared positioning hook for the floating dropdown panel
+function usePanelPos(open: boolean, dep: any) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const el = wrapperRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      // Min width so panels don't get cramped
+      const width = Math.max(r.width, 280);
+      setPos({ top: r.bottom + 8, left: r.left, width });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, dep]);
+  return { wrapperRef, pos };
+}
+
+function useOutsideClose(open: boolean, setOpen: (v: boolean) => void, wrapperRef: React.RefObject<HTMLDivElement | null>, panelId: string) {
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (wrapperRef.current?.contains(target)) return;
+      const panel = document.getElementById(panelId);
+      if (panel?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open, setOpen, wrapperRef, panelId]);
+}
+
+function MenuSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"data" | "menu">(() => {
-    if (typeof window === "undefined") return "data";
-    return (localStorage.getItem("globalSearchMode") as "data" | "menu") || "data";
-  });
+  const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { canView } = usePermissions();
+  const { wrapperRef, pos } = usePanelPos(open, query);
+  useOutsideClose(open, setOpen, wrapperRef, "menu-search-panel");
+
+  const results = useMemo(() => {
+    const allowed = APP_SCREENS.filter((s) => canView(s.key as ScreenKey));
+    const q = query.trim().toLowerCase();
+    if (!q) return allowed;
+    return allowed.filter(
+      (s) => s.label.toLowerCase().includes(q) || s.key.toLowerCase().includes(q)
+    );
+  }, [query, canView]);
+
+  return (
+    <div ref={wrapperRef} className="relative w-40 md:w-56">
+      <div className="relative">
+        <LayoutGrid className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              inputRef.current?.blur();
+            }
+          }}
+          placeholder="Search menus…"
+          aria-label="Menu search"
+          className="h-9 pl-8 pr-2"
+        />
+      </div>
+
+      {open && typeof document !== "undefined" && createPortal(
+        <div
+          id="menu-search-panel"
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
+          className="z-[1000] rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden"
+        >
+          <Command shouldFilter={false} className="bg-popover">
+            <CommandList className="max-h-[55vh] bg-popover">
+              {results.length === 0 ? (
+                <CommandEmpty>No matching screens.</CommandEmpty>
+              ) : (
+                <CommandGroup heading="Screens">
+                  {results.map((s) => (
+                    <CommandItem
+                      key={`m-${s.key}`}
+                      value={`menu ${s.label} ${s.key}`}
+                      onSelect={() => {
+                        setOpen(false);
+                        setQuery("");
+                        navigate({ to: s.path as any });
+                      }}
+                    >
+                      <LayoutGrid className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">{s.label}</span>
+                        <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">
+                          {s.path}
+                        </span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+function DataSearch() {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
-  const { canView } = usePermissions();
-
-  useEffect(() => {
-    if (typeof window !== "undefined") localStorage.setItem("globalSearchMode", mode);
-  }, [mode]);
-
-  const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const navigate = useNavigate();
   const reqId = useRef(0);
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { wrapperRef, pos } = usePanelPos(open, results.length);
+  useOutsideClose(open, setOpen, wrapperRef, "data-search-panel");
 
-  // Keyboard shortcut: Cmd/Ctrl + K — focus the input and open the dropdown
+  // ⌘K / Ctrl+K focuses the Data search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -214,45 +330,7 @@ export function GlobalSearch() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Click outside closes the dropdown
   useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (wrapperRef.current?.contains(target)) return;
-      const panel = document.getElementById("global-search-panel");
-      if (panel?.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  // Position the fixed overlay just below the input; track resize/scroll
-  useEffect(() => {
-    if (!open) return;
-    const update = () => {
-      const el = wrapperRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setPanelPos({ top: r.bottom + 8, left: r.left, width: r.width });
-    };
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [open, results.length]);
-
-  // Debounced query (data mode only)
-  useEffect(() => {
-    if (mode !== "data") {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
     const term = query.trim();
     if (term.length < 2) {
       setResults([]);
@@ -270,29 +348,16 @@ export function GlobalSearch() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [query, mode]);
+  }, [query]);
 
-  const menuResults = useMemo(() => {
-    if (mode !== "menu") return [];
-    const allowed = APP_SCREENS.filter((s) => canView(s.key as ScreenKey));
-    const q = query.trim().toLowerCase();
-    if (!q) return allowed;
-    return allowed.filter(
-      (s) => s.label.toLowerCase().includes(q) || s.key.toLowerCase().includes(q)
-    );
-  }, [mode, query, canView]);
-
-
-  const groups = useMemo(() => {
-    return {
-      project: results.filter((r) => r.kind === "project"),
-      contractor: results.filter((r) => r.kind === "contractor"),
-      department: results.filter((r) => r.kind === "department"),
-      category: results.filter((r) => r.kind === "category"),
-      sheet: results.filter((r) => r.kind === "sheet"),
-      user: results.filter((r) => r.kind === "user"),
-    } as Record<Result["kind"], Result[]>;
-  }, [results]);
+  const groups = useMemo(() => ({
+    project: results.filter((r) => r.kind === "project"),
+    contractor: results.filter((r) => r.kind === "contractor"),
+    department: results.filter((r) => r.kind === "department"),
+    category: results.filter((r) => r.kind === "category"),
+    sheet: results.filter((r) => r.kind === "sheet"),
+    user: results.filter((r) => r.kind === "user"),
+  } as Record<Result["kind"], Result[]>), [results]);
 
   const handleSelect = (r: Result) => {
     setOpen(false);
@@ -326,7 +391,7 @@ export function GlobalSearch() {
   };
 
   return (
-    <div ref={wrapperRef} className="relative w-full md:w-72">
+    <div ref={wrapperRef} className="relative w-44 md:w-72">
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -343,8 +408,8 @@ export function GlobalSearch() {
               inputRef.current?.blur();
             }
           }}
-          placeholder={mode === "menu" ? "Search menus…" : "Search anything…"}
-          aria-label="Global search"
+          placeholder="Search anything…"
+          aria-label="Data search"
           className="h-9 pl-8 pr-12"
         />
         <kbd className="hidden md:inline-flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none select-none items-center rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -354,64 +419,12 @@ export function GlobalSearch() {
 
       {open && typeof document !== "undefined" && createPortal(
         <div
-          id="global-search-panel"
-          style={{ position: "fixed", top: panelPos.top, left: panelPos.left, width: panelPos.width }}
+          id="data-search-panel"
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
           className="z-[1000] rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden"
         >
-          <div className="flex items-center gap-1 border-b bg-muted/40 p-1.5">
-            <button
-              type="button"
-              onClick={() => setMode("menu")}
-              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                mode === "menu"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Menu
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("data")}
-              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                mode === "data"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Data
-            </button>
-          </div>
           <Command shouldFilter={false} className="bg-popover">
             <CommandList className="max-h-[55vh] bg-popover">
-              {mode === "menu" ? (
-                menuResults.length === 0 ? (
-                  <CommandEmpty>No matching screens.</CommandEmpty>
-                ) : (
-                  <CommandGroup heading="Screens">
-                    {menuResults.map((s) => (
-                      <CommandItem
-                        key={`m-${s.key}`}
-                        value={`menu ${s.label} ${s.key}`}
-                        onSelect={() => {
-                          setOpen(false);
-                          setQuery("");
-                          navigate({ to: s.path as any });
-                        }}
-                      >
-                        <LayoutGrid className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
-                        <div className="flex flex-col">
-                          <span className="font-medium">{s.label}</span>
-                          <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">
-                            {s.path}
-                          </span>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                )
-              ) : (
-                <>
               {query.trim().length < 2 ? (
                 <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>
               ) : loading ? (
@@ -420,21 +433,14 @@ export function GlobalSearch() {
                 <CommandEmpty>No results found.</CommandEmpty>
               ) : null}
 
-
               {groups.project.length > 0 && (
                 <CommandGroup heading="Projects">
                   {groups.project.map((r) => (
-                    <CommandItem
-                      key={`p-${r.id}`}
-                      value={`project ${r.title} ${r.subtitle || ""}`}
-                      onSelect={() => handleSelect(r)}
-                    >
+                    <CommandItem key={`p-${r.id}`} value={`project ${r.title} ${r.subtitle || ""}`} onSelect={() => handleSelect(r)}>
                       <Briefcase className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
                       <div className="flex flex-col">
                         <span className="font-medium">{r.title}</span>
-                        {r.subtitle && (
-                          <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                        )}
+                        {r.subtitle && <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>}
                       </div>
                     </CommandItem>
                   ))}
@@ -446,17 +452,11 @@ export function GlobalSearch() {
                   <CommandSeparator />
                   <CommandGroup heading="Contractors">
                     {groups.contractor.map((r) => (
-                      <CommandItem
-                        key={`c-${r.id}`}
-                        value={`contractor ${r.title} ${r.subtitle || ""}`}
-                        onSelect={() => handleSelect(r)}
-                      >
+                      <CommandItem key={`c-${r.id}`} value={`contractor ${r.title} ${r.subtitle || ""}`} onSelect={() => handleSelect(r)}>
                         <HardHat className="mr-2 h-4 w-4 text-accent group-data-[selected=true]:text-accent-foreground" />
                         <div className="flex flex-col">
                           <span className="font-medium">{r.title}</span>
-                          {r.subtitle && (
-                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                          )}
+                          {r.subtitle && <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>}
                         </div>
                       </CommandItem>
                     ))}
@@ -469,17 +469,11 @@ export function GlobalSearch() {
                   <CommandSeparator />
                   <CommandGroup heading="Category of Labour">
                     {groups.department.map((r) => (
-                      <CommandItem
-                        key={`d-${r.id}`}
-                        value={`department ${r.title} ${r.subtitle || ""}`}
-                        onSelect={() => handleSelect(r)}
-                      >
+                      <CommandItem key={`d-${r.id}`} value={`department ${r.title} ${r.subtitle || ""}`} onSelect={() => handleSelect(r)}>
                         <Layers className="mr-2 h-4 w-4 text-chart-3 group-data-[selected=true]:text-accent-foreground" />
                         <div className="flex flex-col">
                           <span className="font-medium">{r.title}</span>
-                          {r.subtitle && (
-                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                          )}
+                          {r.subtitle && <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>}
                         </div>
                       </CommandItem>
                     ))}
@@ -492,17 +486,11 @@ export function GlobalSearch() {
                   <CommandSeparator />
                   <CommandGroup heading="Categories">
                     {groups.category.map((r) => (
-                      <CommandItem
-                        key={`cat-${r.id}`}
-                        value={`category ${r.title} ${r.subtitle || ""}`}
-                        onSelect={() => handleSelect(r)}
-                      >
+                      <CommandItem key={`cat-${r.id}`} value={`category ${r.title} ${r.subtitle || ""}`} onSelect={() => handleSelect(r)}>
                         <Tag className="mr-2 h-4 w-4 text-chart-4 group-data-[selected=true]:text-accent-foreground" />
                         <div className="flex flex-col">
                           <span className="font-medium">{r.title}</span>
-                          {r.subtitle && (
-                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                          )}
+                          {r.subtitle && <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>}
                         </div>
                       </CommandItem>
                     ))}
@@ -515,17 +503,11 @@ export function GlobalSearch() {
                   <CommandSeparator />
                   <CommandGroup heading="Daily Entry Sheets">
                     {groups.sheet.map((r) => (
-                      <CommandItem
-                        key={`s-${r.id}`}
-                        value={`sheet ${r.title} ${r.subtitle || ""}`}
-                        onSelect={() => handleSelect(r)}
-                      >
+                      <CommandItem key={`s-${r.id}`} value={`sheet ${r.title} ${r.subtitle || ""}`} onSelect={() => handleSelect(r)}>
                         <FileText className="mr-2 h-4 w-4 text-chart-2 group-data-[selected=true]:text-accent-foreground" />
                         <div className="flex flex-col">
                           <span className="font-medium">{r.title}</span>
-                          {r.subtitle && (
-                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                          )}
+                          {r.subtitle && <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>}
                         </div>
                       </CommandItem>
                     ))}
@@ -538,31 +520,31 @@ export function GlobalSearch() {
                   <CommandSeparator />
                   <CommandGroup heading="Users">
                     {groups.user.map((r) => (
-                      <CommandItem
-                        key={`u-${r.id}`}
-                        value={`user ${r.title} ${r.subtitle || ""}`}
-                        onSelect={() => handleSelect(r)}
-                      >
+                      <CommandItem key={`u-${r.id}`} value={`user ${r.title} ${r.subtitle || ""}`} onSelect={() => handleSelect(r)}>
                         <User className="mr-2 h-4 w-4 text-chart-5 group-data-[selected=true]:text-accent-foreground" />
                         <div className="flex flex-col">
                           <span className="font-medium">{r.title}</span>
-                          {r.subtitle && (
-                            <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>
-                          )}
+                          {r.subtitle && <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">{r.subtitle}</span>}
                         </div>
                       </CommandItem>
                     ))}
                   </CommandGroup>
                 </>
               )}
-                </>
-              )}
             </CommandList>
-
           </Command>
         </div>,
         document.body
       )}
+    </div>
+  );
+}
+
+export function GlobalSearch() {
+  return (
+    <div className="flex items-center gap-2">
+      <MenuSearch />
+      <DataSearch />
     </div>
   );
 }
