@@ -672,6 +672,7 @@ function DailyEntryPage() {
           headcount: x.n,
           remarks,
           weather_condition: weather,
+          sheet_type: 'daily',
           status: 'draft',
           created_by: user.id,
           submitted_by: user.id,
