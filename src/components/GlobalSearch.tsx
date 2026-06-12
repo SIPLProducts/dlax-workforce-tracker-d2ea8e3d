@@ -10,8 +10,11 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
-import { Search, Briefcase, HardHat, Layers, Tag, FileText, User } from "lucide-react";
+import { Search, Briefcase, HardHat, Layers, Tag, FileText, User, LayoutGrid } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { APP_SCREENS, type ScreenKey } from "@/lib/screens";
+import { usePermissions } from "@/hooks/use-permissions";
+
 
 type Result =
   | { kind: "project"; id: string; title: string; subtitle?: string }
@@ -180,8 +183,18 @@ async function searchAll(term: string): Promise<Result[]> {
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<"data" | "menu">(() => {
+    if (typeof window === "undefined") return "data";
+    return (localStorage.getItem("globalSearchMode") as "data" | "menu") || "data";
+  });
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
+  const { canView } = usePermissions();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem("globalSearchMode", mode);
+  }, [mode]);
+
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const navigate = useNavigate();
   const reqId = useRef(0);
@@ -233,8 +246,13 @@ export function GlobalSearch() {
     };
   }, [open, results.length]);
 
-  // Debounced query
+  // Debounced query (data mode only)
   useEffect(() => {
+    if (mode !== "data") {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
     const term = query.trim();
     if (term.length < 2) {
       setResults([]);
@@ -252,7 +270,18 @@ export function GlobalSearch() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, mode]);
+
+  const menuResults = useMemo(() => {
+    if (mode !== "menu") return [];
+    const allowed = APP_SCREENS.filter((s) => canView(s.key as ScreenKey));
+    const q = query.trim().toLowerCase();
+    if (!q) return allowed;
+    return allowed.filter(
+      (s) => s.label.toLowerCase().includes(q) || s.key.toLowerCase().includes(q)
+    );
+  }, [mode, query, canView]);
+
 
   const groups = useMemo(() => {
     return {
@@ -314,7 +343,7 @@ export function GlobalSearch() {
               inputRef.current?.blur();
             }
           }}
-          placeholder="Search anything…"
+          placeholder={mode === "menu" ? "Search menus…" : "Search anything…"}
           aria-label="Global search"
           className="h-9 pl-8 pr-12"
         />
@@ -329,8 +358,60 @@ export function GlobalSearch() {
           style={{ position: "fixed", top: panelPos.top, left: panelPos.left, width: panelPos.width }}
           className="z-[1000] rounded-md border bg-popover text-popover-foreground shadow-lg overflow-hidden"
         >
+          <div className="flex items-center gap-1 border-b bg-muted/40 p-1.5">
+            <button
+              type="button"
+              onClick={() => setMode("menu")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                mode === "menu"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Menu
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("data")}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                mode === "data"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Data
+            </button>
+          </div>
           <Command shouldFilter={false} className="bg-popover">
             <CommandList className="max-h-[55vh] bg-popover">
+              {mode === "menu" ? (
+                menuResults.length === 0 ? (
+                  <CommandEmpty>No matching screens.</CommandEmpty>
+                ) : (
+                  <CommandGroup heading="Screens">
+                    {menuResults.map((s) => (
+                      <CommandItem
+                        key={`m-${s.key}`}
+                        value={`menu ${s.label} ${s.key}`}
+                        onSelect={() => {
+                          setOpen(false);
+                          setQuery("");
+                          navigate({ to: s.path as any });
+                        }}
+                      >
+                        <LayoutGrid className="mr-2 h-4 w-4 text-primary group-data-[selected=true]:text-accent-foreground" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{s.label}</span>
+                          <span className="text-xs text-muted-foreground group-data-[selected=true]:text-accent-foreground/80">
+                            {s.path}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )
+              ) : (
+                <>
               {query.trim().length < 2 ? (
                 <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>
               ) : loading ? (
@@ -338,6 +419,7 @@ export function GlobalSearch() {
               ) : results.length === 0 ? (
                 <CommandEmpty>No results found.</CommandEmpty>
               ) : null}
+
 
               {groups.project.length > 0 && (
                 <CommandGroup heading="Projects">
@@ -473,7 +555,10 @@ export function GlobalSearch() {
                   </CommandGroup>
                 </>
               )}
+                </>
+              )}
             </CommandList>
+
           </Command>
         </div>,
         document.body
