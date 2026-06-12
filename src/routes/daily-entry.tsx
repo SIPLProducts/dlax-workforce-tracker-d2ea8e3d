@@ -700,7 +700,8 @@ function DailyEntryPage() {
       .from("daily_manpower")
       .delete()
       .eq("project_id", projectId)
-      .eq("entry_date", entry_date);
+      .eq("entry_date", entry_date)
+      .eq("sheet_type", "daily");
     if (orphanRowIdsRef.current.length > 0) {
       // Postgres `not.in` requires a parenthesised list
       delQ = delQ.not("id", "in", `(${orphanRowIdsRef.current.join(",")})`);
