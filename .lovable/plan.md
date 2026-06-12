@@ -1,47 +1,60 @@
-## Goal
-Remove all hardcoded labels from the Daily Labour Report. Every band, sub-column, and label is derived from project configuration and `contractors.nature_of_work` distinct values actually present.
+## Plan
 
-## Header structure (fully dynamic)
+Update the Daily Labour Report so it is generated only from the selected project/date database records and project configuration, matching the reference layout as closely as the available database fields allow.
 
-```text
-Row 0: <project name> — DAILY LABOUR REPORT — <date>     [title]
-Row 1: Sl.No. | Name of the Project | <dept band 1..N> | Total Labour            | Total | NMR % on Total | Remarks
-Row 2:                              | <category leaves>  | <nature_of_work band>  |
-Row 3:                              |                    | <each nature_of_work>  |
-```
+### What will change
 
-- **Dept bands (left side)**: from project's `departments` → `worker_categories` join. No "NMR" assumption. Each department becomes a band; each category a leaf column.
-- **Total Labour sub-columns**: built from `SELECT DISTINCT nature_of_work FROM contractors WHERE id IN (project contractors)` ordered alphabetically. Whatever values exist (e.g. "Item Rate", "NMR", "Daily Wage") become sub-columns. If only one value exists, single sub-column with that label. If none, single "Total Labour" leaf.
-- **Fixed right columns**: `Total`, `NMR % on Total`, `Remarks`. The `NMR % on Total` column is rendered only if a nature_of_work value literally equals `NMR` (case-insensitive); otherwise dropped (no fake placeholder).
-- **Removed**: `Budget NMR`, `NMR % on Budget`, `Security` (no DB backing).
+1. **Remove remaining fake/fallback data sources**
+   - Stop falling back to all worker categories when a project has no category assignment.
+   - Stop falling back to all contractors when a project has no contractor assignment.
+   - Stop creating placeholder groups such as “Other” from code unless the label comes from actual database data.
+   - Keep structural report labels from the reference only, such as `Sl.No.`, `Name of the Project`, `Total`, and `Remarks`.
 
-## Data row aggregation
+2. **Load DLR data for the selected project and date only**
+   - Fetch `daily_manpower` rows filtered by:
+     - selected `project_id`
+     - selected `entry_date`
+   - Include joined contractor, department, and category names from the database.
+   - Build the report values from those rows only.
 
-- Each category leaf: `SUM(headcount)` where `category_id = <leaf>` for project+date.
-- Each Total Labour leaf (one per distinct nature_of_work): `SUM(headcount)` joined to `contractors` filtered by that `nature_of_work`.
-- `Total` = sum of all Total Labour leaves.
-- `NMR % on Total` (only if NMR column present) = NMR sum / Total.
-- `Remarks` = unique concatenated remarks.
-- Zero → `-`.
+3. **Build headers dynamically from database configuration and actual records**
+   - Department/category bands:
+     - Prefer the project’s category configuration.
+     - If selected-date rows contain department/category combinations missing from project configuration, include them from the actual row data so no recorded data disappears.
+   - Total Labour sub-columns:
+     - For dates with records, use distinct `contractors.nature_of_work` values from the selected-date records.
+     - For dates with no records, use the selected project’s assigned contractors so the empty sheet still shows configured headers with `-` values.
+   - Do not inject labels like `NMR`, `Sub Contractors/Job Works`, or contractor work names unless they exist in database records/configuration.
 
-## Empty data behavior
-If no `daily_manpower` rows for the selected project+date: render the full dynamic header from project config + contractors' nature_of_work distinct values; data row shows `-` in every numeric cell, blank `Remarks`, Sl.No. `1`, Name of Project = project name.
+4. **Generate the complete row dynamically**
+   - Category cells: sum `headcount` by category.
+   - Total Labour cells: sum `headcount` by contractor `nature_of_work`.
+   - Total: sum selected-date headcount.
+   - Security: use `security_count` dynamically if the reference report includes it and database rows contain that field.
+   - Deficiency manpower / OT: use existing database fields only where needed by the reference layout.
+   - Empty numeric cells render as `-`.
 
-## Files to change
+5. **Keep exports identical to preview**
+   - Excel and CSV generation will use the same matrix metadata as the preview.
+   - Header merges, frozen columns, right-side fixed columns, and downloaded values will all come from the same dynamic report matrix.
+
+### Files to update
+
+- `src/routes/reports.tsx`
+  - Replace the current separate fallback-heavy metadata loading with selected project/date-aware dynamic loading.
+  - Remove global category/contractor fallbacks from DLR.
 
 - `src/lib/dlr-daily.ts`
-  - Extend `DlrInput` with `natureOfWorkValues: string[]` (distinct values loaded by caller).
-  - Rebuild `buildBands()`: drop hardcoded "Sub Contractors/Job Works" / "NMR" / "Item Rate" branches. `totalLabourLeaves = natureOfWorkValues` (sorted). Conditionally include `nmrPctOnTotalCol` only if any leaf matches /^nmr$/i. Drop `budgetNmrCol`, `nmrPctOnBudgetCol`, `securityCol` from bands and indices.
-  - `getDlrDailyMatrix()`: aggregate per nature_of_work leaf instead of fixed Item Rate/NMR pair. Pass through `contractorNatureMap: Map<contractorId, nature_of_work>` for joining manpower rows.
-  - `buildDlrDailyWorkbook()` / `buildDlrDailyCsv()`: regenerate merges and cells from new band metadata; remove fixed-column literals.
-
-- `src/routes/reports.tsx` (DlrTab)
-  - When `projectId` changes, additionally query:
-    - `project_contractors` → `contractors(id, nature_of_work)` for that project; build `natureOfWorkValues` = sorted distinct non-null trimmed values, and `contractorNatureMap`.
-  - Pass both into `getDlrDailyMatrix`.
+  - Adjust matrix creation to derive header leaves and totals from actual rows/configuration.
+  - Add support for database-backed right-side fields only.
+  - Ensure all zero numeric values export/display as `-`.
 
 - `src/components/DlrDailyPreview.tsx`
-  - Render header from matrix metadata only. Compute `rowSpan`/`colSpan` from the dynamic band widths. No string literals for column names — all come from matrix.
+  - Keep rendering from matrix metadata only so the preview matches Excel/CSV output.
+  - Avoid any report data labels not supplied by the matrix.
 
-## Out of scope
-Other Reports tabs, Daily Entry, Approvals, Masters, DB schema/RLS/migrations, monthly DLR pivot.
+### Validation
+
+- Check the selected BHELSTPP / 12-06-2026 data directly against the database totals.
+- Verify the preview row totals match the actual `daily_manpower` rows for that date.
+- Verify Excel and CSV outputs contain the same headers and values as the preview.
