@@ -968,7 +968,8 @@ function OtEntryPage() {
       )}
 
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
+      <Tabs value={editorMode ? activeTab : "saved"} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
+        {editorMode && (
         <div className="sticky top-[240px] md:top-[248px] z-10 bg-background py-2 -mt-2">
           <TabsList>
             <TabsTrigger value="entry">Entry Sheet</TabsTrigger>
@@ -978,6 +979,7 @@ function OtEntryPage() {
             </TabsTrigger>
           </TabsList>
         </div>
+        )}
 
         <TabsContent value="entry" className="mt-0">
       <Card>
