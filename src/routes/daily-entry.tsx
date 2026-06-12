@@ -762,6 +762,10 @@ function DailyEntryPage() {
   };
 
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
+    if ((s as any).sheet_type === "ot") {
+      navigate({ to: "/ot-entry", search: { project: s.project_id, date: s.entry_date, from: "daily" } as any });
+      return;
+    }
     pendingModeRef.current = asMode;
     setProjectId(s.project_id);
     const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
