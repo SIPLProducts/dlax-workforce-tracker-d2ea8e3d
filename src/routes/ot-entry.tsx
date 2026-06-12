@@ -214,6 +214,7 @@ function OtEntryPage() {
 
   const handleDateTextChange = (raw: string) => {
     setDateText(raw);
+    openedSheetRef.current = false;
     const parsed = tryParseDate(raw);
     if (parsed) { setDate(parsed); setDateError(false); } else { setDateError(raw.length > 0); }
   };
