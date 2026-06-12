@@ -905,7 +905,7 @@ function DailyEntryPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 380px)' }}>
-            <table className="border-collapse text-xs w-full min-w-[1600px]">
+            <table className="border-separate border-spacing-0 text-xs w-full min-w-[1600px]">
               <colgroup>
                 <col style={{ width: 48 }} />
                 <col style={{ width: 100 }} />
@@ -915,21 +915,21 @@ function DailyEntryPage() {
               </colgroup>
               <thead className="bg-slate-100">
                 <tr>
-                  <th rowSpan={2} style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-0 top-0 z-30 box-border">Sl.no</th>
-                  <th rowSpan={2} style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[48px] top-0 z-30 box-border">SC Code</th>
-                  <th rowSpan={2} style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[148px] top-0 z-30 box-border text-left">Name of the Contractor</th>
-                  <th rowSpan={2} style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[368px] top-0 z-30 box-border">Contact No</th>
-                  <th rowSpan={2} style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[488px] top-0 z-40 box-border border-r-2 border-r-slate-300">Work Place</th>
+                  <th rowSpan={2} style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border-l border-r border-b border-t bg-slate-100 bg-clip-padding px-2 py-2 sticky left-0 top-0 z-30 box-border">Sl.no</th>
+                  <th rowSpan={2} style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border-r border-b border-t bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[48px] top-0 z-30 box-border">SC Code</th>
+                  <th rowSpan={2} style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border-r border-b border-t bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[148px] top-0 z-30 box-border text-left">Name of the Contractor</th>
+                  <th rowSpan={2} style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border-r border-b border-t bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[368px] top-0 z-30 box-border">Contact No</th>
+                  <th rowSpan={2} style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border-b border-t bg-slate-100 bg-clip-padding px-2 py-2 sticky left-[488px] top-0 z-40 box-border border-r-2 border-r-slate-300">Work Place</th>
                   {displayGroups.map((g) => (
-                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border px-2 py-1 text-center font-semibold sticky top-0 z-20", g.headerClass)}>{g.deptName}</th>
+                    <th key={g.deptId} colSpan={g.cells.length} className={cn("border-r border-b border-t px-2 py-1 text-center font-semibold sticky top-0 z-20", g.headerClass)}>{g.deptName}</th>
                   ))}
-                  <th rowSpan={2} className="border bg-green-100 text-green-900 px-2 py-2 min-w-[60px] sticky top-0 z-20">Total</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[160px] sticky top-0 z-20">Remarks</th>
-                  <th rowSpan={2} className="border bg-slate-100 px-2 py-2 min-w-[130px] sticky top-0 z-20">Weather</th>
+                  <th rowSpan={2} className="border-r border-b border-t bg-green-100 text-green-900 px-2 py-2 min-w-[60px] sticky top-0 z-20">Total</th>
+                  <th rowSpan={2} className="border-r border-b border-t bg-slate-100 px-2 py-2 min-w-[160px] sticky top-0 z-20">Remarks</th>
+                  <th rowSpan={2} className="border-r border-b border-t bg-slate-100 px-2 py-2 min-w-[130px] sticky top-0 z-20">Weather</th>
                 </tr>
                 <tr>
                   {displayGroups.flatMap((g) => g.cells.map((c) => (
-                    <th key={c.key} className={cn("border px-1 py-1 text-center font-medium min-w-[64px] sticky top-[36px] z-20", g.headerClass)}>{c.catName}</th>
+                    <th key={c.key} className={cn("border-r border-b px-1 py-1 text-center font-medium min-w-[64px] sticky top-[36px] z-20", g.headerClass)}>{c.catName}</th>
                   )))}
                 </tr>
               </thead>
