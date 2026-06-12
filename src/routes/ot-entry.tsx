@@ -818,7 +818,8 @@ function OtEntryPage() {
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
     pendingModeRef.current = asMode;
     setProjectId(s.project_id);
-    // OT page is locked to yesterday; ignore historical sheet date.
+    const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
+    if (isValid(d)) { d.setHours(0, 0, 0, 0); setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
     setMode(asMode);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -908,8 +909,20 @@ function OtEntryPage() {
       <Card className="sticky top-[112px] md:top-[120px] z-20 bg-background">
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <label className="text-xs font-medium">Date (Previous Day)</label>
-            <Input value={dateText} readOnly disabled className="w-36" />
+            <label className="text-xs font-medium">Date</label>
+            <div className="flex gap-1">
+              <Input value={dateText} onChange={(e) => handleDateTextChange(e.target.value)} placeholder="dd/MM/yyyy"
+                className={cn("w-36", dateError && "border-destructive")} />
+              <Popover>
+                <PopoverTrigger asChild><Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={date}
+                    onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }}
+                    disabled={(d) => d > new Date(new Date().setHours(23, 59, 59, 999))}
+                    initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
           <div className="space-y-1 min-w-[240px]">
             <label className="text-xs font-medium">Project</label>

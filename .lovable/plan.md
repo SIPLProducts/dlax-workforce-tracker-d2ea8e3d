@@ -1,19 +1,24 @@
-## Goal
+## Problem
 
-Add red highlight rectangles to **Figure 3 — Daily Manpower Entry** in `dlax-user-manual.docx`, matching the style already used on Figure 4 (Approvals): a red box around the sidebar nav item and a red box around the page header.
+In **OT Entry Sheet**, after saving, the saved data does not reliably appear back in the grid because the date input is hard-locked to yesterday and the "Saved Entries → View/Edit" action deliberately ignores the saved sheet's actual date. Any OT sheet that isn't literally yesterday's becomes invisible in the entry grid. The Daily Entry sheet does not have this restriction — it loads whatever (project, date) the user opens.
 
-## Changes
+## Fix
 
-1. Locate the current Figure 3 image inside `word/media/` (the Daily Entry screenshot added last turn).
-2. Using Pillow, draw two thin red rectangles (≈2 px, colour `#E11D2A`, no fill) on a copy of the image:
-   - Around the **"Daily Entry"** item in the left sidebar.
-   - Around the **"Daily Manpower Entry / Daily Labour Attendance Register"** title block at the top of the main content area.
-3. Save the annotated PNG over the existing media file (same filename, same `rId`) so the document layout, caption ("Figure 3 — Daily Manpower Entry") and size are untouched.
-4. Repack `dlax-user-manual.docx` to `/mnt/documents/dlax-user-manual.docx`.
-5. QA: render the page as an image and verify both red boxes sit on the right elements with clean edges and no overlap with surrounding text.
+Bring OT Entry Sheet in line with Daily Entry's loading behaviour, while keeping its default-to-yesterday convenience for fresh entries.
 
-## Notes
+### Changes in `src/routes/ot-entry.tsx`
 
-- No other figures, text, or layout changes.
-- Box coordinates derived empirically from the screenshot by inspecting pixel positions of "Daily Entry" in the sidebar and the "Daily Manpower Entry" header.
-- If the boxes look misplaced in QA, adjust coordinates and re-render before finalising.
+1. **Unlock the date field** in the sticky filter card so the user can pick any date and the grid reloads for that (project, date) — same control style as Daily Entry (`Input` + calendar popover, with the same dd/MM/yyyy parsing already present).
+2. **Saved Entries → View/Edit** (`loadSheetIntoEditor`): also set `date` and `dateText` from `s.entry_date` (currently it explicitly skips this). This lets the grid populate with the chosen sheet's saved rows.
+3. **Saved Entries → Send to Approval** (`sendFromList`): keep the existing same-day reload guard — it already compares `s.entry_date` with the current `date`, which will now work correctly once the date can change.
+4. **`handleSave` reload**: no behavioural change needed — `loadEntries()` already runs with the just-saved (project, date) and will now show the data because the date won't be silently overridden anywhere.
+5. **Default behaviour preserved**: opening OT Entry Sheet fresh still defaults to yesterday; "New Entry" button still resets to yesterday.
+
+No DB, RLS, schema or server-function changes. Daily Entry Sheet is untouched.
+
+## Verification
+
+- Save a new OT sheet for yesterday → rows remain visible in the grid in view mode.
+- From **Saved Entries**, click View on an older OT sheet → date switches to that sheet's date and the grid shows its saved headcounts, OT hours, remarks and weather.
+- Click Edit on a draft/rejected OT sheet from Saved Entries → grid loads in edit mode for the correct date.
+- Change the date manually to a date with no OT data → grid shows empty editable state (as today).
