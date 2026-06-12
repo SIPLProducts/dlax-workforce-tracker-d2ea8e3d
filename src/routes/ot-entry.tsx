@@ -938,9 +938,10 @@ function OtEntryPage() {
             <label className="text-xs font-medium">Date</label>
             <div className="flex gap-1">
               <Input value={dateText} onChange={(e) => handleDateTextChange(e.target.value)} placeholder="dd/MM/yyyy"
+                disabled
                 className={cn("w-36", dateError && "border-destructive")} />
               <Popover>
-                <PopoverTrigger asChild><Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
+                <PopoverTrigger asChild><Button variant="outline" size="icon" disabled><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar mode="single" selected={date}
                     onSelect={(d) => { if (d) { openedSheetRef.current = false; setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }}
@@ -1104,9 +1105,6 @@ function OtEntryPage() {
               <h2 className="text-lg font-semibold">Saved Entries</h2>
               <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load in the Entry Sheet tab.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; openedSheetRef.current = false; setMode("edit"); setDate(yesterdayDate()); setDateText(format(yesterdayDate(), "dd/MM/yyyy")); setEditorMode(true); setActiveTab("entry"); }}>
-              <Plus className="w-4 h-4 mr-2" /> New Entry
-            </Button>
           </div>
           <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 380px)' }}>
             <table className="w-full caption-bottom text-sm">
