@@ -989,16 +989,16 @@ function DailyEntryPage() {
               {contractors.length > 0 && displayCells.length > 0 && (
                 <tfoot>
                   <tr className="bg-yellow-100 font-bold">
-                    <td style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border text-center sticky left-0 bg-yellow-100 bg-clip-padding z-20 box-border">TOTAL</td>
-                    <td style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border sticky left-[48px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
-                    <td style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border sticky left-[148px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
-                    <td style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border sticky left-[368px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
-                    <td style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border sticky left-[488px] bg-yellow-100 bg-clip-padding z-30 box-border border-r-2 border-r-slate-300"></td>
-                    {displayCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
-                    <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
-                    <td className="border"></td>
+                    <td style={{ width: 48, minWidth: 48, maxWidth: 48 }} className="border-l border-r border-t border-b text-center sticky left-0 bg-yellow-100 bg-clip-padding z-20 box-border">TOTAL</td>
+                    <td style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="border-r border-t border-b sticky left-[48px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
+                    <td style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border-r border-t border-b sticky left-[148px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
+                    <td style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border-r border-t border-b sticky left-[368px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
+                    <td style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border-t border-b sticky left-[488px] bg-yellow-100 bg-clip-padding z-30 box-border border-r-2 border-r-slate-300"></td>
+                    {displayCells.map((c) => (<td key={c.key} className="border-r border-t border-b text-center">{colTotals[c.key] || ""}</td>))}
+                    <td className="border-r border-t border-b text-center bg-green-200">{colTotals.total || ""}</td>
+                    <td className="border-r border-t border-b"></td>
 
-                    <td className="border"></td>
+                    <td className="border-r border-t border-b"></td>
                   </tr>
                 </tfoot>
 
