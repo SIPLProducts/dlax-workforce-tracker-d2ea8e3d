@@ -707,20 +707,12 @@ function DlrTab({ projects }: { projects: any[] }) {
         if (nv) natureMap[c.id] = nv;
       }
 
-      // Nature of work columns: from records when present, else from project config
+      // Nature of work columns: strictly from records for the selected date
       const natureSet = new Set<string>();
-      if (dmRows.length > 0) {
-        for (const r of dmRows) {
-          const c: any = (r as any).contractors;
-          const nv = (c?.nature_of_work || "").toString().trim();
-          if (nv) natureSet.add(nv);
-        }
-      } else {
-        for (const r of pcrRes.data || []) {
-          const c: any = (r as any).contractors;
-          const nv = (c?.nature_of_work || "").toString().trim();
-          if (nv) natureSet.add(nv);
-        }
+      for (const r of dmRows) {
+        const c: any = (r as any).contractors;
+        const nv = (c?.nature_of_work || "").toString().trim();
+        if (nv) natureSet.add(nv);
       }
 
       setRows(dmRows);
