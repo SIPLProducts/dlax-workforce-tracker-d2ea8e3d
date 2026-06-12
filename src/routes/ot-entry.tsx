@@ -142,6 +142,13 @@ function OtEntryPage() {
   const pendingModeRef = useRef<"view" | "edit" | null>(null);
   const [allSheets, setAllSheets] = useState<SheetRow[]>([]);
   const [activeTab, setActiveTab] = useState<"entry" | "saved">("entry");
+  // Editor mode shows the blank/saved OT entry grid + actions. Browse mode
+  // (sidebar landing) shows only the Saved Entries list. Editor mode is
+  // entered via the Daily Entry → OT popup (`from=daily`), a deep-link with
+  // an explicit date, or clicking View/Edit/New Entry from Saved Entries.
+  const [editorMode, setEditorMode] = useState<boolean>(
+    () => search.from === "daily" || !!search.date,
+  );
   // Cells from saved daily_manpower rows whose (dept, cat) is no longer in the
   // project's current assignments. Rendered read-only so totals reconcile and
   // historical data isn't silently dropped from the grid.
@@ -224,6 +231,9 @@ function OtEntryPage() {
       openedSheetRef.current = !!search.date;
       pendingModeRef.current = search.date ? "view" : "edit";
       setActiveTab("entry");
+    }
+    if (search.from === "daily" || !!search.date) {
+      setEditorMode(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.project, search.date]);
@@ -867,9 +877,13 @@ function OtEntryPage() {
     <div className="space-y-4 max-w-[100vw]">
       <PageHeader
         title="OT Entry Sheet"
-        subtitle="Overtime register for the previous day"
+        subtitle={editorMode ? "Overtime register for the previous day" : "Saved overtime entries"}
         actions={
+          editorMode ? (
           <>
+            <Button variant="outline" onClick={() => { setEditorMode(false); setActiveTab("saved"); }}>
+              ← Saved Entries
+            </Button>
             {!isEmpty && (
               <Button variant="outline" onClick={() => setMode("view")} disabled={mode === "view"}>
                 <Eye className="w-4 h-4 mr-2" /> View
@@ -913,9 +927,11 @@ function OtEntryPage() {
               );
             })()}
           </>
+          ) : null
         }
       />
 
+      {editorMode && (
       <Card className="sticky top-[112px] md:top-[120px] z-20 bg-background">
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
@@ -949,8 +965,11 @@ function OtEntryPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
+
+      <Tabs value={editorMode ? activeTab : "saved"} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
+        {editorMode && (
         <div className="sticky top-[240px] md:top-[248px] z-10 bg-background py-2 -mt-2">
           <TabsList>
             <TabsTrigger value="entry">Entry Sheet</TabsTrigger>
@@ -960,6 +979,7 @@ function OtEntryPage() {
             </TabsTrigger>
           </TabsList>
         </div>
+        )}
 
         <TabsContent value="entry" className="mt-0">
       <Card>
@@ -1084,7 +1104,7 @@ function OtEntryPage() {
               <h2 className="text-lg font-semibold">Saved Entries</h2>
               <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load in the Entry Sheet tab.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; openedSheetRef.current = false; setMode("edit"); setDate(yesterdayDate()); setDateText(format(yesterdayDate(), "dd/MM/yyyy")); setActiveTab("entry"); }}>
+            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; openedSheetRef.current = false; setMode("edit"); setDate(yesterdayDate()); setDateText(format(yesterdayDate(), "dd/MM/yyyy")); setEditorMode(true); setActiveTab("entry"); }}>
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
@@ -1116,9 +1136,9 @@ function OtEntryPage() {
                       <td className="p-2 align-middle"><Badge variant="outline" className={m.cls}>{m.label}</Badge></td>
                       <td className="p-2 align-middle text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => { loadSheetIntoEditor(s, "view"); setActiveTab("entry"); }}><Eye className="w-4 h-4" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => { loadSheetIntoEditor(s, "view"); setEditorMode(true); setActiveTab("entry"); }}><Eye className="w-4 h-4" /></Button>
                           {editable ? (
-                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); setActiveTab("entry"); }}><Pencil className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { if (!requireEdit()) return; loadSheetIntoEditor(s, "edit"); setEditorMode(true); setActiveTab("entry"); }}><Pencil className="w-4 h-4" /></Button>
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild><span><Button size="sm" variant="ghost" disabled><Pencil className="w-4 h-4" /></Button></span></TooltipTrigger>
