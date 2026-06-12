@@ -615,9 +615,61 @@ function DlrTab({ projects }: { projects: any[] }) {
   const [projectId, setProjectId] = useState<string>("");
   const [date, setDate] = useState<Date>(new Date());
   const [rows, setRows] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
+
+  // Load project-specific department + category structure
+  useEffect(() => {
+    if (!projectId) { setDepartments([]); return; }
+    let cancelled = false;
+    (async () => {
+      // 1) project's assigned categories
+      const { data: pc } = await supabase
+        .from("project_categories")
+        .select("category_id, worker_categories(id, name, display_order)")
+        .eq("project_id", projectId);
+      let cats: any[] = (pc || []).map((r: any) => r.worker_categories).filter(Boolean);
+      // Fallback: all worker categories
+      if (cats.length === 0) {
+        const { data: all } = await supabase.from("worker_categories").select("id, name, display_order");
+        cats = all || [];
+      }
+      // 2) category -> department mapping
+      const catIds = cats.map((c) => c.id);
+      const { data: dc } = await supabase
+        .from("department_categories")
+        .select("category_id, department_id, departments(id, name)")
+        .in("category_id", catIds.length ? catIds : ["00000000-0000-0000-0000-000000000000"]);
+      // Group categories by first department (sorted by dept name)
+      const byDept = new Map<string, { name: string; isNmr: boolean; categories: { id: string; name: string; display_order: number }[] }>();
+      const seenCat = new Set<string>();
+      const mappings = (dc || []).slice().sort((a: any, b: any) => (a.departments?.name || "").localeCompare(b.departments?.name || ""));
+      for (const m of mappings) {
+        if (!m.departments) continue;
+        if (seenCat.has(m.category_id)) continue;
+        const cat = cats.find((c) => c.id === m.category_id);
+        if (!cat) continue;
+        const key = m.departments.id;
+        if (!byDept.has(key)) byDept.set(key, { name: m.departments.name, isNmr: /nmr/i.test(m.departments.name), categories: [] });
+        byDept.get(key)!.categories.push({ id: cat.id, name: cat.name, display_order: cat.display_order || 0 });
+        seenCat.add(m.category_id);
+      }
+      // Categories with no department mapping -> bucket "Other"
+      const orphans = cats.filter((c) => !seenCat.has(c.id));
+      if (orphans.length) {
+        byDept.set("__other__", { name: "Other", isNmr: false, categories: orphans.map((c) => ({ id: c.id, name: c.name, display_order: c.display_order || 0 })) });
+      }
+      const arr = Array.from(byDept.values()).map((d) => ({
+        name: d.name,
+        isNmr: d.isNmr,
+        categories: d.categories.sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name)).map(({ id, name }) => ({ id, name })),
+      })).sort((a, b) => Number(a.isNmr) - Number(b.isNmr) || a.name.localeCompare(b.name));
+      if (!cancelled) setDepartments(arr);
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   useEffect(() => {
     if (!projectId) { setRows([]); return; }
@@ -639,8 +691,9 @@ function DlrTab({ projects }: { projects: any[] }) {
 
   const matrix = useMemo(() => {
     if (!project) return null;
-    return getDlrDailyMatrix({ project, date, rows });
-  }, [project, date, rows]);
+    return getDlrDailyMatrix({ project, date, rows, departments });
+  }, [project, date, rows, departments]);
+
 
   const fileBase = project
     ? `DLR-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(date, "dd-MM-yyyy")}`
