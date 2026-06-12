@@ -14,11 +14,14 @@ import { CalendarIcon, Download, Users, CalendarDays, HardHat, TrendingUp } from
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend } from "recharts";
 import { format, subDays, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ClientOnly } from "@tanstack/react-router";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
+import { DlrDailyPreview } from "@/components/DlrDailyPreview";
+import { getDlrDailyMatrix, downloadDlrXlsx, downloadDlrCsv } from "@/lib/dlr-daily";
+import { FileSpreadsheet, FileText } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
