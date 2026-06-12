@@ -822,6 +822,7 @@ function OtEntryPage() {
       console.error("[ot-entry] insert failed", error);
       return toast.error(error.message);
     }
+    openedSheetRef.current = true;
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
