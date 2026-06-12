@@ -658,14 +658,8 @@ function DlrTab({ projects }: { projects: any[] }) {
           .map(({ id, name }) => ({ id, name })),
       })).sort((a, b) => a.name.localeCompare(b.name));
 
-      // Contractor -> nature_of_work map (config + records)
+      // Contractor -> nature_of_work map strictly from records
       const natureMap: Record<string, string> = {};
-      for (const r of pcrRes.data || []) {
-        const c: any = (r as any).contractors;
-        if (!c) continue;
-        const nv = (c.nature_of_work || "").toString().trim();
-        if (nv) natureMap[c.id] = nv;
-      }
       for (const r of dmRows) {
         const c: any = (r as any).contractors;
         if (!c) continue;
