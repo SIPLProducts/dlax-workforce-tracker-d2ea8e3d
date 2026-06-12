@@ -1,3 +1,1 @@
-# Rename column "Sheet Type" → "Screen Type"
-
-In `src/routes/approvals.tsx`, change the table header label from **Sheet Type** to **Screen Type**. Badge values ("OT Entry" / "Daily Entry") and all other logic remain unchanged.
+In `src/routes/daily-entry.tsx` line 1085, change the OT popup description from `Do you want to enter OT?` to `Would you like to enter OT for the previous date?`. Title and buttons unchanged.

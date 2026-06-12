@@ -1082,7 +1082,7 @@ function DailyEntryPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Enter OT?</DialogTitle>
-            <DialogDescription>Do you want to enter OT?</DialogDescription>
+            <DialogDescription>Would you like to enter OT for the previous date?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOtPromptOpen(false)}>No</Button>
