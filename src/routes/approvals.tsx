@@ -132,7 +132,7 @@ function Page() {
       <TableHeader>
         <TableRow>
           <TableHead>Sheet ID</TableHead>
-          <TableHead>Sheet Type</TableHead>
+          <TableHead>Screen Type</TableHead>
           <TableHead>Date</TableHead>
           <TableHead>Project</TableHead>
           <TableHead className="text-right">Headcount</TableHead>
