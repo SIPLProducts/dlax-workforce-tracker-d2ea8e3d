@@ -628,78 +628,38 @@ function DlrTab({ projects }: { projects: any[] }) {
     (async () => {
       setLoading(true);
       const dateStr = format(date, "yyyy-MM-dd");
-      const [pcRes, dcRes, pcrRes, dmRes] = await Promise.all([
-        supabase
-          .from("project_categories")
-          .select("category_id, worker_categories(id, name, display_order)")
-          .eq("project_id", projectId),
-        supabase
-          .from("department_categories")
-          .select("category_id, department_id, departments(id, name)"),
-        supabase
-          .from("project_contractors")
-          .select("contractor_id, contractors(id, nature_of_work)")
-          .eq("project_id", projectId),
-        supabase
-          .from("daily_manpower")
-          .select("*, contractors(id, company_name, nature_of_work), departments(id, name), worker_categories(id, name, display_order)")
-          .eq("project_id", projectId)
-          .eq("entry_date", dateStr),
-      ]);
+      const dmRes = await supabase
+        .from("daily_manpower")
+        .select("*, contractors(id, company_name, nature_of_work), departments(id, name), worker_categories(id, name, display_order)")
+        .eq("project_id", projectId)
+        .eq("entry_date", dateStr);
       if (cancelled) return;
 
       if (dmRes.error) console.error(dmRes.error);
       const dmRows = dmRes.data || [];
 
-      // Build category -> department mapping (one dept per cat; pick first)
-      const catDeptMap = new Map<string, { id: string; name: string }>();
-      for (const m of dcRes.data || []) {
-        const d: any = (m as any).departments;
-        if (!d || catDeptMap.has((m as any).category_id)) continue;
-        catDeptMap.set((m as any).category_id, { id: d.id, name: d.name });
-      }
-
-      // Project-configured categories
-      const cats = new Map<string, { id: string; name: string; display_order: number }>();
-      for (const r of pcRes.data || []) {
-        const c: any = (r as any).worker_categories;
-        if (c) cats.set(c.id, { id: c.id, name: c.name, display_order: c.display_order || 0 });
-      }
-      // Add any category present in records but missing from config
+      // Build department -> categories strictly from actual records for the selected date
+      const byDept = new Map<string, { name: string; isNmr: boolean; categories: Map<string, { id: string; name: string; display_order: number }> }>();
       for (const r of dmRows) {
-        const c: any = (r as any).worker_categories;
-        if (c && !cats.has(c.id)) cats.set(c.id, { id: c.id, name: c.name, display_order: c.display_order || 0 });
-        // also ensure dept mapping picks up dept from the record
-        if (c && !catDeptMap.has(c.id)) {
-          const d: any = (r as any).departments;
-          if (d) catDeptMap.set(c.id, { id: d.id, name: d.name });
+        const dept: any = (r as any).departments;
+        const cat: any = (r as any).worker_categories;
+        if (!dept || !cat) continue;
+        if (!byDept.has(dept.id)) byDept.set(dept.id, { name: dept.name, isNmr: /nmr/i.test(dept.name), categories: new Map() });
+        const entry = byDept.get(dept.id)!;
+        if (!entry.categories.has(cat.id)) {
+          entry.categories.set(cat.id, { id: cat.id, name: cat.name, display_order: cat.display_order || 0 });
         }
-      }
-
-      // Group categories under their department; skip categories with no department
-      const byDept = new Map<string, { name: string; isNmr: boolean; categories: { id: string; name: string; display_order: number }[] }>();
-      for (const cat of cats.values()) {
-        const dept = catDeptMap.get(cat.id);
-        if (!dept) continue;
-        if (!byDept.has(dept.id)) byDept.set(dept.id, { name: dept.name, isNmr: /nmr/i.test(dept.name), categories: [] });
-        byDept.get(dept.id)!.categories.push(cat);
       }
       const deptArr = Array.from(byDept.values()).map((d) => ({
         name: d.name,
         isNmr: d.isNmr,
-        categories: d.categories
+        categories: Array.from(d.categories.values())
           .sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name))
           .map(({ id, name }) => ({ id, name })),
       })).sort((a, b) => a.name.localeCompare(b.name));
 
-      // Contractor -> nature_of_work map (config + records)
+      // Contractor -> nature_of_work map strictly from records
       const natureMap: Record<string, string> = {};
-      for (const r of pcrRes.data || []) {
-        const c: any = (r as any).contractors;
-        if (!c) continue;
-        const nv = (c.nature_of_work || "").toString().trim();
-        if (nv) natureMap[c.id] = nv;
-      }
       for (const r of dmRows) {
         const c: any = (r as any).contractors;
         if (!c) continue;
