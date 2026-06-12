@@ -623,88 +623,110 @@ function DlrTab({ projects }: { projects: any[] }) {
   const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
 
   useEffect(() => {
-    if (!projectId) { setDepartments([]); setNatureOfWorkValues([]); setContractorNatureMap({}); return; }
-    let cancelled = false;
-    (async () => {
-      const { data: pc } = await supabase
-        .from("project_categories")
-        .select("category_id, worker_categories(id, name, display_order)")
-        .eq("project_id", projectId);
-      let cats: any[] = (pc || []).map((r: any) => r.worker_categories).filter(Boolean);
-      if (cats.length === 0) {
-        const { data: all } = await supabase.from("worker_categories").select("id, name, display_order");
-        cats = all || [];
-      }
-      const catIds = cats.map((c) => c.id);
-      const { data: dc } = await supabase
-        .from("department_categories")
-        .select("category_id, department_id, departments(id, name)")
-        .in("category_id", catIds.length ? catIds : ["00000000-0000-0000-0000-000000000000"]);
-      const byDept = new Map<string, { name: string; isNmr: boolean; categories: { id: string; name: string; display_order: number }[] }>();
-      const seenCat = new Set<string>();
-      const mappings = (dc || []).slice().sort((a: any, b: any) => (a.departments?.name || "").localeCompare(b.departments?.name || ""));
-      for (const m of mappings) {
-        if (!m.departments) continue;
-        if (seenCat.has(m.category_id)) continue;
-        const cat = cats.find((c) => c.id === m.category_id);
-        if (!cat) continue;
-        const key = m.departments.id;
-        if (!byDept.has(key)) byDept.set(key, { name: m.departments.name, isNmr: /nmr/i.test(m.departments.name), categories: [] });
-        byDept.get(key)!.categories.push({ id: cat.id, name: cat.name, display_order: cat.display_order || 0 });
-        seenCat.add(m.category_id);
-      }
-      const orphans = cats.filter((c) => !seenCat.has(c.id));
-      if (orphans.length) {
-        byDept.set("__other__", { name: "Other", isNmr: false, categories: orphans.map((c) => ({ id: c.id, name: c.name, display_order: c.display_order || 0 })) });
-      }
-      const arr = Array.from(byDept.values()).map((d) => ({
-        name: d.name,
-        isNmr: d.isNmr,
-        categories: d.categories.sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name)).map(({ id, name }) => ({ id, name })),
-      })).sort((a, b) => a.name.localeCompare(b.name));
-
-      const { data: pcr } = await supabase
-        .from("project_contractors")
-        .select("contractor_id, contractors(id, nature_of_work)")
-        .eq("project_id", projectId);
-      const natureMap: Record<string, string> = {};
-      const natureSet = new Set<string>();
-      for (const r of pcr || []) {
-        const c: any = (r as any).contractors;
-        if (!c) continue;
-        const nv = (c.nature_of_work || "").toString().trim();
-        if (nv) { natureMap[c.id] = nv; natureSet.add(nv); }
-      }
-      if (natureSet.size === 0) {
-        const { data: allC } = await supabase.from("contractors").select("id, nature_of_work");
-        for (const c of allC || []) {
-          const nv = (c.nature_of_work || "").toString().trim();
-          if (nv) { natureMap[c.id] = nv; natureSet.add(nv); }
-        }
-      }
-
-      if (!cancelled) {
-        setDepartments(arr);
-        setNatureOfWorkValues(Array.from(natureSet).sort((a, b) => a.localeCompare(b)));
-        setContractorNatureMap(natureMap);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) { setRows([]); return; }
+    if (!projectId) { setRows([]); setDepartments([]); setNatureOfWorkValues([]); setContractorNatureMap({}); return; }
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("daily_manpower")
-        .select("*, contractors(company_name, nature_of_work), departments(name), worker_categories(name)")
-        .eq("project_id", projectId)
-        .eq("entry_date", format(date, "yyyy-MM-dd"));
+      const dateStr = format(date, "yyyy-MM-dd");
+      const [pcRes, dcRes, pcrRes, dmRes] = await Promise.all([
+        supabase
+          .from("project_categories")
+          .select("category_id, worker_categories(id, name, display_order)")
+          .eq("project_id", projectId),
+        supabase
+          .from("department_categories")
+          .select("category_id, department_id, departments(id, name)"),
+        supabase
+          .from("project_contractors")
+          .select("contractor_id, contractors(id, nature_of_work)")
+          .eq("project_id", projectId),
+        supabase
+          .from("daily_manpower")
+          .select("*, contractors(id, company_name, nature_of_work), departments(id, name), worker_categories(id, name, display_order)")
+          .eq("project_id", projectId)
+          .eq("entry_date", dateStr),
+      ]);
       if (cancelled) return;
-      if (error) { console.error(error); setRows([]); }
-      else setRows(data || []);
+
+      if (dmRes.error) console.error(dmRes.error);
+      const dmRows = dmRes.data || [];
+
+      // Build category -> department mapping (one dept per cat; pick first)
+      const catDeptMap = new Map<string, { id: string; name: string }>();
+      for (const m of dcRes.data || []) {
+        const d: any = (m as any).departments;
+        if (!d || catDeptMap.has((m as any).category_id)) continue;
+        catDeptMap.set((m as any).category_id, { id: d.id, name: d.name });
+      }
+
+      // Project-configured categories
+      const cats = new Map<string, { id: string; name: string; display_order: number }>();
+      for (const r of pcRes.data || []) {
+        const c: any = (r as any).worker_categories;
+        if (c) cats.set(c.id, { id: c.id, name: c.name, display_order: c.display_order || 0 });
+      }
+      // Add any category present in records but missing from config
+      for (const r of dmRows) {
+        const c: any = (r as any).worker_categories;
+        if (c && !cats.has(c.id)) cats.set(c.id, { id: c.id, name: c.name, display_order: c.display_order || 0 });
+        // also ensure dept mapping picks up dept from the record
+        if (c && !catDeptMap.has(c.id)) {
+          const d: any = (r as any).departments;
+          if (d) catDeptMap.set(c.id, { id: d.id, name: d.name });
+        }
+      }
+
+      // Group categories under their department; skip categories with no department
+      const byDept = new Map<string, { name: string; isNmr: boolean; categories: { id: string; name: string; display_order: number }[] }>();
+      for (const cat of cats.values()) {
+        const dept = catDeptMap.get(cat.id);
+        if (!dept) continue;
+        if (!byDept.has(dept.id)) byDept.set(dept.id, { name: dept.name, isNmr: /nmr/i.test(dept.name), categories: [] });
+        byDept.get(dept.id)!.categories.push(cat);
+      }
+      const deptArr = Array.from(byDept.values()).map((d) => ({
+        name: d.name,
+        isNmr: d.isNmr,
+        categories: d.categories
+          .sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name))
+          .map(({ id, name }) => ({ id, name })),
+      })).sort((a, b) => a.name.localeCompare(b.name));
+
+      // Contractor -> nature_of_work map (config + records)
+      const natureMap: Record<string, string> = {};
+      for (const r of pcrRes.data || []) {
+        const c: any = (r as any).contractors;
+        if (!c) continue;
+        const nv = (c.nature_of_work || "").toString().trim();
+        if (nv) natureMap[c.id] = nv;
+      }
+      for (const r of dmRows) {
+        const c: any = (r as any).contractors;
+        if (!c) continue;
+        const nv = (c.nature_of_work || "").toString().trim();
+        if (nv) natureMap[c.id] = nv;
+      }
+
+      // Nature of work columns: from records when present, else from project config
+      const natureSet = new Set<string>();
+      if (dmRows.length > 0) {
+        for (const r of dmRows) {
+          const c: any = (r as any).contractors;
+          const nv = (c?.nature_of_work || "").toString().trim();
+          if (nv) natureSet.add(nv);
+        }
+      } else {
+        for (const r of pcrRes.data || []) {
+          const c: any = (r as any).contractors;
+          const nv = (c?.nature_of_work || "").toString().trim();
+          if (nv) natureSet.add(nv);
+        }
+      }
+
+      setRows(dmRows);
+      setDepartments(deptArr);
+      setNatureOfWorkValues(Array.from(natureSet).sort((a, b) => a.localeCompare(b)));
+      setContractorNatureMap(natureMap);
       setLoading(false);
     })();
     return () => { cancelled = true; };
