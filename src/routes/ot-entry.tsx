@@ -1105,9 +1105,6 @@ function OtEntryPage() {
               <h2 className="text-lg font-semibold">Saved Entries</h2>
               <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load in the Entry Sheet tab.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; openedSheetRef.current = false; setMode("edit"); setDate(yesterdayDate()); setDateText(format(yesterdayDate(), "dd/MM/yyyy")); setEditorMode(true); setActiveTab("entry"); }}>
-              <Plus className="w-4 h-4 mr-2" /> New Entry
-            </Button>
           </div>
           <div className="overflow-auto rounded-md border" style={{ maxHeight: 'calc(100vh - 380px)' }}>
             <table className="w-full caption-bottom text-sm">
