@@ -174,6 +174,11 @@ function OtEntryPage() {
   // IDs of saved daily_manpower rows that are orphan; Save preserves these.
   const orphanRowIdsRef = useRef<string[]>([]);
   const loadSeqRef = useRef(0);
+  // True only when the editor reflects a specific saved sheet the user opened
+  // (via Saved Entries View/Edit, or a deep-link with explicit date such as
+  // View from Approvals or Daily Entry → OT prompt). When false, the entry
+  // grid stays blank instead of auto-loading saved OT rows for project+date.
+  const openedSheetRef = useRef(false);
 
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
@@ -209,6 +214,7 @@ function OtEntryPage() {
 
   const handleDateTextChange = (raw: string) => {
     setDateText(raw);
+    openedSheetRef.current = false;
     const parsed = tryParseDate(raw);
     if (parsed) { setDate(parsed); setDateError(false); } else { setDateError(raw.length > 0); }
   };
@@ -237,8 +243,10 @@ function OtEntryPage() {
       }
     }
     if (search.project) {
-      // When opened with an explicit date (View from Approvals) default to view;
-      // otherwise (Daily Entry → OT prompt) default to edit.
+      // When opened with an explicit date (View from Approvals, or Daily
+      // Entry → OT prompt) we treat it as opening that specific sheet.
+      // Without a date, this is a fresh blank OT session.
+      openedSheetRef.current = !!search.date;
       pendingModeRef.current = search.date ? "view" : "edit";
       setActiveTab("entry");
     }
@@ -395,6 +403,31 @@ function OtEntryPage() {
     if (!projectId) return;
     const loadSeq = ++loadSeqRef.current;
     if (!contractorsReady || !assignmentsReady) return;
+
+    // Fresh OT session: keep grid blank until the user explicitly opens a
+    // saved sheet via Saved Entries → View/Edit (or a deep-link with date).
+    if (!openedSheetRef.current) {
+      setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
+      setOrphanCells([]);
+      orphanRowIdsRef.current = [];
+      setRowCount(0);
+      setSheet(null);
+      setSubmitterName("");
+      // Still load approval config/levels so the action buttons reflect the project.
+      const [{ data: cfg }, { data: lvs }] = await Promise.all([
+        supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
+        supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
+      ]);
+      if (loadSeq !== loadSeqRef.current) return;
+      setApprovalEnabled(!!(cfg as any)?.approval_enabled);
+      setLevels((lvs || []) as any[]);
+      setApproverNames({});
+      pendingModeRef.current = null;
+      setMode("edit");
+      setLoading(false);
+      return;
+    }
+
     if (contractors.length > 0 && allCells.length === 0) {
       setRows(Object.fromEntries(contractors.map((c) => [c.id, emptyRow()])));
       setOrphanCells([]);
@@ -789,6 +822,7 @@ function OtEntryPage() {
       console.error("[ot-entry] insert failed", error);
       return toast.error(error.message);
     }
+    openedSheetRef.current = true;
     await loadEntries(); await loadAllSheets();
     toast.success(`Saved as Draft`);
     setMode("view");
@@ -817,6 +851,7 @@ function OtEntryPage() {
 
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
     pendingModeRef.current = asMode;
+    openedSheetRef.current = true;
     setProjectId(s.project_id);
     const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
     if (isValid(d)) { d.setHours(0, 0, 0, 0); setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
@@ -917,7 +952,7 @@ function OtEntryPage() {
                 <PopoverTrigger asChild><Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar mode="single" selected={date}
-                    onSelect={(d) => { if (d) { setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }}
+                    onSelect={(d) => { if (d) { openedSheetRef.current = false; setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }}
                     disabled={(d) => d > new Date(new Date().setHours(23, 59, 59, 999))}
                     initialFocus />
                 </PopoverContent>
@@ -926,7 +961,7 @@ function OtEntryPage() {
           </div>
           <div className="space-y-1 min-w-[240px]">
             <label className="text-xs font-medium">Project</label>
-            <ProjectCombobox value={projectId} onChange={setProjectId} projects={projects} placeholder="Select project" />
+            <ProjectCombobox value={projectId} onChange={(v) => { openedSheetRef.current = false; setProjectId(v); }} projects={projects} placeholder="Select project" />
           </div>
           <div className="ml-auto flex items-center gap-2 flex-wrap">
             {sheet?.sheet_code && <div className="text-sm"><span className="text-muted-foreground">Sheet ID:</span> <span className="font-mono font-semibold">{sheet.sheet_code}</span></div>}
@@ -1074,7 +1109,7 @@ function OtEntryPage() {
               <h2 className="text-lg font-semibold">Saved Entries</h2>
               <p className="text-xs text-muted-foreground">All saved daily sheets. Click View/Edit to load in the Entry Sheet tab.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; setMode("edit"); setDate(yesterdayDate()); setDateText(format(yesterdayDate(), "dd/MM/yyyy")); setActiveTab("entry"); }}>
+            <Button variant="outline" size="sm" onClick={() => { if (!requireEdit()) return; openedSheetRef.current = false; setMode("edit"); setDate(yesterdayDate()); setDateText(format(yesterdayDate(), "dd/MM/yyyy")); setActiveTab("entry"); }}>
               <Plus className="w-4 h-4 mr-2" /> New Entry
             </Button>
           </div>
