@@ -476,6 +476,8 @@ function ReportsPage() {
             </div>
           </CardContent>
         </Card>
+        </>
+        )}
       </Tabs>
 
       <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
