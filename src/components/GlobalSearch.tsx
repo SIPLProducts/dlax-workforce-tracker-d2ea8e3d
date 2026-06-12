@@ -555,7 +555,10 @@ export function GlobalSearch() {
                   </CommandGroup>
                 </>
               )}
+                </>
+              )}
             </CommandList>
+
           </Command>
         </div>,
         document.body
