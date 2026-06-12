@@ -938,9 +938,10 @@ function OtEntryPage() {
             <label className="text-xs font-medium">Date</label>
             <div className="flex gap-1">
               <Input value={dateText} onChange={(e) => handleDateTextChange(e.target.value)} placeholder="dd/MM/yyyy"
+                disabled
                 className={cn("w-36", dateError && "border-destructive")} />
               <Popover>
-                <PopoverTrigger asChild><Button variant="outline" size="icon"><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
+                <PopoverTrigger asChild><Button variant="outline" size="icon" disabled><CalendarIcon className="w-4 h-4" /></Button></PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar mode="single" selected={date}
                     onSelect={(d) => { if (d) { openedSheetRef.current = false; setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); } }}
