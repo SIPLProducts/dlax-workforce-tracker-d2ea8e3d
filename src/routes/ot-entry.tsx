@@ -818,7 +818,8 @@ function OtEntryPage() {
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
     pendingModeRef.current = asMode;
     setProjectId(s.project_id);
-    // OT page is locked to yesterday; ignore historical sheet date.
+    const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
+    if (isValid(d)) { d.setHours(0, 0, 0, 0); setDate(d); setDateText(format(d, "dd/MM/yyyy")); setDateError(false); }
     setMode(asMode);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
