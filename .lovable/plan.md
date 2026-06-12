@@ -1,39 +1,41 @@
-## Goal
+## Problem
 
-The OT Entry Sheet editor (blank grid for new OT entry) should only appear when the user clicks "Yes" on the OT popup after saving a Daily Entry. From the sidebar, users can still reach the OT screen, but they should land on a Saved Entries view — not the blank editor — and can open any past OT record from there.
+When the user clicks "Yes" on the Daily Entry → OT popup, `/ot-entry` always opens as a blank editor — even if an OT Entry Sheet already exists for that project + date. It lets the user create a duplicate.
 
-## Behavior matrix
+## Root cause
 
-| Entry path | What shows |
-|---|---|
-| Sidebar → OT Entry Sheet | Saved Entries list only (no blank editor, no Send to Approval bar) |
-| Daily Entry → OT popup → Yes | Blank OT editor for that project/date, ready for entry |
-| Saved Entries → View / Edit | OT editor populated with that saved sheet |
-| Approvals → View OT record | OT editor populated with that saved sheet |
+`src/routes/daily-entry.tsx` line 1091 navigates with only `{ project, from: "daily" }` — no `date`. In `src/routes/ot-entry.tsx` the deep-link effect (line 217–239) only marks `openedSheetRef = true` when `search.date` is present, so without a date it skips the existing-sheet lookup and renders an empty editor.
 
-## Changes (only `src/routes/ot-entry.tsx`)
+## Fix (two small edits, no other behavior changes)
 
-1. **Reintroduce a soft gate based on URL intent.**
-   - Treat the route as "editor mode" only when one of these is true:
-     - `search.from === "daily"` (came from OT popup Yes), or
-     - `search.date` is present (deep-link to a specific sheet), or
-     - the user has opened a sheet from the Saved Entries tab in this session (`openedSheetRef.current === true`).
-   - Otherwise the route is in "browse mode".
+### 1. `src/routes/daily-entry.tsx` (OT popup "Yes" handler, line 1091)
 
-2. **Browse mode UI.**
-   - Hide the header action buttons (Edit / Save / Send to Approval) and the date/project picker card.
-   - Render only the Saved Entries tab content (existing component/section), defaulted as the active tab.
-   - Clicking View/Edit on a row flips to editor mode (sets `openedSheetRef.current = true` as today) and loads that sheet — unchanged behavior.
+Pass the current Daily Entry `date` to OT entry:
 
-3. **Editor mode UI.**
-   - Same as current blank-editor behavior: empty rows unless a specific saved sheet was opened. No auto-load of existing OT records for the default project/date.
-   - "New Entry" button continues to reset to a blank editor (stays in editor mode since the user is already inside it).
+```ts
+navigate({
+  to: "/ot-entry",
+  search: {
+    project: projectId || undefined,
+    date: format(date, "yyyy-MM-dd"),
+    from: "daily",
+  },
+});
+```
 
-4. **Daily Entry OT popup.**
-   - No change needed if it already navigates with `from=daily` (and/or `date=...`). Plan assumes the existing link is preserved; if it isn't, the same edit will add `from: "daily"` to that navigate call.
+This aligns with the "View OT from saved list" path (line 766) which already passes `date`.
+
+### 2. `src/routes/ot-entry.tsx` — only flip to view mode when a sheet actually exists
+
+In the deep-link effect (around line 227–234), when arriving via `from=daily` with a date, do a lightweight existence check for `daily_manpower_sheets` (project_id, entry_date, sheet_type='ot'):
+
+- **Sheet exists** → keep current behavior: `openedSheetRef.current = true`, `pendingModeRef.current = "view"`, `setEditorMode(true)`. The existing sheet loads in disabled/view mode (Edit button still respects approval status / permissions — unchanged).
+- **No sheet exists** → `openedSheetRef.current = false`, `pendingModeRef.current = "edit"`, `setEditorMode(true)`. Blank editor for that project+date so the user can create the first OT sheet.
+
+The "View from Approvals" path (also uses `search.date`, but without `from=daily`) keeps today's behavior: always opens the specific sheet in view mode.
 
 ## Out of scope
 
 - No DB / RLS / schema changes.
-- No changes to Daily Entry save logic or the approval workflow.
-- Sidebar link to OT Entry Sheet stays visible (permission-gated as today).
+- No change to Save, Send to Approval, Saved Entries list, approval workflow, or the disabled Date field & removed "New Entry" button done previously.
+- Sidebar OT Entry browse mode unchanged.

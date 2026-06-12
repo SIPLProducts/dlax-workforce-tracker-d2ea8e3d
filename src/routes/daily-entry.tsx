@@ -1088,7 +1088,7 @@ function DailyEntryPage() {
             <Button variant="outline" onClick={() => setOtPromptOpen(false)}>No</Button>
             <Button onClick={() => {
               setOtPromptOpen(false);
-              navigate({ to: "/ot-entry", search: { project: projectId || undefined, from: "daily" } });
+              navigate({ to: "/ot-entry", search: { project: projectId || undefined, date: format(date, "yyyy-MM-dd"), from: "daily" } });
             }}>Yes</Button>
           </DialogFooter>
         </DialogContent>
