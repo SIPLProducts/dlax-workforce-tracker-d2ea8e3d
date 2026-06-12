@@ -1,72 +1,70 @@
 
 ## Goal
-Add a new **Daily Labour Report (DLR)** to the Reports screen that exports the exact layout of the uploaded reference file. Selection requires **one project** and **one date**. Provide **two download buttons: Excel (.xlsx)** and **CSV (.csv)**.
+Make the **Daily Labour Report** headers dynamic per project: columns come from the categories assigned to the selected project (grouped by their department), instead of the hard-coded reference list. The overall framing (Sub Contractors/Job Works · NMR · Total Labour · Total · NMR% on Total · Budget NMR · NMR% on Budget · Security · Remarks) stays exactly like the reference.
 
-## UI changes (single screen: `/reports`)
-- Add a 4th tab **"Daily Labour Report"** to the existing Tabs (Daily / Project / Contractor stay unchanged).
-- Inside this tab:
-  - **Project** — single-select combobox (no "All"; required).
-  - **Date** — single date picker.
-  - **Download Excel** button (.xlsx) and **Download CSV** button (.csv), both disabled until a project and date are chosen.
-  - **Preview table** rendering the same matrix that will be exported, so the user can confirm before downloading.
-- The existing top-level Export button keeps working for the other tabs.
+## Header structure (dynamic part)
 
-## File layout (matches the reference exactly)
-20 columns in this order:
-`Sl.No | Name of the Project | Masons | Carpenters | Steel Fixers | Painters | Helpers (Civil) | Skilled (MEP) | Helpers (MEP) | Mason (NMR) | Helpers (M) | Helpers (F) | Sub Contractors/Job Work | NMR | Total | NMR % on Total | Budget NMR | NMR % on Budget | Security | Remarks`
+For the selected project, build a category list from:
+- `project_categories` JOIN `worker_categories` JOIN `department_categories` JOIN `departments` for that project.
+- Fallback: if a project has no rows in `project_categories`, use all `worker_categories` linked via `department_categories` to a department (global fallback, consistent with current master-fallback behavior).
+- Sort: by `departments.name` then `worker_categories.display_order`, then `worker_categories.name`.
 
-Header rows (rows 1–5):
+Group the categories under their department. Each department becomes a second-row sub-band; each category becomes a leaf column.
+
+Resulting header band:
 ```text
-Row 1: DAILY LABOUR REPORT\n<dd-mm-yyyy>   (merged across all cols, wrap, bold, centered)
-Row 2: Sl.No | Name of the Project | Sub Contractors/Job Works (C2:I2 merged) | NMR (J2:L2) | Total Labour (M2:N2) | Total | NMR % on Total | Budget NMR | NMR % on Budget | Security | Remarks
-Row 3: Civil (C3:G3 merged) | MEP (H3:I3 merged)
-Row 4: Masons | Carpenters | Steel Fixers | Painters | Helpers | Skilled | Helpers | Mason | Helpers (M) | Helpers (F) | Sub Contractors/Job Work | NMR
-Row 5: Tiles, Granite, Brickwork, Glazing | Shuttering, Scaffolding, Wood works | Fabricator works, Rod benders   (under Masons/Carpenters/Steel Fixers)
-Row 6+: project_group section header row, then the selected project's data row
+Row 1: "DAILY LABOUR REPORT\n<dd-mm-yyyy>"  (merged across all columns)
+Row 2: Sl.No | Name of the Project | Sub Contractors/Job Works (merged across all dynamic dept columns) | NMR (merged across NMR-tagged dept columns, if any) | Total Labour (Sub Contractors/Job Work | NMR) | Total | NMR % on Total | Budget NMR | NMR % on Budget | Security | Remarks
+Row 3: (under Sub Contractors/Job Works) <Dept A>  (merged across its categories) | <Dept B> (...) | ...
+        (under NMR) <NMR Dept> (if exists)
+Row 4: <Cat 1> | <Cat 2> | ... (one cell per category)
 ```
 
-CSV note: CSV cannot represent merged cells or styling, so the CSV writes the **same 20-column layout** as plain rows (header rows 1–5 included verbatim, empty cells where merges would span). This matches the structure of the reference CSV the user uploaded as the comparison baseline.
+How "NMR" vs "Sub Contractors/Job Works" is decided per category column:
+- A category lives under "NMR" if its department is flagged as NMR (department name contains "NMR", case-insensitive) — easy heuristic, no schema change.
+- Otherwise it lives under "Sub Contractors/Job Works".
+- If a project has no NMR-tagged department, the "NMR" top band collapses to zero width and only "Sub Contractors/Job Works" spans the dynamic columns; the Total Labour `NMR` sub-column still appears (from contractor `nature_of_work = 'NMR'` aggregation).
 
-## Data mapping (Supabase)
-Query: `daily_manpower` for `project_id = $project AND entry_date = $date`, joined to `projects`, `contractors`, `worker_categories`, `departments`.
+Right-side columns stay fixed (Total Labour · Total · NMR% on Total · Budget NMR · NMR% on Budget · Security · Remarks).
 
-- **Sl.No / Project Name / Section row** — from `projects.code`, `projects.name`, `projects.project_group`.
-- **Category columns** (Masons … Helpers (F)) — sum `headcount` matched to `worker_categories.name` via a case-insensitive alias map kept in the helper. Unmatched categories don't populate a column but still feed Totals.
-- **Sub Contractors/Job Work** — sum of headcount where `contractors.nature_of_work = 'Item Rate'`.
-- **NMR** column — sum of headcount where `contractors.nature_of_work = 'NMR'`.
-- **Total** — Item Rate + NMR.
-- **NMR % on Total** — `NMR/Total` (formula in xlsx, computed value in csv), formatted as `0%`; blank if Total = 0.
-- **Budget NMR** — 0 placeholder (no DB field today).
-- **NMR % on Budget** — `IFERROR(NMR/Budget,"")`.
-- **Security** — 0 placeholder.
-- **Remarks** — concatenated unique remarks for that project+date.
+## Cell values (data row)
 
-Zero values render as `-` (Excel number format `#,##0;(#,##0);-`; CSV writes literal `-`).
+For the project + selected date, aggregate `daily_manpower` rows:
+- Per dynamic category column: sum of `headcount` where `category_id = <that category>`.
+- Total Labour → `Sub Contractors/Job Work` = sum where `contractors.nature_of_work = 'Item Rate'`.
+- Total Labour → `NMR` = sum where `contractors.nature_of_work = 'NMR'`.
+- `Total` = Sub Contractors/Job Work + NMR.
+- `NMR % on Total` = NMR / Total (blank if Total=0).
+- `Budget NMR` = 0 placeholder.
+- `NMR % on Budget` = blank (no budget field).
+- `Security` = 0 placeholder.
+- `Remarks` = concatenated unique remarks for that project+date.
+- Zero values render as `-` (Excel format `#,##0;(#,##0);"-"`).
 
-## Formatting (Excel only)
-- Bold + centered + wrap-text on header rows; thin borders across the table.
-- Column widths sized to fit headers; freeze top 5 rows + first 2 columns.
-- Number format `#,##0;(#,##0);-`; percentage cells `0%`.
+Section row (project_group label) above the project row stays as today.
 
-## Files
-- `src/routes/reports.tsx` — add the 4th tab, its controls, preview, and the two download buttons. No changes to existing tabs/exports.
-- `src/lib/dlr-daily.ts` *(new)* — pure helpers:
-  - `getDlrDailyMatrix({ project, date, rows })` → 2D array used by the preview, .xlsx writer, and .csv writer (single source of truth).
-  - `buildDlrDailyWorkbook(matrix, meta)` → SheetJS workbook (merges, widths, freeze, number formats).
-  - `buildDlrDailyCsv(matrix)` → RFC-4180 CSV string from the same matrix.
-- `src/components/DlrDailyPreview.tsx` *(new)* — renders the matrix as a styled read-only HTML table.
-- `package.json` — ensure `xlsx` is installed (`bun add xlsx` if missing).
+## Files to change
 
-Download filenames:
-- `DLR-<PROJECT_CODE>-<dd-mm-yyyy>.xlsx`
-- `DLR-<PROJECT_CODE>-<dd-mm-yyyy>.csv`
+- `src/lib/dlr-daily.ts` — replace the hard-coded `DLR_CATEGORY_COLUMNS` / `ALIASES` matching with a dynamic builder:
+  - New input shape: `getDlrDailyMatrix({ project, date, rows, departments })` where `departments` is `Array<{ name: string; isNmr: boolean; categories: Array<{ id: string; name: string }> }>`.
+  - Recompute total column count, merges, and per-category data cells from this dynamic structure.
+  - Excel writer (`buildDlrDailyWorkbook`) and CSV writer (`buildDlrDailyCsv`) keep the same public API but consume the new matrix shape; merges are derived from the dynamic header structure (no hard-coded indexes).
+- `src/components/DlrDailyPreview.tsx` — render the same dynamic 3-row header band from the matrix metadata (the matrix now carries `headerBands` so preview and export stay in sync).
+- `src/routes/reports.tsx` (DlrTab) — load the project's department + category structure when `projectId` changes:
+  1. `select * from project_categories where project_id = $project` (with `worker_categories(*)`).
+  2. If empty, use all `worker_categories` (global fallback).
+  3. `select * from department_categories` to map category → department; `select * from departments` for names.
+  4. Pass the resulting `departments` structure to `getDlrDailyMatrix`.
 
 ## Out of scope (untouched)
-- Existing Daily / Project / Contractor tabs, their filters, KPIs, breakdown cards, and current CSV export
-- Daily Entry, Approvals, Masters, Auth/RLS, DB schema
-- The monthly DLR pivot sheet (different layout in the reference) — not requested
-- Any visual changes outside the new tab
 
-## Risks
-- If `worker_categories.name` values don't match the reference labels, some category columns will be empty even when Totals are correct. The alias map can be extended without code-structure changes.
-- `Budget NMR` stays 0 until a project budget field is added (future, out of scope).
+- Other Reports tabs (Daily / Project / Contractor) and their CSV export.
+- Daily Entry, Approvals, Masters UIs.
+- DB schema / RLS / migrations (no changes needed — uses existing `project_categories`, `department_categories`, `departments`, `worker_categories`).
+- The monthly DLR pivot layout.
+
+## Risks / notes
+
+- A category linked to multiple departments via `department_categories` will appear under the first department by sort order to avoid duplicate columns; we'll document this in code.
+- If a project has neither `project_categories` nor any `department_categories` mapping, the dynamic band renders empty and only the right-side fixed columns + Totals appear; data row still works because totals come from `contractors.nature_of_work`.
+- Excel merges are computed from runtime band widths, so the exported file's structure shifts per project, exactly as requested.
