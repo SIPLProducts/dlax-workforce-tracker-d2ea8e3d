@@ -174,6 +174,11 @@ function OtEntryPage() {
   // IDs of saved daily_manpower rows that are orphan; Save preserves these.
   const orphanRowIdsRef = useRef<string[]>([]);
   const loadSeqRef = useRef(0);
+  // True only when the editor reflects a specific saved sheet the user opened
+  // (via Saved Entries View/Edit, or a deep-link with explicit date such as
+  // View from Approvals or Daily Entry → OT prompt). When false, the entry
+  // grid stays blank instead of auto-loading saved OT rows for project+date.
+  const openedSheetRef = useRef(false);
 
 
   const sheetStatus = sheet ? sheet.status : (rowCount === 0 ? "empty" : "draft");
