@@ -132,6 +132,7 @@ function Page() {
       <TableHeader>
         <TableRow>
           <TableHead>Sheet ID</TableHead>
+          <TableHead>Sheet Type</TableHead>
           <TableHead>Date</TableHead>
           <TableHead>Project</TableHead>
           <TableHead className="text-right">Headcount</TableHead>
@@ -141,10 +142,17 @@ function Page() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {list.length === 0 && (<TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No sheets</TableCell></TableRow>)}
+        {list.length === 0 && (<TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No sheets</TableCell></TableRow>)}
         {list.map((s) => (
           <TableRow key={s.id}>
             <TableCell className="font-mono">{s.sheet_code}</TableCell>
+            <TableCell>
+              {s.sheet_type === "ot" ? (
+                <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300">OT Entry</Badge>
+              ) : (
+                <Badge variant="outline" className="bg-blue-100 text-blue-900 border-blue-300">Daily Entry</Badge>
+              )}
+            </TableCell>
             <TableCell>{format(new Date(s.entry_date), "dd/MM/yyyy")}</TableCell>
             <TableCell className="font-medium">{projectName(s.project_id)}</TableCell>
             <TableCell className="text-right">{s.total_headcount}</TableCell>
