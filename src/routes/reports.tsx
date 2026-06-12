@@ -616,33 +616,30 @@ function DlrTab({ projects }: { projects: any[] }) {
   const [date, setDate] = useState<Date>(new Date());
   const [rows, setRows] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [natureOfWorkValues, setNatureOfWorkValues] = useState<string[]>([]);
+  const [contractorNatureMap, setContractorNatureMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
 
-  // Load project-specific department + category structure
   useEffect(() => {
-    if (!projectId) { setDepartments([]); return; }
+    if (!projectId) { setDepartments([]); setNatureOfWorkValues([]); setContractorNatureMap({}); return; }
     let cancelled = false;
     (async () => {
-      // 1) project's assigned categories
       const { data: pc } = await supabase
         .from("project_categories")
         .select("category_id, worker_categories(id, name, display_order)")
         .eq("project_id", projectId);
       let cats: any[] = (pc || []).map((r: any) => r.worker_categories).filter(Boolean);
-      // Fallback: all worker categories
       if (cats.length === 0) {
         const { data: all } = await supabase.from("worker_categories").select("id, name, display_order");
         cats = all || [];
       }
-      // 2) category -> department mapping
       const catIds = cats.map((c) => c.id);
       const { data: dc } = await supabase
         .from("department_categories")
         .select("category_id, department_id, departments(id, name)")
         .in("category_id", catIds.length ? catIds : ["00000000-0000-0000-0000-000000000000"]);
-      // Group categories by first department (sorted by dept name)
       const byDept = new Map<string, { name: string; isNmr: boolean; categories: { id: string; name: string; display_order: number }[] }>();
       const seenCat = new Set<string>();
       const mappings = (dc || []).slice().sort((a: any, b: any) => (a.departments?.name || "").localeCompare(b.departments?.name || ""));
@@ -656,7 +653,6 @@ function DlrTab({ projects }: { projects: any[] }) {
         byDept.get(key)!.categories.push({ id: cat.id, name: cat.name, display_order: cat.display_order || 0 });
         seenCat.add(m.category_id);
       }
-      // Categories with no department mapping -> bucket "Other"
       const orphans = cats.filter((c) => !seenCat.has(c.id));
       if (orphans.length) {
         byDept.set("__other__", { name: "Other", isNmr: false, categories: orphans.map((c) => ({ id: c.id, name: c.name, display_order: c.display_order || 0 })) });
@@ -665,8 +661,33 @@ function DlrTab({ projects }: { projects: any[] }) {
         name: d.name,
         isNmr: d.isNmr,
         categories: d.categories.sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name)).map(({ id, name }) => ({ id, name })),
-      })).sort((a, b) => Number(a.isNmr) - Number(b.isNmr) || a.name.localeCompare(b.name));
-      if (!cancelled) setDepartments(arr);
+      })).sort((a, b) => a.name.localeCompare(b.name));
+
+      const { data: pcr } = await supabase
+        .from("project_contractors")
+        .select("contractor_id, contractors(id, nature_of_work)")
+        .eq("project_id", projectId);
+      const natureMap: Record<string, string> = {};
+      const natureSet = new Set<string>();
+      for (const r of pcr || []) {
+        const c: any = (r as any).contractors;
+        if (!c) continue;
+        const nv = (c.nature_of_work || "").toString().trim();
+        if (nv) { natureMap[c.id] = nv; natureSet.add(nv); }
+      }
+      if (natureSet.size === 0) {
+        const { data: allC } = await supabase.from("contractors").select("id, nature_of_work");
+        for (const c of allC || []) {
+          const nv = (c.nature_of_work || "").toString().trim();
+          if (nv) { natureMap[c.id] = nv; natureSet.add(nv); }
+        }
+      }
+
+      if (!cancelled) {
+        setDepartments(arr);
+        setNatureOfWorkValues(Array.from(natureSet).sort((a, b) => a.localeCompare(b)));
+        setContractorNatureMap(natureMap);
+      }
     })();
     return () => { cancelled = true; };
   }, [projectId]);
@@ -691,8 +712,8 @@ function DlrTab({ projects }: { projects: any[] }) {
 
   const matrix = useMemo(() => {
     if (!project) return null;
-    return getDlrDailyMatrix({ project, date, rows, departments });
-  }, [project, date, rows, departments]);
+    return getDlrDailyMatrix({ project, date, rows, departments, natureOfWorkValues, contractorNatureMap });
+  }, [project, date, rows, departments, natureOfWorkValues, contractorNatureMap]);
 
 
   const fileBase = project
