@@ -616,61 +616,78 @@ function DlrTab({ projects }: { projects: any[] }) {
   const [date, setDate] = useState<Date>(new Date());
   const [rows, setRows] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [natureOfWorkValues, setNatureOfWorkValues] = useState<string[]>([]);
+  const [contractorNatureMap, setContractorNatureMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
 
   useEffect(() => {
-    if (!projectId) { setDepartments([]); return; }
+    if (!projectId) { setDepartments([]); setNatureOfWorkValues([]); setContractorNatureMap({}); return; }
     let cancelled = false;
     (async () => {
-      // Project-configured departments
-      const { data: pd } = await supabase
-        .from("project_departments")
-        .select("department_id, departments(id, name)")
-        .eq("project_id", projectId);
-      const projectDepts: { id: string; name: string }[] =
-        (pd || []).map((r: any) => r.departments).filter(Boolean);
-
-      // Project-configured categories
       const { data: pc } = await supabase
         .from("project_categories")
         .select("category_id, worker_categories(id, name, display_order)")
         .eq("project_id", projectId);
-      const cats: any[] = (pc || []).map((r: any) => r.worker_categories).filter(Boolean);
+      let cats: any[] = (pc || []).map((r: any) => r.worker_categories).filter(Boolean);
+      if (cats.length === 0) {
+        const { data: all } = await supabase.from("worker_categories").select("id, name, display_order");
+        cats = all || [];
+      }
       const catIds = cats.map((c) => c.id);
-      const deptIds = projectDepts.map((d) => d.id);
-
-      // Department <-> Category mappings, scoped to project's configured set
       const { data: dc } = await supabase
         .from("department_categories")
-        .select("category_id, department_id")
-        .in("category_id", catIds.length ? catIds : ["00000000-0000-0000-0000-000000000000"])
-        .in("department_id", deptIds.length ? deptIds : ["00000000-0000-0000-0000-000000000000"]);
-
-      const byDept = new Map<string, { name: string; categories: { id: string; name: string; display_order: number }[] }>();
-      for (const d of projectDepts) {
-        byDept.set(d.id, { name: d.name, categories: [] });
-      }
+        .select("category_id, department_id, departments(id, name)")
+        .in("category_id", catIds.length ? catIds : ["00000000-0000-0000-0000-000000000000"]);
+      const byDept = new Map<string, { name: string; isNmr: boolean; categories: { id: string; name: string; display_order: number }[] }>();
       const seenCat = new Set<string>();
-      for (const m of dc || []) {
+      const mappings = (dc || []).slice().sort((a: any, b: any) => (a.departments?.name || "").localeCompare(b.departments?.name || ""));
+      for (const m of mappings) {
+        if (!m.departments) continue;
         if (seenCat.has(m.category_id)) continue;
         const cat = cats.find((c) => c.id === m.category_id);
-        const dept = byDept.get(m.department_id);
-        if (!cat || !dept) continue;
-        dept.categories.push({ id: cat.id, name: cat.name, display_order: cat.display_order || 0 });
+        if (!cat) continue;
+        const key = m.departments.id;
+        if (!byDept.has(key)) byDept.set(key, { name: m.departments.name, isNmr: /nmr/i.test(m.departments.name), categories: [] });
+        byDept.get(key)!.categories.push({ id: cat.id, name: cat.name, display_order: cat.display_order || 0 });
         seenCat.add(m.category_id);
       }
-      const arr = Array.from(byDept.values())
-        .map((d) => ({
-          name: d.name,
-          categories: d.categories
-            .sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name))
-            .map(({ id, name }) => ({ id, name })),
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      const orphans = cats.filter((c) => !seenCat.has(c.id));
+      if (orphans.length) {
+        byDept.set("__other__", { name: "Other", isNmr: false, categories: orphans.map((c) => ({ id: c.id, name: c.name, display_order: c.display_order || 0 })) });
+      }
+      const arr = Array.from(byDept.values()).map((d) => ({
+        name: d.name,
+        isNmr: d.isNmr,
+        categories: d.categories.sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name)).map(({ id, name }) => ({ id, name })),
+      })).sort((a, b) => a.name.localeCompare(b.name));
 
-      if (!cancelled) setDepartments(arr);
+      const { data: pcr } = await supabase
+        .from("project_contractors")
+        .select("contractor_id, contractors(id, nature_of_work)")
+        .eq("project_id", projectId);
+      const natureMap: Record<string, string> = {};
+      const natureSet = new Set<string>();
+      for (const r of pcr || []) {
+        const c: any = (r as any).contractors;
+        if (!c) continue;
+        const nv = (c.nature_of_work || "").toString().trim();
+        if (nv) { natureMap[c.id] = nv; natureSet.add(nv); }
+      }
+      if (natureSet.size === 0) {
+        const { data: allC } = await supabase.from("contractors").select("id, nature_of_work");
+        for (const c of allC || []) {
+          const nv = (c.nature_of_work || "").toString().trim();
+          if (nv) { natureMap[c.id] = nv; natureSet.add(nv); }
+        }
+      }
+
+      if (!cancelled) {
+        setDepartments(arr);
+        setNatureOfWorkValues(Array.from(natureSet).sort((a, b) => a.localeCompare(b)));
+        setContractorNatureMap(natureMap);
+      }
     })();
     return () => { cancelled = true; };
   }, [projectId]);
@@ -682,7 +699,7 @@ function DlrTab({ projects }: { projects: any[] }) {
       setLoading(true);
       const { data, error } = await supabase
         .from("daily_manpower")
-        .select("id, headcount, category_id, department_id, remarks")
+        .select("*, contractors(company_name, nature_of_work), departments(name), worker_categories(name)")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"));
       if (cancelled) return;
@@ -695,8 +712,8 @@ function DlrTab({ projects }: { projects: any[] }) {
 
   const matrix = useMemo(() => {
     if (!project) return null;
-    return getDlrDailyMatrix({ project, date, rows, departments });
-  }, [project, date, rows, departments]);
+    return getDlrDailyMatrix({ project, date, rows, departments, natureOfWorkValues, contractorNatureMap });
+  }, [project, date, rows, departments, natureOfWorkValues, contractorNatureMap]);
 
 
   const fileBase = project

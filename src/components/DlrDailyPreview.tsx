@@ -9,6 +9,7 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
     if (typeof v === "number") return v === 0 ? "-" : v.toLocaleString();
     return String(v);
   };
+  const fmtPct = (v: any) => (typeof v === "number" ? `${Math.round(v * 100)}%` : "-");
 
   return (
     <div className="overflow-auto border rounded-md">
@@ -23,21 +24,25 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
             <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Sl.No.</th>
             <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Name of the Project</th>
             {b.depts.map((d, i) => (
-              <th
-                key={i}
-                colSpan={d.categories.length}
-                rowSpan={d.categories.length > 1 ? 1 : 1}
-                className="border bg-muted px-2 py-1 text-center"
-              >
-                {d.name}
-              </th>
+              <th key={i} colSpan={d.categories.length} className="border bg-muted px-2 py-1 text-center">{d.name}</th>
             ))}
+            {b.totalLabourWidth > 1 ? (
+              <th colSpan={b.totalLabourWidth} className="border bg-muted px-2 py-1 text-center">Total Labour</th>
+            ) : (
+              <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle text-center">Total Labour</th>
+            )}
             <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Total</th>
+            {b.pctTotalCol !== null && (
+              <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">NMR % on Total</th>
+            )}
             <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Remarks</th>
           </tr>
           <tr>
             {b.catCols.map((c) => (
               <th key={c.id} className="border bg-muted px-2 py-1">{c.name}</th>
+            ))}
+            {b.totalLabourWidth > 1 && b.natureValues.map((v) => (
+              <th key={v} className="border bg-muted px-2 py-1">{v}</th>
             ))}
           </tr>
         </thead>
@@ -54,11 +59,14 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
             }
             return (
               <tr key={ri}>
-                {row.map((v, ci) => (
-                  <td key={ci} className={`border px-2 py-1 ${ci >= 2 && ci !== b.remarksCol ? "text-right tabular-nums" : ""}`}>
-                    {fmtNum(v)}
-                  </td>
-                ))}
+                {row.map((v, ci) => {
+                  const isPct = b.pctTotalCol !== null && ci === b.pctTotalCol;
+                  return (
+                    <td key={ci} className={`border px-2 py-1 ${ci >= 2 && ci !== b.remarksCol ? "text-right tabular-nums" : ""}`}>
+                      {isPct ? fmtPct(v) : fmtNum(v)}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}
