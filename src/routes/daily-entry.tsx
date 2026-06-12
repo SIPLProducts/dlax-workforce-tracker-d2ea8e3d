@@ -357,12 +357,14 @@ function DailyEntryPage() {
       supabase.from("daily_manpower")
         .select("id,contractor_id,department_id,category_id,headcount,security_count,deficiency_manpower,remarks,weather_condition,status")
         .eq("project_id", projectId)
-        .eq("entry_date", format(date, "yyyy-MM-dd")),
+        .eq("entry_date", format(date, "yyyy-MM-dd"))
+        .eq("sheet_type", "daily"),
 
       supabase.from("daily_manpower_sheets")
         .select("id, sheet_code, status, current_level, total_levels, submitted_by")
         .eq("project_id", projectId)
         .eq("entry_date", format(date, "yyyy-MM-dd"))
+        .eq("sheet_type", "daily")
         .maybeSingle(),
       supabase.from("project_approval_config").select("approval_enabled").eq("project_id", projectId).maybeSingle(),
       supabase.from("project_approval_levels").select("level_no, approver_user_id, label").eq("project_id", projectId).order("level_no"),
@@ -539,6 +541,7 @@ function DailyEntryPage() {
     const { data: sheets } = await supabase
       .from("daily_manpower_sheets")
       .select("id, sheet_code, project_id, entry_date, status, current_level, total_levels")
+      .eq("sheet_type", "daily")
       .order("entry_date", { ascending: false })
       .limit(500);
     const sheetIds = (sheets || []).map((s: any) => s.id);
@@ -669,6 +672,7 @@ function DailyEntryPage() {
           headcount: x.n,
           remarks,
           weather_condition: weather,
+          sheet_type: 'daily',
           status: 'draft',
           created_by: user.id,
           submitted_by: user.id,
@@ -696,7 +700,8 @@ function DailyEntryPage() {
       .from("daily_manpower")
       .delete()
       .eq("project_id", projectId)
-      .eq("entry_date", entry_date);
+      .eq("entry_date", entry_date)
+      .eq("sheet_type", "daily");
     if (orphanRowIdsRef.current.length > 0) {
       // Postgres `not.in` requires a parenthesised list
       delQ = delQ.not("id", "in", `(${orphanRowIdsRef.current.join(",")})`);
@@ -757,6 +762,10 @@ function DailyEntryPage() {
   };
 
   const loadSheetIntoEditor = (s: SheetRow, asMode: "view" | "edit") => {
+    if ((s as any).sheet_type === "ot") {
+      navigate({ to: "/ot-entry", search: { project: s.project_id, date: s.entry_date, from: "daily" } as any });
+      return;
+    }
     pendingModeRef.current = asMode;
     setProjectId(s.project_id);
     const d = parseDate(s.entry_date, "yyyy-MM-dd", new Date());
