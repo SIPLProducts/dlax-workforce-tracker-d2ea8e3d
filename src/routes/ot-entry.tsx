@@ -879,7 +879,11 @@ function OtEntryPage() {
         title="OT Entry Sheet"
         subtitle="Overtime register for the previous day"
         actions={
+          editorMode ? (
           <>
+            <Button variant="outline" onClick={() => { setEditorMode(false); setActiveTab("saved"); }}>
+              ← Saved Entries
+            </Button>
             {!isEmpty && (
               <Button variant="outline" onClick={() => setMode("view")} disabled={mode === "view"}>
                 <Eye className="w-4 h-4 mr-2" /> View
@@ -923,6 +927,7 @@ function OtEntryPage() {
               );
             })()}
           </>
+          ) : null
         }
       />
 
