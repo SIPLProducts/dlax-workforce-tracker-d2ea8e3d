@@ -268,11 +268,21 @@ function ReportsPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-4 sm:flex">
           <TabsTrigger value="daily">Daily</TabsTrigger>
           <TabsTrigger value="project">Project</TabsTrigger>
           <TabsTrigger value="contractor">Contractor</TabsTrigger>
+          <TabsTrigger value="dlr">Daily Labour Report</TabsTrigger>
         </TabsList>
+
+        {tab === "dlr" ? (
+          <DlrTab projects={projects} />
+        ) : (
+          <></>
+        )}
+        {tab !== "dlr" && (
+        <>
+
 
         {/* Filters */}
         <Card>
