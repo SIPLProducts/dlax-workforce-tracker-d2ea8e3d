@@ -965,6 +965,8 @@ function OtEntryPage() {
           </div>
         </CardContent>
       </Card>
+      )}
+
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "entry" | "saved")} className="space-y-4">
         <div className="sticky top-[240px] md:top-[248px] z-10 bg-background py-2 -mt-2">
