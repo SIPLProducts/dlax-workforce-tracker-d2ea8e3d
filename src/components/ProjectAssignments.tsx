@@ -373,6 +373,13 @@ function AssignmentSection({
       const { error } = await supabase.from(cfg.joinTable as any).delete().eq("project_id", projectId).eq(cfg.joinFk, id);
       if (error) { toast.error(error.message); setBusy(false); return; }
       setAssigned((s) => { const n = new Set(s); n.delete(id); return n; });
+      if (kind === "departments") {
+        const n = await autoRemoveCategoriesForDepartments(projectId, [id]);
+        if (n > 0) {
+          toast.success(`Also removed ${n} categor${n === 1 ? "y" : "ies"}`);
+          onCategoriesChanged();
+        }
+      }
     }
     setBusy(false);
   };
