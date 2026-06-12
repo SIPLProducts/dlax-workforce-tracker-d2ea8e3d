@@ -1,29 +1,72 @@
-## Problem
 
-On the Daily Entry sheet (`src/routes/daily-entry.tsx`):
+## Goal
+Add a new **Daily Labour Report (DLR)** to the Reports screen that exports the exact layout of the uploaded reference file. Selection requires **one project** and **one date**. Provide **two download buttons: Excel (.xlsx)** and **CSV (.csv)**.
 
-1. Horizontal lines between some contractor rows (e.g. between Sl.no 18 and 19) disappear.
-2. While scrolling vertically/horizontally, the sticky left columns (Sl.no, SC Code, Name, Contact, Work Place) and sticky header rows visually drift / overlap rows below.
+## UI changes (single screen: `/reports`)
+- Add a 4th tab **"Daily Labour Report"** to the existing Tabs (Daily / Project / Contractor stay unchanged).
+- Inside this tab:
+  - **Project** — single-select combobox (no "All"; required).
+  - **Date** — single date picker.
+  - **Download Excel** button (.xlsx) and **Download CSV** button (.csv), both disabled until a project and date are chosen.
+  - **Preview table** rendering the same matrix that will be exported, so the user can confirm before downloading.
+- The existing top-level Export button keeps working for the other tabs.
 
-Both come from the same root cause: the table uses `border-collapse: collapse` while several `<th>` / `<td>` cells are `position: sticky`. With collapsed borders, the border belongs to the table, not to the cell — so when a sticky cell paints over the scrolling area it covers the row's bottom border, leaving gaps that look random (more visible on rows whose content is empty/short, like row 18 in the screenshot). The same overlap is why headers/columns look misaligned mid-scroll.
+## File layout (matches the reference exactly)
+20 columns in this order:
+`Sl.No | Name of the Project | Masons | Carpenters | Steel Fixers | Painters | Helpers (Civil) | Skilled (MEP) | Helpers (MEP) | Mason (NMR) | Helpers (M) | Helpers (F) | Sub Contractors/Job Work | NMR | Total | NMR % on Total | Budget NMR | NMR % on Budget | Security | Remarks`
 
-## Fix (scoped to `src/routes/daily-entry.tsx`, entry-sheet table only)
+Header rows (rows 1–5):
+```text
+Row 1: DAILY LABOUR REPORT\n<dd-mm-yyyy>   (merged across all cols, wrap, bold, centered)
+Row 2: Sl.No | Name of the Project | Sub Contractors/Job Works (C2:I2 merged) | NMR (J2:L2) | Total Labour (M2:N2) | Total | NMR % on Total | Budget NMR | NMR % on Budget | Security | Remarks
+Row 3: Civil (C3:G3 merged) | MEP (H3:I3 merged)
+Row 4: Masons | Carpenters | Steel Fixers | Painters | Helpers | Skilled | Helpers | Mason | Helpers (M) | Helpers (F) | Sub Contractors/Job Work | NMR
+Row 5: Tiles, Granite, Brickwork, Glazing | Shuttering, Scaffolding, Wood works | Fabricator works, Rod benders   (under Masons/Carpenters/Steel Fixers)
+Row 6+: project_group section header row, then the selected project's data row
+```
 
-Switch the entry-sheet table to a separated-border model so borders belong to each cell and stay attached to it while sticky:
+CSV note: CSV cannot represent merged cells or styling, so the CSV writes the **same 20-column layout** as plain rows (header rows 1–5 included verbatim, empty cells where merges would span). This matches the structure of the reference CSV the user uploaded as the comparison baseline.
 
-1. Change the `<table>` class from `border-collapse text-xs w-full min-w-[1600px]` to `border-separate border-spacing-0 text-xs w-full min-w-[1600px]`.
-2. Replace the per-cell `border` utility (which renders 4 sides and doubles up under `border-separate`) on `<th>` and `<td>` in this table with directional borders so each cell draws exactly one shared edge:
-   - Header cells (top row): `border-b border-r` (+ keep existing `border-r-2 border-r-slate-300` on Work Place divider).
-   - Second header row (categories): `border-b border-r`.
-   - Body cells: `border-b border-r`.
-   - Footer (TOTAL) row cells: `border-t border-r`.
-   - First column (`Sl.no` / index) also gets `border-l` so the left edge is visible.
-3. Keep all existing `sticky`, `z-*`, `bg-*`, `bg-clip-padding`, `box-border`, width, and `border-r-2 border-r-slate-300` classes untouched — only swap `border` → directional borders.
-4. Outer wrapper `<div className="overflow-auto rounded-md border" …>` already supplies the outer frame, so no double border appears.
+## Data mapping (Supabase)
+Query: `daily_manpower` for `project_id = $project AND entry_date = $date`, joined to `projects`, `contractors`, `worker_categories`, `departments`.
 
-This guarantees every row keeps its bottom border even when a sticky cell paints over it, and sticky columns stay visually aligned with their rows during scroll. No logic, data, layout offsets, or other screens are touched.
+- **Sl.No / Project Name / Section row** — from `projects.code`, `projects.name`, `projects.project_group`.
+- **Category columns** (Masons … Helpers (F)) — sum `headcount` matched to `worker_categories.name` via a case-insensitive alias map kept in the helper. Unmatched categories don't populate a column but still feed Totals.
+- **Sub Contractors/Job Work** — sum of headcount where `contractors.nature_of_work = 'Item Rate'`.
+- **NMR** column — sum of headcount where `contractors.nature_of_work = 'NMR'`.
+- **Total** — Item Rate + NMR.
+- **NMR % on Total** — `NMR/Total` (formula in xlsx, computed value in csv), formatted as `0%`; blank if Total = 0.
+- **Budget NMR** — 0 placeholder (no DB field today).
+- **NMR % on Budget** — `IFERROR(NMR/Budget,"")`.
+- **Security** — 0 placeholder.
+- **Remarks** — concatenated unique remarks for that project+date.
 
-## Out of scope
+Zero values render as `-` (Excel number format `#,##0;(#,##0);-`; CSV writes literal `-`).
 
-- Saved Entries table, OT Entry, Reports, and any other screen.
-- Column widths, sticky offsets, header heights, business logic, data shape.
+## Formatting (Excel only)
+- Bold + centered + wrap-text on header rows; thin borders across the table.
+- Column widths sized to fit headers; freeze top 5 rows + first 2 columns.
+- Number format `#,##0;(#,##0);-`; percentage cells `0%`.
+
+## Files
+- `src/routes/reports.tsx` — add the 4th tab, its controls, preview, and the two download buttons. No changes to existing tabs/exports.
+- `src/lib/dlr-daily.ts` *(new)* — pure helpers:
+  - `getDlrDailyMatrix({ project, date, rows })` → 2D array used by the preview, .xlsx writer, and .csv writer (single source of truth).
+  - `buildDlrDailyWorkbook(matrix, meta)` → SheetJS workbook (merges, widths, freeze, number formats).
+  - `buildDlrDailyCsv(matrix)` → RFC-4180 CSV string from the same matrix.
+- `src/components/DlrDailyPreview.tsx` *(new)* — renders the matrix as a styled read-only HTML table.
+- `package.json` — ensure `xlsx` is installed (`bun add xlsx` if missing).
+
+Download filenames:
+- `DLR-<PROJECT_CODE>-<dd-mm-yyyy>.xlsx`
+- `DLR-<PROJECT_CODE>-<dd-mm-yyyy>.csv`
+
+## Out of scope (untouched)
+- Existing Daily / Project / Contractor tabs, their filters, KPIs, breakdown cards, and current CSV export
+- Daily Entry, Approvals, Masters, Auth/RLS, DB schema
+- The monthly DLR pivot sheet (different layout in the reference) — not requested
+- Any visual changes outside the new tab
+
+## Risks
+- If `worker_categories.name` values don't match the reference labels, some category columns will be empty even when Totals are correct. The alias map can be extended without code-structure changes.
+- `Budget NMR` stays 0 until a project budget field is added (future, out of scope).
