@@ -370,7 +370,6 @@ function LoginPage() {
               </div>
             </div>
 
-            {/* Forgot password temporarily disabled
             <div className="flex justify-end -mt-1">
               <button
                 type="button"
@@ -380,7 +379,6 @@ function LoginPage() {
                 Forgot password?
               </button>
             </div>
-            */}
 
 
 
@@ -433,7 +431,63 @@ function LoginPage() {
         </div>
       </div>
 
-      {/* Forgot password dialog temporarily disabled */}
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset your password</DialogTitle>
+            <DialogDescription>
+              Enter the email address linked to your account. We'll send you a password reset link.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const email = fpUserId.trim().toLowerCase();
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                toast.error("Please enter a valid email address");
+                return;
+              }
+              setFpLoading(true);
+              try {
+                const redirectTo = (typeof window !== "undefined" ? window.location.origin : "") + "/reset-password";
+                await supabase.functions.invoke("send-password-reset", { body: { email, redirectTo } });
+                toast.success("If that email is registered, a reset link has been sent.");
+                setForgotOpen(false);
+                setFpUserId("");
+              } catch {
+                toast.success("If that email is registered, a reset link has been sent.");
+                setForgotOpen(false);
+                setFpUserId("");
+              } finally {
+                setFpLoading(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="fpEmail">Email address</Label>
+              <Input
+                id="fpEmail"
+                type="email"
+                required
+                autoComplete="email"
+                value={fpUserId}
+                onChange={(e) => setFpUserId(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setForgotOpen(false)} disabled={fpLoading}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={fpLoading}>
+                {fpLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Send reset link
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

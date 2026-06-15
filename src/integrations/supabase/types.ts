@@ -317,6 +317,51 @@ export type Database = {
         }
         Relationships: []
       }
+      email_config: {
+        Row: {
+          app_password: string
+          cc_recipients: string[]
+          enabled: boolean
+          encryption: string
+          from_email: string
+          from_name: string
+          id: string
+          smtp_host: string
+          smtp_port: number
+          updated_at: string
+          updated_by: string | null
+          username: string
+        }
+        Insert: {
+          app_password?: string
+          cc_recipients?: string[]
+          enabled?: boolean
+          encryption?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          smtp_host?: string
+          smtp_port?: number
+          updated_at?: string
+          updated_by?: string | null
+          username?: string
+        }
+        Update: {
+          app_password?: string
+          cc_recipients?: string[]
+          enabled?: boolean
+          encryption?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          smtp_host?: string
+          smtp_port?: number
+          updated_at?: string
+          updated_by?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -790,7 +835,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      email_config_public: {
+        Row: {
+          cc_recipients: string[] | null
+          enabled: boolean | null
+          encryption: string | null
+          from_email: string | null
+          from_name: string | null
+          has_password: boolean | null
+          id: string | null
+          smtp_host: string | null
+          smtp_port: number | null
+          updated_at: string | null
+          updated_by: string | null
+          username: string | null
+        }
+        Insert: {
+          cc_recipients?: string[] | null
+          enabled?: boolean | null
+          encryption?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          has_password?: never
+          id?: string | null
+          smtp_host?: string | null
+          smtp_port?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+          username?: string | null
+        }
+        Update: {
+          cc_recipients?: string[] | null
+          enabled?: boolean | null
+          encryption?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          has_password?: never
+          id?: string | null
+          smtp_host?: string | null
+          smtp_port?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       approve_sheet: {
