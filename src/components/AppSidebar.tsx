@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   ShieldCheck,
   Link2,
+  Mail,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +55,7 @@ const reportItems = [
 
 const adminItems = [
   { to: "/users", label: "User Management", icon: UserCog, screen: "user_management" },
+  { to: "/email-config", label: "Email Configuration", icon: Mail, screen: "user_management" },
 ];
 
 export function AppSidebar() {
