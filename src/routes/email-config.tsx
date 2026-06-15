@@ -199,9 +199,9 @@ function EmailConfigPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Mail}
+        icon={<Mail className="h-6 w-6 text-primary" />}
         title="Email Configuration"
-        description="Manage SMTP credentials for outbound emails (host, port, sender, app password). Used by Forgot Password and other system notifications."
+        subtitle="Manage SMTP credentials for outbound emails (host, port, sender, app password). Used by Forgot Password and other system notifications."
       />
 
       <Card>
