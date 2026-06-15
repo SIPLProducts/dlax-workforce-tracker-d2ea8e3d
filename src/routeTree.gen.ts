@@ -10,9 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as OtEntryRouteImport } from './routes/ot-entry'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as EmailConfigRouteImport } from './routes/email-config'
 import { Route as DailyEntryRouteImport } from './routes/daily-entry'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as IndexRouteImport } from './routes/index'
@@ -28,6 +30,11 @@ const UsersRoute = UsersRouteImport.update({
   path: '/users',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -41,6 +48,11 @@ const OtEntryRoute = OtEntryRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailConfigRoute = EmailConfigRouteImport.update({
+  id: '/email-config',
+  path: '/email-config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DailyEntryRoute = DailyEntryRouteImport.update({
@@ -93,9 +105,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
+  '/email-config': typeof EmailConfigRoute
   '/login': typeof LoginRoute
   '/ot-entry': typeof OtEntryRoute
   '/reports': typeof ReportsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
   '/masters/assignments': typeof MastersAssignmentsRoute
@@ -108,9 +122,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
+  '/email-config': typeof EmailConfigRoute
   '/login': typeof LoginRoute
   '/ot-entry': typeof OtEntryRoute
   '/reports': typeof ReportsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
   '/masters/assignments': typeof MastersAssignmentsRoute
@@ -124,9 +140,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/approvals': typeof ApprovalsRoute
   '/daily-entry': typeof DailyEntryRoute
+  '/email-config': typeof EmailConfigRoute
   '/login': typeof LoginRoute
   '/ot-entry': typeof OtEntryRoute
   '/reports': typeof ReportsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/users': typeof UsersRoute
   '/masters/approvals': typeof MastersApprovalsRoute
   '/masters/assignments': typeof MastersAssignmentsRoute
@@ -141,9 +159,11 @@ export interface FileRouteTypes {
     | '/'
     | '/approvals'
     | '/daily-entry'
+    | '/email-config'
     | '/login'
     | '/ot-entry'
     | '/reports'
+    | '/reset-password'
     | '/users'
     | '/masters/approvals'
     | '/masters/assignments'
@@ -156,9 +176,11 @@ export interface FileRouteTypes {
     | '/'
     | '/approvals'
     | '/daily-entry'
+    | '/email-config'
     | '/login'
     | '/ot-entry'
     | '/reports'
+    | '/reset-password'
     | '/users'
     | '/masters/approvals'
     | '/masters/assignments'
@@ -171,9 +193,11 @@ export interface FileRouteTypes {
     | '/'
     | '/approvals'
     | '/daily-entry'
+    | '/email-config'
     | '/login'
     | '/ot-entry'
     | '/reports'
+    | '/reset-password'
     | '/users'
     | '/masters/approvals'
     | '/masters/assignments'
@@ -187,9 +211,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApprovalsRoute: typeof ApprovalsRoute
   DailyEntryRoute: typeof DailyEntryRoute
+  EmailConfigRoute: typeof EmailConfigRoute
   LoginRoute: typeof LoginRoute
   OtEntryRoute: typeof OtEntryRoute
   ReportsRoute: typeof ReportsRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   UsersRoute: typeof UsersRoute
   MastersApprovalsRoute: typeof MastersApprovalsRoute
   MastersAssignmentsRoute: typeof MastersAssignmentsRoute
@@ -206,6 +232,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -227,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/email-config': {
+      id: '/email-config'
+      path: '/email-config'
+      fullPath: '/email-config'
+      preLoaderRoute: typeof EmailConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/daily-entry': {
@@ -299,9 +339,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApprovalsRoute: ApprovalsRoute,
   DailyEntryRoute: DailyEntryRoute,
+  EmailConfigRoute: EmailConfigRoute,
   LoginRoute: LoginRoute,
   OtEntryRoute: OtEntryRoute,
   ReportsRoute: ReportsRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   UsersRoute: UsersRoute,
   MastersApprovalsRoute: MastersApprovalsRoute,
   MastersAssignmentsRoute: MastersAssignmentsRoute,
