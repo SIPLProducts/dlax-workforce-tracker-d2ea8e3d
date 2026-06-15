@@ -60,11 +60,12 @@ function EmailConfigPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from("email_config_public" as any)
+      const { data: dataRaw, error } = await (supabase as any)
+        .from("email_config_public")
         .select("*")
         .eq("id", "default")
         .maybeSingle();
+      const data = dataRaw as any;
       if (cancelled) return;
       if (error) {
         toast.error("Failed to load configuration");
