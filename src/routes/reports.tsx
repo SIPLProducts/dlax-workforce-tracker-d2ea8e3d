@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -764,11 +764,8 @@ function isoWeek(d: Date): { year: number; week: number } {
 
 type SummaryColumn =
   | { kind: "day"; date: Date; key: string }
-  | { kind: "avg"; week: number; key: string; dayKeys: string[] }
+  | { kind: "avg"; week: number; key: string }
   | { kind: "month"; key: string };
-
-type Band = "item_rate" | "nmr" | "total";
-const BAND_LABEL: Record<Band, string> = { item_rate: "Item Rate", nmr: "NMR", total: "Total" };
 
 function SummaryTab({ projects }: { projects: any[] }) {
   const [dateFrom, setDateFrom] = useState<Date>(startOfMonth(new Date()));
@@ -783,7 +780,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
       setLoading(true);
       let q = supabase
         .from("daily_manpower")
-        .select("entry_date, headcount, project_id, projects(name, code), contractors(contract_type)")
+        .select("entry_date, headcount, project_id, projects(name, code)")
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
         .lte("entry_date", format(dateTo, "yyyy-MM-dd"))
         .eq("status", "approved");
@@ -798,175 +795,114 @@ function SummaryTab({ projects }: { projects: any[] }) {
   }, [dateFrom, dateTo, projectId]);
 
   const matrix = useMemo(() => {
+    // Build day list
     const days: Date[] = [];
-    const cur = new Date(dateFrom); cur.setHours(0, 0, 0, 0);
-    const end = new Date(dateTo); end.setHours(0, 0, 0, 0);
+    const cur = new Date(dateFrom);
+    cur.setHours(0, 0, 0, 0);
+    const end = new Date(dateTo);
+    end.setHours(0, 0, 0, 0);
     while (cur <= end) { days.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
 
-    // Build columns: days grouped by ISO week, with Avg col after each week's last day, then Month Total
+    // Build columns: days, with an avg column inserted at each ISO week boundary
     const columns: SummaryColumn[] = [];
+    const weekGroups: { weekKey: string; week: number; dayKeys: string[] }[] = [];
     let curGroup: { weekKey: string; week: number; dayKeys: string[] } | null = null;
-    const pushAvg = () => {
-      if (!curGroup) return;
-      columns.push({ kind: "avg", week: curGroup.week, key: `avg-${curGroup.weekKey}`, dayKeys: curGroup.dayKeys });
-    };
     for (const d of days) {
       const { year, week } = isoWeek(d);
       const wKey = `${year}-W${week}`;
       const dKey = format(d, "yyyy-MM-dd");
       if (!curGroup || curGroup.weekKey !== wKey) {
-        pushAvg();
+        if (curGroup) {
+          columns.push({ kind: "avg", week: curGroup.week, key: `avg-${curGroup.weekKey}` });
+          weekGroups.push(curGroup);
+        }
         curGroup = { weekKey: wKey, week, dayKeys: [] };
       }
       columns.push({ kind: "day", date: d, key: dKey });
       curGroup.dayKeys.push(dKey);
     }
-    pushAvg();
+    if (curGroup) {
+      columns.push({ kind: "avg", week: curGroup.week, key: `avg-${curGroup.weekKey}` });
+      weekGroups.push(curGroup);
+    }
     columns.push({ kind: "month", key: "month-total" });
 
-    // Aggregate: project -> band -> dateKey -> headcount
-    type ProjAgg = { id: string; name: string; code: string; bands: Record<Band, Map<string, number>> };
-    const byProject = new Map<string, ProjAgg>();
+    // Aggregate: project -> dateKey -> total headcount
+    const byProject = new Map<string, { id: string; name: string; code: string; daily: Map<string, number> }>();
     for (const r of rows) {
       const pid = r.project_id || "—";
       const p: any = r.projects;
-      const ct: Band = ((r as any).contractors?.contract_type === "nmr") ? "nmr" : "item_rate";
-      if (!byProject.has(pid)) {
-        byProject.set(pid, {
-          id: pid, name: p?.name || "—", code: p?.code || "",
-          bands: { item_rate: new Map(), nmr: new Map(), total: new Map() },
-        });
-      }
+      if (!byProject.has(pid)) byProject.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", daily: new Map() });
       const proj = byProject.get(pid)!;
-      const h = r.headcount || 0;
-      proj.bands[ct].set(r.entry_date, (proj.bands[ct].get(r.entry_date) || 0) + h);
-      proj.bands.total.set(r.entry_date, (proj.bands.total.get(r.entry_date) || 0) + h);
+      proj.daily.set(r.entry_date, (proj.daily.get(r.entry_date) || 0) + (r.headcount || 0));
     }
-
-    const computeBandRow = (band: Map<string, number>) => {
-      const dayVals: Record<string, number> = {};
-      let monthTotal = 0;
-      for (const d of days) {
-        const k = format(d, "yyyy-MM-dd");
-        const v = band.get(k) || 0;
-        dayVals[k] = v; monthTotal += v;
-      }
-      const weekAvgs: Record<string, number | null> = {};
-      for (const c of columns) {
-        if (c.kind !== "avg") continue;
-        const sum = c.dayKeys.reduce((s, k) => s + (dayVals[k] || 0), 0);
-        weekAvgs[c.key] = sum === 0 ? null : Math.round((sum / c.dayKeys.length) * 10) / 10;
-      }
-      return { dayVals, weekAvgs, monthTotal };
-    };
 
     const projectRows = Array.from(byProject.values())
-      .map((p) => ({
-        ...p,
-        rowsByBand: {
-          item_rate: computeBandRow(p.bands.item_rate),
-          nmr: computeBandRow(p.bands.nmr),
-          total: computeBandRow(p.bands.total),
-        },
-      }))
-      .filter((p) => p.rowsByBand.total.monthTotal > 0)
+      .map((p) => {
+        const dayVals: Record<string, number> = {};
+        let monthTotal = 0;
+        for (const d of days) {
+          const k = format(d, "yyyy-MM-dd");
+          const v = p.daily.get(k) || 0;
+          dayVals[k] = v;
+          monthTotal += v;
+        }
+        const weekAvgs: Record<string, number> = {};
+        for (const g of weekGroups) {
+          const sum = g.dayKeys.reduce((s, k) => s + (dayVals[k] || 0), 0);
+          weekAvgs[`avg-${g.weekKey}`] = g.dayKeys.length ? Math.round((sum / g.dayKeys.length) * 10) / 10 : 0;
+        }
+        return { ...p, dayVals, weekAvgs, monthTotal };
+      })
+      .filter((p) => p.monthTotal > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Grand totals — combine across projects per band
-    const grand: Record<Band, { dayVals: Record<string, number>; weekAvgs: Record<string, number | null>; monthTotal: number }> = {
-      item_rate: { dayVals: {}, weekAvgs: {}, monthTotal: 0 },
-      nmr: { dayVals: {}, weekAvgs: {}, monthTotal: 0 },
-      total: { dayVals: {}, weekAvgs: {}, monthTotal: 0 },
-    };
-    for (const band of ["item_rate", "nmr", "total"] as Band[]) {
-      for (const c of columns) {
-        if (c.kind === "day") {
-          grand[band].dayVals[c.key] = projectRows.reduce((s, p) => s + (p.rowsByBand[band].dayVals[c.key] || 0), 0);
-        }
-      }
-      grand[band].monthTotal = projectRows.reduce((s, p) => s + p.rowsByBand[band].monthTotal, 0);
-      for (const c of columns) {
-        if (c.kind !== "avg") continue;
-        const sum = c.dayKeys.reduce((s, k) => s + (grand[band].dayVals[k] || 0), 0);
-        grand[band].weekAvgs[c.key] = sum === 0 ? null : Math.round((sum / c.dayKeys.length) * 10) / 10;
+    // Grand totals per column
+    const colTotals: Record<string, number> = {};
+    let grandMonth = 0;
+    for (const c of columns) {
+      if (c.kind === "day") {
+        colTotals[c.key] = projectRows.reduce((s, p) => s + (p.dayVals[c.key] || 0), 0);
+      } else if (c.kind === "avg") {
+        colTotals[c.key] = Math.round(projectRows.reduce((s, p) => s + (p.weekAvgs[c.key] || 0), 0) * 10) / 10;
+      } else {
+        colTotals[c.key] = projectRows.reduce((s, p) => s + p.monthTotal, 0);
+        grandMonth = colTotals[c.key];
       }
     }
 
-    const totalLabour = grand.total.monthTotal;
+    const totalLabour = projectRows.reduce((s, p) => s + p.monthTotal, 0);
     const totalDays = days.length;
     const avgPerWeek = totalDays > 0 ? Math.round((totalLabour / (totalDays / 7)) * 10) / 10 : 0;
 
-    return { columns, projectRows, grand, totalLabour, avgPerWeek, grandMonth: totalLabour, weeks: Math.round((totalDays / 7) * 10) / 10 };
+    return { columns, projectRows, colTotals, totalLabour, avgPerWeek, grandMonth, weeks: Math.round((totalDays / 7) * 10) / 10 };
   }, [rows, dateFrom, dateTo]);
-
-  const fmtVal = (v: number | null | undefined, isAvg = false) => {
-    if (v === null || v === undefined) return "-";
-    if (!isAvg && v === 0) return "0";
-    return v.toLocaleString();
-  };
 
   const exportXlsx = async () => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
-    const totalCols = 2 + matrix.columns.length + 1; // S.No + Project + cols + Remarks
-    const header1: any[] = ["KPC Projects Limited", ...Array(totalCols - 1).fill("")];
-    const header2: any[] = [`Manpower engaged from ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`, ...Array(totalCols - 1).fill("")];
-    const head: any[] = ["S.No", "Project Name", ""];
+    const header1: any[] = ["KPC Projects Limited"];
+    const header2: any[] = [`Manpower engaged from ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`];
+    const head: any[] = ["S.No", "Project Name"];
     for (const c of matrix.columns) {
-      if (c.kind === "day") head.push(format(c.date, "d/M"));
-      else if (c.kind === "avg") head.push(`Average per Week-${c.week}`);
-      else head.push("Total labour for the month");
+      if (c.kind === "day") head.push(format(c.date, "M/d/yyyy"));
+      else if (c.kind === "avg") head.push(`Avg Week-${c.week}`);
+      else head.push("Total Labour for the Month");
     }
-    head.push("Remarks");
-
-    const body: any[] = [];
-    const merges: any[] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
-    ];
-    let rowIdx = 3; // header row at index 2, body starts at 3
-    matrix.projectRows.forEach((p, i) => {
-      const startRow = rowIdx;
-      (["item_rate", "nmr", "total"] as Band[]).forEach((band, bi) => {
-        const r = p.rowsByBand[band];
-        const row: any[] = [
-          bi === 0 ? i + 1 : "",
-          bi === 0 ? (p.code ? `[${p.code}] ${p.name}` : p.name) : "",
-          BAND_LABEL[band],
-        ];
-        for (const c of matrix.columns) {
-          if (c.kind === "day") row.push(r.dayVals[c.key] || 0);
-          else if (c.kind === "avg") row.push(r.weekAvgs[c.key] === null ? "" : r.weekAvgs[c.key]);
-          else row.push(r.monthTotal);
-        }
-        row.push("");
-        body.push(row);
-        rowIdx++;
-      });
-      // Merge S.No and Project Name across the 3 band rows
-      merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 2, c: 0 } });
-      merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 2, c: 1 } });
-    });
-
-    // Grand Total (3 band rows)
-    const gtStart = rowIdx;
-    (["item_rate", "nmr", "total"] as Band[]).forEach((band, bi) => {
-      const g = matrix.grand[band];
-      const row: any[] = [bi === 0 ? "" : "", bi === 0 ? "Grand Total" : "", BAND_LABEL[band]];
+    const body = matrix.projectRows.map((p, i) => {
+      const row: any[] = [i + 1, p.code ? `[${p.code}] ${p.name}` : p.name];
       for (const c of matrix.columns) {
-        if (c.kind === "day") row.push(g.dayVals[c.key] || 0);
-        else if (c.kind === "avg") row.push(g.weekAvgs[c.key] === null ? "" : g.weekAvgs[c.key]);
-        else row.push(g.monthTotal);
+        if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
+        else if (c.kind === "avg") row.push(p.weekAvgs[c.key] || 0);
+        else row.push(p.monthTotal);
       }
-      row.push("");
-      body.push(row);
+      return row;
     });
-    merges.push({ s: { r: gtStart, c: 1 }, e: { r: gtStart + 2, c: 1 } });
+    const totalRow: any[] = ["", "Grand Total"];
+    for (const c of matrix.columns) totalRow.push(matrix.colTotals[c.key] || 0);
 
-    const aoa = [header1, header2, head, ...body];
+    const aoa = [header1, header2, [], head, ...body, totalRow];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    (ws as any)["!merges"] = merges;
-    (ws as any)["!cols"] = [{ wch: 6 }, { wch: 28 }, { wch: 11 }, ...matrix.columns.map(() => ({ wch: 8 })), { wch: 16 }];
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `summary-${format(dateFrom, "yyyyMMdd")}-${format(dateTo, "yyyyMMdd")}.xlsx`);
   };
@@ -1033,14 +969,13 @@ function SummaryTab({ projects }: { projects: any[] }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="sticky left-0 bg-background z-10 w-14 align-bottom">S.No</TableHead>
-                  <TableHead className="sticky left-14 bg-background z-10 min-w-[200px] align-bottom">Project Name</TableHead>
-                  <TableHead className="bg-background align-bottom">Contract</TableHead>
+                  <TableHead className="sticky left-0 bg-background z-10 w-14">S.No</TableHead>
+                  <TableHead className="sticky left-14 bg-background z-10 min-w-[200px]">Project Name</TableHead>
                   {matrix.columns.map((c) => (
                     <TableHead
                       key={c.key}
                       className={cn(
-                        "text-right whitespace-nowrap align-bottom",
+                        "text-right whitespace-nowrap",
                         c.kind === "avg" && "bg-muted/40",
                         c.kind === "month" && "bg-primary/10 font-semibold",
                       )}
@@ -1054,74 +989,50 @@ function SummaryTab({ projects }: { projects: any[] }) {
               </TableHeader>
               <TableBody>
                 {loading && (
-                  <TableRow><TableCell colSpan={3 + matrix.columns.length} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={2 + matrix.columns.length} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>
                 )}
                 {!loading && matrix.projectRows.length === 0 && (
-                  <TableRow><TableCell colSpan={3 + matrix.columns.length} className="text-center text-muted-foreground py-8">No approved data in selected range</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={2 + matrix.columns.length} className="text-center text-muted-foreground py-8">No approved data in selected range</TableCell></TableRow>
                 )}
                 {!loading && matrix.projectRows.map((p, i) => (
-                  <Fragment key={p.id}>
-                    {(["item_rate", "nmr", "total"] as Band[]).map((band, bi) => {
-                      const r = p.rowsByBand[band];
-                      const isTotal = band === "total";
+                  <TableRow key={p.id}>
+                    <TableCell className="sticky left-0 bg-background z-10 tabular-nums">{i + 1}</TableCell>
+                    <TableCell className="sticky left-14 bg-background z-10 font-medium whitespace-nowrap">
+                      {p.code ? <span className="text-muted-foreground mr-1">[{p.code}]</span> : null}{p.name}
+                    </TableCell>
+                    {matrix.columns.map((c) => {
+                      const v = c.kind === "day" ? p.dayVals[c.key] || 0
+                        : c.kind === "avg" ? p.weekAvgs[c.key] || 0
+                        : p.monthTotal;
                       return (
-                        <TableRow key={band} className={cn(isTotal && "font-semibold bg-muted/30", bi === 2 && "border-b-2")}>
-                          {bi === 0 && (
-                            <>
-                              <TableCell rowSpan={3} className="sticky left-0 bg-background z-10 tabular-nums align-top border-r">{i + 1}</TableCell>
-                              <TableCell rowSpan={3} className="sticky left-14 bg-background z-10 font-medium whitespace-nowrap align-top border-r">
-                                {p.code ? <span className="text-muted-foreground mr-1">[{p.code}]</span> : null}{p.name}
-                              </TableCell>
-                            </>
+                        <TableCell
+                          key={c.key}
+                          className={cn(
+                            "text-right tabular-nums",
+                            c.kind === "avg" && "bg-muted/40",
+                            c.kind === "month" && "bg-primary/10 font-semibold",
                           )}
-                          <TableCell className="whitespace-nowrap text-xs">{BAND_LABEL[band]}</TableCell>
-                          {matrix.columns.map((c) => {
-                            const v = c.kind === "day" ? r.dayVals[c.key] || 0
-                              : c.kind === "avg" ? r.weekAvgs[c.key]
-                              : r.monthTotal;
-                            return (
-                              <TableCell
-                                key={c.key}
-                                className={cn(
-                                  "text-right tabular-nums",
-                                  c.kind === "avg" && "bg-muted/40",
-                                  c.kind === "month" && "bg-primary/10 font-semibold",
-                                )}
-                              >{fmtVal(v as any, c.kind === "avg")}</TableCell>
-                            );
-                          })}
-                        </TableRow>
+                        >{v.toLocaleString()}</TableCell>
                       );
                     })}
-                  </Fragment>
+                  </TableRow>
                 ))}
-                {!loading && matrix.projectRows.length > 0 && (["item_rate", "nmr", "total"] as Band[]).map((band, bi) => {
-                  const g = matrix.grand[band];
-                  const isTotal = band === "total";
-                  return (
-                    <TableRow key={`gt-${band}`} className={cn("bg-muted/60 font-semibold", isTotal && "bg-muted")}>
-                      {bi === 0 && (
-                        <TableCell rowSpan={3} colSpan={2} className="sticky left-0 bg-muted/60 z-10 align-top border-r">Grand Total</TableCell>
-                      )}
-                      <TableCell className="whitespace-nowrap text-xs">{BAND_LABEL[band]}</TableCell>
-                      {matrix.columns.map((c) => {
-                        const v = c.kind === "day" ? g.dayVals[c.key] || 0
-                          : c.kind === "avg" ? g.weekAvgs[c.key]
-                          : g.monthTotal;
-                        return (
-                          <TableCell
-                            key={c.key}
-                            className={cn(
-                              "text-right tabular-nums",
-                              c.kind === "avg" && "bg-muted",
-                              c.kind === "month" && "bg-primary/20",
-                            )}
-                          >{fmtVal(v as any, c.kind === "avg")}</TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  );
-                })}
+                {!loading && matrix.projectRows.length > 0 && (
+                  <TableRow className="bg-muted/60 font-semibold">
+                    <TableCell className="sticky left-0 bg-muted/60 z-10" />
+                    <TableCell className="sticky left-14 bg-muted/60 z-10">Grand Total</TableCell>
+                    {matrix.columns.map((c) => (
+                      <TableCell
+                        key={c.key}
+                        className={cn(
+                          "text-right tabular-nums",
+                          c.kind === "avg" && "bg-muted",
+                          c.kind === "month" && "bg-primary/20",
+                        )}
+                      >{(matrix.colTotals[c.key] || 0).toLocaleString()}</TableCell>
+                    ))}
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

@@ -19,7 +19,6 @@ export type Database = {
           company_name: string
           contact_number: string | null
           contact_person: string | null
-          contract_type: Database["public"]["Enums"]["contract_type"]
           contractor_code: string | null
           created_at: string
           id: string
@@ -33,7 +32,6 @@ export type Database = {
           company_name: string
           contact_number?: string | null
           contact_person?: string | null
-          contract_type?: Database["public"]["Enums"]["contract_type"]
           contractor_code?: string | null
           created_at?: string
           id?: string
@@ -47,7 +45,6 @@ export type Database = {
           company_name?: string
           contact_number?: string | null
           contact_person?: string | null
-          contract_type?: Database["public"]["Enums"]["contract_type"]
           contractor_code?: string | null
           created_at?: string
           id?: string
@@ -1024,7 +1021,6 @@ export type Database = {
         | "pending_l2"
         | "approved"
         | "rejected"
-      contract_type: "item_rate" | "nmr"
       permission_level: "none" | "view" | "edit"
     }
     CompositeTypes: {
@@ -1167,7 +1163,6 @@ export const Constants = {
         "approved",
         "rejected",
       ],
-      contract_type: ["item_rate", "nmr"],
       permission_level: ["none", "view", "edit"],
     },
   },

@@ -1,52 +1,51 @@
-## Summary Report — match May'26 reference sheet exactly
+# Summary Report — May'26 Sheet Format
 
-### 1. Schema change
+Add a new **Summary Report** view (alongside Daily Labour Report on `/reports`) that renders daily approved headcount in the exact matrix layout of the uploaded May'26 sheet — projects as rows, days as columns, with weekly average columns and a monthly total column. All numbers computed dynamically from `daily_manpower`.
 
-Add `contract_type` to `contractors`:
+## Filters
+- **From Date** (default: 1st of current month)
+- **To Date** (default: today)
+- **Project**: existing `ProjectCombobox` with "All Projects" (matches the multi-project rows in the sheet); selecting one project shows just that row.
 
-- enum `contract_type`: `'item_rate' | 'nmr'`
-- `contractors.contract_type contract_type NOT NULL DEFAULT 'item_rate'`
-- Expose the field in the Contractors master (Add/Edit dialog) as a required select. Default existing rows to `item_rate`; admins can flip individual contractors to `nmr`.
-
-### 2. Layout — replicate the reference sheet 1:1
+## Layout (mirrors the screenshot)
 
 ```text
-Row 1 (merged A..last):  KPC Projects Limited
-Row 2 (merged A..last):  Manpower engaged from <From> to <To>
-Row 3 (header):          S.No | Project Name | Manpower deployed at site (merged across day+avg+month cols) | Total labour for the month | Remarks
-Row 4 (header):          (empty) | (empty) | (empty) | d1 d2 .. d7 | Avg Week-W | d8..d14 | Avg Week-W | ... | Total | (Remarks)
-Body — 3 rows per project (S.No + Project Name merged vertically):
-  Item Rate  | <daily Item-Rate headcounts> | <weekly avg> | ... | <monthly total>
-  NMR        | <daily NMR headcounts>       | <weekly avg> | ... | <monthly total>
-  Total      | <Item Rate + NMR per day>    | <weekly avg> | ... | <monthly total>
-Grand Total row (Item Rate / NMR / Total — same 3-row block, summed across projects)
+Header:  KPC Projects Limited
+         Manpower engaged for <From> – <To>
+
+Columns: S.No │ Project Name │ <Day1> <Day2> … <Day7> │ Avg Week-N │ <Day8> … │ Avg Week-N+1 │ … │ Total Labour for the Month
+Rows:    One row per project (only the "Total" line — no Item Rate / NMR split)
+         Bottom "Grand Total" row summing every column
 ```
 
-Columns are built from the From/To range. Weeks group by ISO week; an `Average per Week-NN` column is inserted after each week's last day. Final column is the monthly total. Day cells display `M/D` (or `D/M` matching the reference); `Average per Week-XX` uses the ISO week number.
+- **Daily cell** = sum of approved `daily_manpower.headcount` for that project on that day (0 if none).
+- **Weekly average column** inserted after every 7 day-columns, labelled `Average per Week-NN` using ISO week number of the last day in that block. Value = mean of those 7 daily cells.
+- **Monthly Total column** = sum of all daily cells in the selected range for that project (the sheet calls it "Total labour for the month").
+- **S.No** = sequential 1..N for the projects with any data in range.
 
-Empty weekly-average cells render as `-` (dash). Empty day cells render as `0` (matching the reference where untouched cells show 0). Project rows with zero monthly total are hidden.
+## Data source
+Single query:
+```ts
+supabase.from('daily_manpower')
+  .select('entry_date, headcount, project_id, projects(name, code)')
+  .gte('entry_date', from).lte('entry_date', to)
+  .eq('status','approved')
+  .maybeEq('project_id', selected)  // when not "All"
+```
+Aggregate client-side in `useMemo` into a `Map<projectId, Map<dateISO, total>>`, then render.
 
-### 3. Data flow
+## UX
+- Tabs on `/reports`: keep existing tabs; add (or replace the previously-added) **Summary** tab.
+- Sticky left columns (S.No, Project Name) and sticky header row for horizontal scroll.
+- Weekly-avg columns highlighted with a subtle bg; Monthly Total column bold.
+- **Excel export** button — generates an `.xlsx` matching this layout (header rows, merged title, weekly-avg columns, totals) via the existing xlsx export pattern used elsewhere.
+- Empty state when no approved data in range.
 
-Single query on `daily_manpower` (status `approved`) joined to `projects(name, code)` and `contractors(contract_type)`, filtered by `entry_date` range and optional `project_id`. In `useMemo`:
+## Files
+- `src/routes/reports.tsx` — add/replace the `SummaryTab` component with the new matrix layout and export handler.
+- No DB changes, no new routes, no schema additions.
 
-- `byProject -> { itemRate: Map<date, sum>, nmr: Map<date, sum> }`
-- `Total = itemRate + nmr` per day
-- Weekly avg = sum of that band's days ÷ days-in-band, rounded to 1 decimal
-- Monthly total = sum of all day cells in the band
-
-KPI cards (top): Total Labour Count, Avg Labour/Week, Total Labour for the Month — all derived from the same matrix (using the `Total` band).
-
-### 4. Excel export
-
-`xlsx` writes the same A..N grid with merged header rows, merged S.No / Project Name cells per 3-row block, bold Grand Total block, and column widths roughly matching the reference (S.No narrow, Project Name wide, day cells narrow). One sheet named `Summary`.
-
-### 5. Files touched
-
-- `supabase/migrations/<new>.sql` — enum + column + default backfill.
-- `src/routes/masters.contractors.tsx` — add `contract_type` select to the dialog and table.
-- `src/routes/reports.tsx` — rewrite `SummaryTab` to render the 3-row-per-project layout, fix empty weekly-avg display (`-` for empty bands), and update `exportXlsx` to match.
-
-### Out of scope
-
-Department / category / contractor sub-rows, separate Remarks per row, per-day weather column, MD(KAK) / VP-PROJECTS leadership rows from the reference, sheet-per-day tabs.
+## Out of scope
+- Item Rate vs NMR split (no field exists for it; would need a new column on `contractors`).
+- Contractor / department / category breakdowns inside Summary.
+- Editing approval status from this view.
