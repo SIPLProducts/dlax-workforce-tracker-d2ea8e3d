@@ -1,35 +1,37 @@
-## Problem
-The Summary Report table has two issues when scrolling:
-1. **Header scrolls away** — the `<TableHeader>` is not fixed; it disappears when scrolling down through long project lists.
-2. **Alignment drift** — the outer wrapper and the shadcn `Table` component both define `overflow-x-auto`, creating nested scrollable containers that can cause column misalignment during scroll.
+# Fix DLAX User Manual (dlax-user-manual.docx)
 
-## Fix
-Replace the shadcn `<Table>` usage inside `SummaryTab` with a plain `<table>` wrapped in a single scrollable container that handles both horizontal and vertical overflow.
+Three issues in the current 19-page manual:
 
-### Changes in `src/routes/reports.tsx` (SummaryTab JSX, ~lines 983–1058)
+1. **Login screenshot (page 4, Figure 1)** is a small/old capture. Replace it with the fresh full-resolution login screenshot (`image-187.png` — KPC Enterprise Edition, "Welcome back" card, Install on Mobile QR).
+2. **Page 8 is mostly blank** — the §4.2 *Individual Worker Attendance* heading sits at the bottom of page 7, its paragraph + amber **Warning** callout flow alone onto page 8, then §5 starts on page 9.
+3. **Page 10 is mostly blank** — the last row of the §5 action table + the blue **Note** callout sit alone on page 10, then §6 starts on page 11.
 
-1. **Remove the outer `overflow-x-auto` div** and replace it with a container that has both vertical and horizontal scroll, plus a max height:
-   ```
-   <div className="rounded-md border max-h-[60vh] overflow-auto">
-   ```
+The user also wants the **Warning** note to stay on the same page as the §4.2 section it belongs to.
 
-2. **Render a native `<table>` instead of shadcn `<Table>`** so we control the wrapper and avoid nested `overflow-x-auto`.
+## Changes
 
-3. **Make `<thead>` sticky at the top:**
-   ```
-   <thead className="sticky top-0 z-20 bg-background">
-   ```
+**A. Replace login figure**
+- In `word/media/`, swap the existing Figure 1 image with `image-187.png`.
+- Keep the same relationship ID and caption ("Figure 1 — Login screen (accessible to all users)") so layout/numbering is unchanged.
+- Resize ImageRun extent to preserve aspect ratio (image is ~16:8, fit to content width).
 
-4. **Make the first two header cells doubly sticky** (top + left) with a higher z-index so they stay visible over both row data and the header bar:
-   - S.No header: `sticky left-0 top-0 z-30 bg-background`
-   - Project Name header: `sticky left-14 top-0 z-30 bg-background`
+**B. Eliminate blank page 8 & keep §4.2 together**
+- Remove the implicit/forced page break currently between §4.2 Warning and §5 *Approvals & Workflow*, so §5 flows up onto page 8 right after the Warning.
+- Add `keepNext` on the §4.2 heading and `keepLines` on its paragraph + the Warning callout block, so the heading + paragraph + warning are guaranteed to render together on the same page (the user's main ask).
+- Net result: §4.2 (heading + text + warning) lives on one page, and §5 begins on the same page filling the remaining space.
 
-5. **Keep data row cells as they are** (`sticky left-0 z-10` and `sticky left-14 z-10`) so the first two columns remain pinned during horizontal scroll.
+**C. Eliminate blank page 10**
+- Remove the page break before §6 *Reports & Analytics* so §6 starts right after the §5 *Note* callout on what is currently page 10.
+- Add `keepLines` on the last table row and the Note callout so the §5 closer stays intact.
 
-6. **Preserve all existing data logic** — columns, rows, totals, and null handling stay unchanged.
+**D. Re-paginate**
+- After edits, manual will compress from 19 → ~17 pages. Footer "Page X of Y" auto-updates because it uses fields, not hard-coded numbers.
 
-### Result
-- Scrolling down keeps the header row fixed at the top.
-- Scrolling right keeps the first two columns fixed at the left.
-- A single overflow container eliminates nested-scroll alignment drift.
-- Only the data rows scroll vertically; the header remains visible.
+## Deliverable
+
+Updated file saved to `/mnt/documents/dlax-user-manual.docx`, plus a re-rendered PDF preview so every page is visually verified (login figure correct, no blank pages, Warning on same page as §4.2).
+
+## Technical notes
+
+- Unpack with `extract_document.py`, edit `word/document.xml` (remove `<w:br w:type="page"/>` and section-break runs at the two locations; add `<w:keepNext/>` / `<w:keepLines/>` to the relevant `<w:pPr>`), swap the binary in `word/media/`, repack with `repack_document.py`.
+- Validate with LibreOffice → PDF → page images and inspect pages 7–11 plus the login page before delivering.
