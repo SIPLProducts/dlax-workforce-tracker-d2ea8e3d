@@ -609,12 +609,13 @@ function ContractorsPage() {
         </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Company Name</TableHead><TableHead>Contract Type</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {filtered.map((c) => (
                 <TableRow key={c.id} data-row-id={c.id}>
                   <TableCell className="font-mono text-xs">{c.contractor_code || "—"}</TableCell>
                   <TableCell className="font-medium">{c.company_name}</TableCell>
+                  <TableCell><span className={`text-xs px-2 py-0.5 rounded ${c.contract_type === "nmr" ? "bg-amber-100 text-amber-900" : "bg-blue-100 text-blue-900"}`}>{c.contract_type === "nmr" ? "NMR" : "Item Rate"}</span></TableCell>
                   <TableCell>{c.contact_person || "—"}</TableCell>
                   <TableCell>{c.phone || "—"}</TableCell>
                   <TableCell>{c.contact_number || "—"}</TableCell>
@@ -624,7 +625,7 @@ function ContractorsPage() {
                   <TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => handleEdit(c)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
