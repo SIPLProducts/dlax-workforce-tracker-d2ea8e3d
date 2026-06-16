@@ -1023,7 +1023,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                     </TableCell>
                     {matrix.columns.map((c) => {
                       const v = c.kind === "day" ? p.dayVals[c.key] || 0
-                        : c.kind === "avg" ? p.weekAvgs[c.key] || 0
+                        : c.kind === "avg" ? p.weekAvgs[c.key]
                         : p.monthTotal;
                       return (
                         <TableCell
@@ -1033,7 +1033,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                             c.kind === "avg" && "bg-muted/40",
                             c.kind === "month" && "bg-primary/10 font-semibold",
                           )}
-                        >{v.toLocaleString()}</TableCell>
+                        >{v == null ? "—" : v.toLocaleString()}</TableCell>
                       );
                     })}
                   </TableRow>
