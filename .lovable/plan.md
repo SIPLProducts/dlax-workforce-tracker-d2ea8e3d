@@ -1,33 +1,51 @@
-# Summary Report Tab
+# Summary Report — May'26 Sheet Format
 
-Add a new **Summary** tab on `/reports`, placed immediately after the **Daily Labour Report** tab. It reuses the same Daily Labour data source so totals stay in sync with the DLR.
+Add a new **Summary Report** view (alongside Daily Labour Report on `/reports`) that renders daily approved headcount in the exact matrix layout of the uploaded May'26 sheet — projects as rows, days as columns, with weekly average columns and a monthly total column. All numbers computed dynamically from `daily_manpower`.
 
-## Filters (top of tab)
-- **From Date** (default: start of current month)
+## Filters
+- **From Date** (default: 1st of current month)
 - **To Date** (default: today)
-- **Project** — uses existing `ProjectCombobox`; supports "All Projects" for users with access to multiple
+- **Project**: existing `ProjectCombobox` with "All Projects" (matches the multi-project rows in the sheet); selecting one project shows just that row.
 
-## Metrics shown
-For the selected range and project filter:
+## Layout (mirrors the screenshot)
 
-1. **KPI cards (top row)**
-   - Total Labour Count (sum of headcount across all daily entries in range)
-   - Average Labour per Week (total labour ÷ number of ISO weeks covered in range)
-   - Total Labour for the Month (sum for the calendar month containing To Date, intersected with available data)
+```text
+Header:  KPC Projects Limited
+         Manpower engaged for <From> – <To>
 
-2. **Project-wise Summary table**
-   | Project | Total Labour | Avg Labour / Week | Total Labour (Month of To Date) | Days Reported |
-   - One row per project (respects project filter — single row if a specific project chosen, otherwise all accessible projects)
-   - Sortable; bottom "Total" row
+Columns: S.No │ Project Name │ <Day1> <Day2> … <Day7> │ Avg Week-N │ <Day8> … │ Avg Week-N+1 │ … │ Total Labour for the Month
+Rows:    One row per project (only the "Total" line — no Item Rate / NMR split)
+         Bottom "Grand Total" row summing every column
+```
+
+- **Daily cell** = sum of approved `daily_manpower.headcount` for that project on that day (0 if none).
+- **Weekly average column** inserted after every 7 day-columns, labelled `Average per Week-NN` using ISO week number of the last day in that block. Value = mean of those 7 daily cells.
+- **Monthly Total column** = sum of all daily cells in the selected range for that project (the sheet calls it "Total labour for the month").
+- **S.No** = sequential 1..N for the projects with any data in range.
 
 ## Data source
-- Queries `daily_manpower` filtered by `entry_date` between From/To and optional `project_id`, joined to `projects` for names.
-- Only `status = 'approved'` entries are counted (matches DLR semantics).
-- Aggregation done client-side in `useMemo` from the same fetch the page already does (extended to honor the date range when on Summary tab).
+Single query:
+```ts
+supabase.from('daily_manpower')
+  .select('entry_date, headcount, project_id, projects(name, code)')
+  .gte('entry_date', from).lte('entry_date', to)
+  .eq('status','approved')
+  .maybeEq('project_id', selected)  // when not "All"
+```
+Aggregate client-side in `useMemo` into a `Map<projectId, Map<dateISO, total>>`, then render.
 
-## Files touched
-- `src/routes/reports.tsx` — add `TabsTrigger value="summary"`, render new `<SummaryReport />` section, add a small inline component for the KPI cards + table. No new routes, no DB changes.
+## UX
+- Tabs on `/reports`: keep existing tabs; add (or replace the previously-added) **Summary** tab.
+- Sticky left columns (S.No, Project Name) and sticky header row for horizontal scroll.
+- Weekly-avg columns highlighted with a subtle bg; Monthly Total column bold.
+- **Excel export** button — generates an `.xlsx` matching this layout (header rows, merged title, weekly-avg columns, totals) via the existing xlsx export pattern used elsewhere.
+- Empty state when no approved data in range.
+
+## Files
+- `src/routes/reports.tsx` — add/replace the `SummaryTab` component with the new matrix layout and export handler.
+- No DB changes, no new routes, no schema additions.
 
 ## Out of scope
-- Excel export for Summary (can be added later if requested)
-- Contractor/department breakdowns inside Summary (those exist on the Project/Contractor tabs)
+- Item Rate vs NMR split (no field exists for it; would need a new column on `contractors`).
+- Contractor / department / category breakdowns inside Summary.
+- Editing approval status from this view.
