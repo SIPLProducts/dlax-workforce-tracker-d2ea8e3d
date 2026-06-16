@@ -56,7 +56,7 @@ function ContractorsPage() {
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" });
+  const [form, setForm] = useState({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "", contract_type: "item_rate" as "item_rate" | "nmr" });
   const [search, setSearch] = useState("");
 
   // Dashboard state
