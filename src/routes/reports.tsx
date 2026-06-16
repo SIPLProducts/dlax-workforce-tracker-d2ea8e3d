@@ -914,7 +914,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
       const row: any[] = [i + 1, p.code ? `[${p.code}] ${p.name}` : p.name];
       for (const c of matrix.columns) {
         if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
-        else if (c.kind === "avg") row.push(p.weekAvgs[c.key] || 0);
+        else if (c.kind === "avg") row.push(p.weekAvgs[c.key] ?? "");
         else row.push(p.monthTotal);
       }
       return row;
