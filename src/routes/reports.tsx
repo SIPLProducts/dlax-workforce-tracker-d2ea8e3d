@@ -920,7 +920,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
       return row;
     });
     const totalRow: any[] = ["", "Grand Total"];
-    for (const c of matrix.columns) totalRow.push(matrix.colTotals[c.key] || 0);
+    for (const c of matrix.columns) totalRow.push(matrix.colTotals[c.key] ?? "");
 
     const aoa = [header1, header2, [], head, ...body, totalRow];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
