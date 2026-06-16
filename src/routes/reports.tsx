@@ -897,7 +897,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
     const avgPerWeek = totalDays > 0 ? Math.round((totalLabour / (totalDays / 7)) * 10) / 10 : 0;
 
     return { columns, projectRows, colTotals, totalLabour, avgPerWeek, grandMonth, weeks: Math.round((totalDays / 7) * 10) / 10 };
-  }, [rows, dateFrom, dateTo]);
+  }, [rows, dateFrom, dateTo, projects, projectId]);
 
   const exportXlsx = async () => {
     const XLSX = await import("xlsx");
