@@ -829,6 +829,13 @@ function SummaryTab({ projects }: { projects: any[] }) {
 
     // Aggregate: project -> dateKey -> total headcount
     const byProject = new Map<string, { id: string; name: string; code: string; daily: Map<string, number> }>();
+    // Seed from selected projects so rows appear even with no data
+    const seedProjects = projectId === "all"
+      ? projects
+      : projects.filter((p: any) => p.id === projectId);
+    for (const p of seedProjects) {
+      byProject.set(p.id, { id: p.id, name: p.name || "—", code: p.code || "", daily: new Map() });
+    }
     for (const r of rows) {
       const pid = r.project_id || "—";
       const p: any = r.projects;
@@ -847,27 +854,41 @@ function SummaryTab({ projects }: { projects: any[] }) {
           dayVals[k] = v;
           monthTotal += v;
         }
-        const weekAvgs: Record<string, number> = {};
+        const weekAvgs: Record<string, number | null> = {};
         for (const g of weekGroups) {
-          const sum = g.dayKeys.reduce((s, k) => s + (dayVals[k] || 0), 0);
-          weekAvgs[`avg-${g.weekKey}`] = g.dayKeys.length ? Math.round((sum / g.dayKeys.length) * 10) / 10 : 0;
+          let sum = 0;
+          let cnt = 0;
+          for (const k of g.dayKeys) {
+            const v = dayVals[k] || 0;
+            if (v > 0) { sum += v; cnt += 1; }
+          }
+          weekAvgs[`avg-${g.weekKey}`] = cnt > 0 ? Math.round((sum / cnt) * 10) / 10 : null;
         }
         return { ...p, dayVals, weekAvgs, monthTotal };
       })
-      .filter((p) => p.monthTotal > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Grand totals per column
-    const colTotals: Record<string, number> = {};
+    // Grand totals per column (avg across all approved entries that week, ignoring empty days)
+    const colTotals: Record<string, number | null> = {};
     let grandMonth = 0;
     for (const c of columns) {
       if (c.kind === "day") {
         colTotals[c.key] = projectRows.reduce((s, p) => s + (p.dayVals[c.key] || 0), 0);
       } else if (c.kind === "avg") {
-        colTotals[c.key] = Math.round(projectRows.reduce((s, p) => s + (p.weekAvgs[c.key] || 0), 0) * 10) / 10;
+        const group = weekGroups.find((g) => `avg-${g.weekKey}` === c.key)!;
+        let sum = 0;
+        let cnt = 0;
+        for (const p of projectRows) {
+          for (const k of group.dayKeys) {
+            const v = p.dayVals[k] || 0;
+            if (v > 0) { sum += v; cnt += 1; }
+          }
+        }
+        colTotals[c.key] = cnt > 0 ? Math.round((sum / cnt) * 10) / 10 : null;
       } else {
-        colTotals[c.key] = projectRows.reduce((s, p) => s + p.monthTotal, 0);
-        grandMonth = colTotals[c.key];
+        const total = projectRows.reduce((s, p) => s + p.monthTotal, 0);
+        colTotals[c.key] = total;
+        grandMonth = total;
       }
     }
 
