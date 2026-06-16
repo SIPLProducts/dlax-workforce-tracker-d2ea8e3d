@@ -244,11 +244,11 @@ function ContractorsPage() {
       }
 
       toast.success(editing ? "Updated" : "Created");
-      setOpen(false); setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); load();
+      setOpen(false); setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "", contract_type: "item_rate" }); load();
     } catch (err: any) { toast.error(err.message); }
   };
 
-  const handleEdit = (c: any) => { if (!requireEdit()) return; setEditing(c); setForm({ contractor_code: c.contractor_code || "", company_name: c.company_name, contact_person: c.contact_person || "", phone: c.phone || "", license_number: c.license_number || "", contact_number: c.contact_number || "", work_place: c.work_place || "", nature_of_work: c.nature_of_work || "" }); setOpen(true); };
+  const handleEdit = (c: any) => { if (!requireEdit()) return; setEditing(c); setForm({ contractor_code: c.contractor_code || "", company_name: c.company_name, contact_person: c.contact_person || "", phone: c.phone || "", license_number: c.license_number || "", contact_number: c.contact_number || "", work_place: c.work_place || "", nature_of_work: c.nature_of_work || "", contract_type: (c.contract_type === "nmr" ? "nmr" : "item_rate") }); setOpen(true); };
   const handleDelete = async (id: string) => { if (!requireEdit()) return; if (!confirm("Delete?")) return; await supabase.from("contractors").delete().eq("id", id); toast.success("Deleted"); load(); };
   const filtered = items.filter((c) => c.company_name.toLowerCase().includes(search.toLowerCase()));
 
