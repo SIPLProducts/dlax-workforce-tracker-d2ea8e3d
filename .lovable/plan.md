@@ -1,44 +1,33 @@
-# Email Configuration & Forgot Password
+# Summary Report Tab
 
-Add an admin-only Email Configuration screen that stores SMTP credentials, and wire a Forgot Password flow that uses those credentials to send reset links via the user's own SMTP server.
+Add a new **Summary** tab on `/reports`, placed immediately after the **Daily Labour Report** tab. It reuses the same Daily Labour data source so totals stay in sync with the DLR.
 
-## Why a Supabase Edge Function (not a TanStack server function)
-The app's TanStack server runtime is Cloudflare Workers, which cannot open raw SMTP/TCP sockets. To send via the user's SMTP host (Gmail, Office365, custom), we need a Deno-based Supabase Edge Function using `denomailer`. The rest of the app stays on TanStack server functions.
+## Filters (top of tab)
+- **From Date** (default: start of current month)
+- **To Date** (default: today)
+- **Project** — uses existing `ProjectCombobox`; supports "All Projects" for users with access to multiple
 
-## 1. Database (migration)
-- `email_config` table (single row, `id = 'default'`):
-  - `smtp_host text`, `smtp_port int`, `encryption text` ('none'|'ssl'|'tls'), `username text`, `from_email text`, `from_name text`, `app_password_encrypted text` (stored via edge fn; UI only sets it), `enabled bool`, `cc_recipients text[]`, `updated_at`, `updated_by`
-  - RLS: only `admin` (or `email_config` screen edit) can SELECT/UPSERT; password column never returned to client (use a view `email_config_public` that omits it).
-- Add `email` column already exists on `profiles` — verify and ensure it's kept in sync with `auth.users.email` (it is, via `handle_new_user`).
-- New screen key `email_config` in screen permissions catalog.
+## Metrics shown
+For the selected range and project filter:
 
-## 2. Supabase Edge Functions
-- `send-email` — Reads `email_config` with service role, sends via `denomailer` SMTP. Inputs: `{ to, subject, html, cc? }`. Used by both test-send and password-reset.
-- `send-password-reset` — Input: `{ email }`. Looks up user via admin API, generates a recovery link with `supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: '<origin>/reset-password' } })`, then calls `send-email` with a branded HTML template. Always returns 200 (no user enumeration).
-- `test-smtp` — Sends a test email to a chosen address using current form values (so admin can verify before saving) OR saved config.
-- All functions: rate-limit basic + input validation with Zod.
-- `config.toml` entries: `verify_jwt = true` for `send-password-reset` is OFF (public), the others ON (admin only, verified inside).
+1. **KPI cards (top row)**
+   - Total Labour Count (sum of headcount across all daily entries in range)
+   - Average Labour per Week (total labour ÷ number of ISO weeks covered in range)
+   - Total Labour for the Month (sum for the calendar month containing To Date, intersected with available data)
 
-## 3. Frontend
-- New route `src/routes/_authenticated/email-config.tsx` (admin only) with tabs matching the screenshot:
-  - **No Reply Email Configuration** (the system sender used by forgot-password).
-  - Fields: Enable toggle, SMTP Host, Port, Encryption (None/SSL 465/TLS 587), Username, App Password (masked, "leave empty to keep existing"), From Email, From Name, CC Recipients (chip input), Send Test To + "Send Test Email" + "Save Configuration".
-- Sidebar entry under Settings/Masters: "Email Configuration" (admin only).
-- New public route `src/routes/forgot-password.tsx` — email input → calls `send-password-reset`. Always shows success message.
-- New public route `src/routes/reset-password.tsx` — handles Supabase recovery token in URL hash, calls `supabase.auth.updateUser({ password })`, redirects to /login.
-- Login page: add "Forgot password?" link.
+2. **Project-wise Summary table**
+   | Project | Total Labour | Avg Labour / Week | Total Labour (Month of To Date) | Days Reported |
+   - One row per project (respects project filter — single row if a specific project chosen, otherwise all accessible projects)
+   - Sortable; bottom "Total" row
 
-## 4. Security
-- App password stored only server-side; never returned to client. UI shows masked placeholder; empty input on save = keep existing.
-- `send-password-reset` is public but rate-limited and always returns generic success.
-- Admin-only check inside `test-smtp` and `send-email` via JWT + `has_role(uid,'admin')`.
+## Data source
+- Queries `daily_manpower` filtered by `entry_date` between From/To and optional `project_id`, joined to `projects` for names.
+- Only `status = 'approved'` entries are counted (matches DLR semantics).
+- Aggregation done client-side in `useMemo` from the same fetch the page already does (extended to honor the date range when on Summary tab).
 
-## Technical details
-- Edge function deps: `https://deno.land/x/denomailer/mod.ts`.
-- TLS=587 uses STARTTLS, SSL=465 uses implicit TLS — denomailer `connection.tls` flag.
-- Password column encrypted at rest using `pgsodium` is overkill; we store as plain text in a column protected by RLS + omitted from client view (acceptable; document tradeoff).
-- Reset link uses Supabase `generateLink` recovery flow; lands on our `/reset-password` page where the hash sets the session.
+## Files touched
+- `src/routes/reports.tsx` — add `TabsTrigger value="summary"`, render new `<SummaryReport />` section, add a small inline component for the KPI cards + table. No new routes, no DB changes.
 
 ## Out of scope
-- Per-user SMTP (only the "No Reply" sender from the screenshot).
-- Email templates editor (single hard-coded reset template; CC list applied if present).
+- Excel export for Summary (can be added later if requested)
+- Contractor/department breakdowns inside Summary (those exist on the Project/Contractor tabs)

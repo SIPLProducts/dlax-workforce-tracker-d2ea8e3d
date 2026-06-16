@@ -268,19 +268,17 @@ function ReportsPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-4 sm:flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-5 sm:flex">
           <TabsTrigger value="daily">Daily</TabsTrigger>
           <TabsTrigger value="project">Project</TabsTrigger>
           <TabsTrigger value="contractor">Contractor</TabsTrigger>
           <TabsTrigger value="dlr">Daily Labour Report</TabsTrigger>
+          <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
 
-        {tab === "dlr" ? (
-          <DlrTab projects={projects} />
-        ) : (
-          <></>
-        )}
-        {tab !== "dlr" && (
+        {tab === "dlr" && <DlrTab projects={projects} />}
+        {tab === "summary" && <SummaryTab projects={projects} />}
+        {tab !== "dlr" && tab !== "summary" && (
         <>
 
 
@@ -749,6 +747,166 @@ function DlrTab({ projects }: { projects: any[] }) {
             <p className="text-sm text-muted-foreground">Loading…</p>
           )}
           {projectId && !loading && matrix && <DlrDailyPreview matrix={matrix} />}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SummaryTab({ projects }: { projects: any[] }) {
+  const [dateFrom, setDateFrom] = useState<Date>(startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date>(new Date());
+  const [projectId, setProjectId] = useState<string>("all");
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      let q = supabase
+        .from("daily_manpower")
+        .select("entry_date, headcount, project_id, projects(name, code)")
+        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
+      if (projectId !== "all") q = q.eq("project_id", projectId);
+      const { data, error } = await q;
+      if (cancelled) return;
+      if (error) { console.error(error); setRows([]); }
+      else setRows(data || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [dateFrom, dateTo, projectId]);
+
+  const summary = useMemo(() => {
+    const msDay = 86400000;
+    const days = Math.max(1, Math.round((dateTo.getTime() - dateFrom.getTime()) / msDay) + 1);
+    const weeks = Math.max(1, days / 7);
+    const monthStart = startOfMonth(dateTo);
+    const monthStartStr = format(monthStart, "yyyy-MM-dd");
+    const monthEndStr = format(dateTo, "yyyy-MM-dd");
+
+    const map = new Map<string, { id: string; name: string; code: string; total: number; monthTotal: number; days: Set<string> }>();
+    let grandTotal = 0;
+    let grandMonth = 0;
+    for (const r of rows) {
+      const pid = r.project_id || "—";
+      const hc = r.headcount || 0;
+      const p: any = r.projects;
+      if (!map.has(pid)) map.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", total: 0, monthTotal: 0, days: new Set() });
+      const row = map.get(pid)!;
+      row.total += hc;
+      row.days.add(r.entry_date);
+      grandTotal += hc;
+      if (r.entry_date >= monthStartStr && r.entry_date <= monthEndStr) {
+        row.monthTotal += hc;
+        grandMonth += hc;
+      }
+    }
+    const projectRows = Array.from(map.values())
+      .map((r) => ({ ...r, avgPerWeek: Math.round(r.total / weeks) }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      projectRows,
+      grandTotal,
+      grandMonth,
+      avgPerWeek: Math.round(grandTotal / weeks),
+      weeks: Math.round(weeks * 10) / 10,
+    };
+  }, [rows, dateFrom, dateTo]);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Summary Report</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
+            <DatePicker value={dateFrom} onChange={setDateFrom} label="From Date" />
+            <DatePicker value={dateTo} onChange={setDateTo} label="To Date" />
+            <div className="space-y-1 min-w-0">
+              <Label>Project</Label>
+              <ProjectCombobox
+                value={projectId === "all" ? "" : projectId}
+                onChange={(v) => setProjectId(v || "all")}
+                projects={[{ id: "", name: "All Projects", code: "" }, ...projects]}
+                className="w-full"
+                formatLabel={(p) => p.id === "" ? "All Projects" : [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Labour Count</CardTitle>
+                <Users className="h-5 w-5 text-primary" />
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold tabular-nums">{summary.grandTotal.toLocaleString()}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Avg Labour / Week</CardTitle>
+                <TrendingUp className="h-5 w-5 text-chart-3" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold tabular-nums">{summary.avgPerWeek.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">over {summary.weeks} weeks</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Labour (Month of {format(dateTo, "MMM yyyy")})</CardTitle>
+                <CalendarDays className="h-5 w-5 text-chart-4" />
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold tabular-nums">{summary.grandMonth.toLocaleString()}</div></CardContent>
+            </Card>
+          </div>
+
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead className="text-right">Total Labour</TableHead>
+                  <TableHead className="text-right">Avg / Week</TableHead>
+                  <TableHead className="text-right">Total ({format(dateTo, "MMM yyyy")})</TableHead>
+                  <TableHead className="text-right">Days Reported</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>
+                )}
+                {!loading && summary.projectRows.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No data in selected range</TableCell></TableRow>
+                )}
+                {!loading && summary.projectRows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.code || "—"}</TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">{r.total.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.avgPerWeek.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.monthTotal.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.days.size}</TableCell>
+                  </TableRow>
+                ))}
+                {!loading && summary.projectRows.length > 0 && (
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell colSpan={2}>Total</TableCell>
+                    <TableCell className="text-right tabular-nums">{summary.grandTotal.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{summary.avgPerWeek.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{summary.grandMonth.toLocaleString()}</TableCell>
+                    <TableCell />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
