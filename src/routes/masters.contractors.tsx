@@ -437,13 +437,23 @@ function ContractorsPage() {
               <Upload className="mr-2 h-4 w-4" />Upload
             </Button>
             <Button variant="outline" onClick={handleDownloadData}><Download className="mr-2 h-4 w-4" />Export</Button>
-            <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "" }); } }}>
+            <Dialog open={open} onOpenChange={(o) => { if (o && !requireEdit()) return; setOpen(o); if (!o) { setEditing(null); setForm({ contractor_code: "", company_name: "", contact_person: "", phone: "", license_number: "", contact_number: "", work_place: "", nature_of_work: "", contract_type: "item_rate" }); } }}>
               <DialogTrigger asChild><Button disabled={!projectId}><Plus className="mr-2 h-4 w-4" />Add Contractor</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>{editing ? "Edit" : "Add"} Contractor</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div><Label>Contractor Code</Label><Input value={form.contractor_code} onChange={(e) => setForm({ ...form, contractor_code: e.target.value })} placeholder="e.g. C-001" /></div>
                   <div><Label>Company Name *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
+                  <div>
+                    <Label>Contract Type *</Label>
+                    <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v as "item_rate" | "nmr" })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="item_rate">Item Rate</SelectItem>
+                        <SelectItem value="nmr">NMR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
                   <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                   <div><Label>Contact Number</Label><Input value={form.contact_number} onChange={(e) => setForm({ ...form, contact_number: e.target.value.replace(/\D/g, "").slice(0, 10) })} inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" /></div>
