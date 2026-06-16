@@ -1050,7 +1050,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                           c.kind === "avg" && "bg-muted",
                           c.kind === "month" && "bg-primary/20",
                         )}
-                      >{(matrix.colTotals[c.key] || 0).toLocaleString()}</TableCell>
+                      >{matrix.colTotals[c.key] == null ? "—" : (matrix.colTotals[c.key] as number).toLocaleString()}</TableCell>
                     ))}
                   </TableRow>
                 )}
