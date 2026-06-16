@@ -1,22 +1,35 @@
-## Fixes for Summary Report
+## Problem
+The Summary Report table has two issues when scrolling:
+1. **Header scrolls away** — the `<TableHeader>` is not fixed; it disappears when scrolling down through long project lists.
+2. **Alignment drift** — the outer wrapper and the shadcn `Table` component both define `overflow-x-auto`, creating nested scrollable containers that can cause column misalignment during scroll.
 
-### Issue 1 — "All Projects" shows only 2 projects
-`SummaryTab` builds rows only from `daily_manpower` results, then filters out any project where `monthTotal === 0`. Projects that have no approved entries in the date range are dropped entirely.
+## Fix
+Replace the shadcn `<Table>` usage inside `SummaryTab` with a plain `<table>` wrapped in a single scrollable container that handles both horizontal and vertical overflow.
 
-**Fix:** When "All Projects" is selected, seed the project list from the `projects` prop (which already holds every project the user can see) so every project appears as a row, with zeros across the date columns when there's no manpower data. When a specific project is selected, show just that project (even if its total is 0). Remove the `monthTotal > 0` filter.
+### Changes in `src/routes/reports.tsx` (SummaryTab JSX, ~lines 983–1058)
 
-Grand Total row and KPI cards (Total Labour, Avg Labour/Week, Total Labour for the Month) keep using actual `daily_manpower` data, so the numbers don't change — only more rows are rendered.
+1. **Remove the outer `overflow-x-auto` div** and replace it with a container that has both vertical and horizontal scroll, plus a max height:
+   ```
+   <div className="rounded-md border max-h-[60vh] overflow-auto">
+   ```
 
-### Issue 2 — Weekly average shows 0
-The current formula divides the week's sum by `dayKeys.length` (the number of days in that ISO week that fall within the selected range). For a week with no entries, that's `0 / 7 = 0`, which is mathematically correct but not what's useful in the Excel template — the May'26 sheet averages only over days that actually had labour.
+2. **Render a native `<table>` instead of shadcn `<Table>`** so we control the wrapper and avoid nested `overflow-x-auto`.
 
-**Fix:** Compute the weekly average as `sum / count_of_days_with_headcount > 0` within that week. If no day in the week has any data, show `—` (or blank) instead of `0`, so empty weeks are visually distinct from "averaged to zero". Apply the same rule to the Grand Total avg cell and to the Excel export.
+3. **Make `<thead>` sticky at the top:**
+   ```
+   <thead className="sticky top-0 z-20 bg-background">
+   ```
 
-### Files
-- `src/routes/reports.tsx` — update `SummaryTab` only:
-  - seed `byProject` from `projects` prop when `projectId === "all"` (or just from the selected project)
-  - drop the `monthTotal > 0` filter; sort by project name
-  - change weekly average denominator to "days-with-data" and render blank when denominator is 0
-  - mirror the same blank-on-empty logic in the `exportXlsx` builder
+4. **Make the first two header cells doubly sticky** (top + left) with a higher z-index so they stay visible over both row data and the header bar:
+   - S.No header: `sticky left-0 top-0 z-30 bg-background`
+   - Project Name header: `sticky left-14 top-0 z-30 bg-background`
 
-No DB changes, no schema changes, no other files touched.
+5. **Keep data row cells as they are** (`sticky left-0 z-10` and `sticky left-14 z-10`) so the first two columns remain pinned during horizontal scroll.
+
+6. **Preserve all existing data logic** — columns, rows, totals, and null handling stay unchanged.
+
+### Result
+- Scrolling down keeps the header row fixed at the top.
+- Scrolling right keeps the first two columns fixed at the left.
+- A single overflow container eliminates nested-scroll alignment drift.
+- Only the data rows scroll vertically; the header remains visible.
