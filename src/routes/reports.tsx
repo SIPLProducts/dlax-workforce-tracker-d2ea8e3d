@@ -753,6 +753,20 @@ function DlrTab({ projects }: { projects: any[] }) {
   );
 }
 
+function isoWeek(d: Date): { year: number; week: number } {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: t.getUTCFullYear(), week };
+}
+
+type SummaryColumn =
+  | { kind: "day"; date: Date; key: string }
+  | { kind: "avg"; week: number; key: string }
+  | { kind: "month"; key: string };
+
 function SummaryTab({ projects }: { projects: any[] }) {
   const [dateFrom, setDateFrom] = useState<Date>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date>(new Date());
@@ -768,7 +782,8 @@ function SummaryTab({ projects }: { projects: any[] }) {
         .from("daily_manpower")
         .select("entry_date, headcount, project_id, projects(name, code)")
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))
+        .eq("status", "approved");
       if (projectId !== "all") q = q.eq("project_id", projectId);
       const { data, error } = await q;
       if (cancelled) return;
@@ -779,49 +794,127 @@ function SummaryTab({ projects }: { projects: any[] }) {
     return () => { cancelled = true; };
   }, [dateFrom, dateTo, projectId]);
 
-  const summary = useMemo(() => {
-    const msDay = 86400000;
-    const days = Math.max(1, Math.round((dateTo.getTime() - dateFrom.getTime()) / msDay) + 1);
-    const weeks = Math.max(1, days / 7);
-    const monthStart = startOfMonth(dateTo);
-    const monthStartStr = format(monthStart, "yyyy-MM-dd");
-    const monthEndStr = format(dateTo, "yyyy-MM-dd");
+  const matrix = useMemo(() => {
+    // Build day list
+    const days: Date[] = [];
+    const cur = new Date(dateFrom);
+    cur.setHours(0, 0, 0, 0);
+    const end = new Date(dateTo);
+    end.setHours(0, 0, 0, 0);
+    while (cur <= end) { days.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
 
-    const map = new Map<string, { id: string; name: string; code: string; total: number; monthTotal: number; days: Set<string> }>();
-    let grandTotal = 0;
-    let grandMonth = 0;
+    // Build columns: days, with an avg column inserted at each ISO week boundary
+    const columns: SummaryColumn[] = [];
+    const weekGroups: { weekKey: string; week: number; dayKeys: string[] }[] = [];
+    let curGroup: { weekKey: string; week: number; dayKeys: string[] } | null = null;
+    for (const d of days) {
+      const { year, week } = isoWeek(d);
+      const wKey = `${year}-W${week}`;
+      const dKey = format(d, "yyyy-MM-dd");
+      if (!curGroup || curGroup.weekKey !== wKey) {
+        if (curGroup) {
+          columns.push({ kind: "avg", week: curGroup.week, key: `avg-${curGroup.weekKey}` });
+          weekGroups.push(curGroup);
+        }
+        curGroup = { weekKey: wKey, week, dayKeys: [] };
+      }
+      columns.push({ kind: "day", date: d, key: dKey });
+      curGroup.dayKeys.push(dKey);
+    }
+    if (curGroup) {
+      columns.push({ kind: "avg", week: curGroup.week, key: `avg-${curGroup.weekKey}` });
+      weekGroups.push(curGroup);
+    }
+    columns.push({ kind: "month", key: "month-total" });
+
+    // Aggregate: project -> dateKey -> total headcount
+    const byProject = new Map<string, { id: string; name: string; code: string; daily: Map<string, number> }>();
     for (const r of rows) {
       const pid = r.project_id || "—";
-      const hc = r.headcount || 0;
       const p: any = r.projects;
-      if (!map.has(pid)) map.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", total: 0, monthTotal: 0, days: new Set() });
-      const row = map.get(pid)!;
-      row.total += hc;
-      row.days.add(r.entry_date);
-      grandTotal += hc;
-      if (r.entry_date >= monthStartStr && r.entry_date <= monthEndStr) {
-        row.monthTotal += hc;
-        grandMonth += hc;
+      if (!byProject.has(pid)) byProject.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", daily: new Map() });
+      const proj = byProject.get(pid)!;
+      proj.daily.set(r.entry_date, (proj.daily.get(r.entry_date) || 0) + (r.headcount || 0));
+    }
+
+    const projectRows = Array.from(byProject.values())
+      .map((p) => {
+        const dayVals: Record<string, number> = {};
+        let monthTotal = 0;
+        for (const d of days) {
+          const k = format(d, "yyyy-MM-dd");
+          const v = p.daily.get(k) || 0;
+          dayVals[k] = v;
+          monthTotal += v;
+        }
+        const weekAvgs: Record<string, number> = {};
+        for (const g of weekGroups) {
+          const sum = g.dayKeys.reduce((s, k) => s + (dayVals[k] || 0), 0);
+          weekAvgs[`avg-${g.weekKey}`] = g.dayKeys.length ? Math.round((sum / g.dayKeys.length) * 10) / 10 : 0;
+        }
+        return { ...p, dayVals, weekAvgs, monthTotal };
+      })
+      .filter((p) => p.monthTotal > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    // Grand totals per column
+    const colTotals: Record<string, number> = {};
+    let grandMonth = 0;
+    for (const c of columns) {
+      if (c.kind === "day") {
+        colTotals[c.key] = projectRows.reduce((s, p) => s + (p.dayVals[c.key] || 0), 0);
+      } else if (c.kind === "avg") {
+        colTotals[c.key] = Math.round(projectRows.reduce((s, p) => s + (p.weekAvgs[c.key] || 0), 0) * 10) / 10;
+      } else {
+        colTotals[c.key] = projectRows.reduce((s, p) => s + p.monthTotal, 0);
+        grandMonth = colTotals[c.key];
       }
     }
-    const projectRows = Array.from(map.values())
-      .map((r) => ({ ...r, avgPerWeek: Math.round(r.total / weeks) }))
-      .sort((a, b) => b.total - a.total);
 
-    return {
-      projectRows,
-      grandTotal,
-      grandMonth,
-      avgPerWeek: Math.round(grandTotal / weeks),
-      weeks: Math.round(weeks * 10) / 10,
-    };
+    const totalLabour = projectRows.reduce((s, p) => s + p.monthTotal, 0);
+    const totalDays = days.length;
+    const avgPerWeek = totalDays > 0 ? Math.round((totalLabour / (totalDays / 7)) * 10) / 10 : 0;
+
+    return { columns, projectRows, colTotals, totalLabour, avgPerWeek, grandMonth, weeks: Math.round((totalDays / 7) * 10) / 10 };
   }, [rows, dateFrom, dateTo]);
+
+  const exportXlsx = async () => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const header1: any[] = ["KPC Projects Limited"];
+    const header2: any[] = [`Manpower engaged from ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`];
+    const head: any[] = ["S.No", "Project Name"];
+    for (const c of matrix.columns) {
+      if (c.kind === "day") head.push(format(c.date, "M/d/yyyy"));
+      else if (c.kind === "avg") head.push(`Avg Week-${c.week}`);
+      else head.push("Total Labour for the Month");
+    }
+    const body = matrix.projectRows.map((p, i) => {
+      const row: any[] = [i + 1, p.code ? `[${p.code}] ${p.name}` : p.name];
+      for (const c of matrix.columns) {
+        if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
+        else if (c.kind === "avg") row.push(p.weekAvgs[c.key] || 0);
+        else row.push(p.monthTotal);
+      }
+      return row;
+    });
+    const totalRow: any[] = ["", "Grand Total"];
+    for (const c of matrix.columns) totalRow.push(matrix.colTotals[c.key] || 0);
+
+    const aoa = [header1, header2, [], head, ...body, totalRow];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, "Summary");
+    XLSX.writeFile(wb, `summary-${format(dateFrom, "yyyyMMdd")}-${format(dateTo, "yyyyMMdd")}.xlsx`);
+  };
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Summary Report</CardTitle>
+          <Button size="sm" variant="outline" onClick={exportXlsx} disabled={loading || matrix.projectRows.length === 0}>
+            <Download className="h-4 w-4 mr-2" />Export Excel
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
@@ -845,7 +938,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Labour Count</CardTitle>
                 <Users className="h-5 w-5 text-primary" />
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold tabular-nums">{summary.grandTotal.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold tabular-nums">{matrix.totalLabour.toLocaleString()}</div></CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -853,55 +946,91 @@ function SummaryTab({ projects }: { projects: any[] }) {
                 <TrendingUp className="h-5 w-5 text-chart-3" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold tabular-nums">{summary.avgPerWeek.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">over {summary.weeks} weeks</p>
+                <div className="text-2xl font-bold tabular-nums">{matrix.avgPerWeek.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">over {matrix.weeks} weeks</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Labour (Month of {format(dateTo, "MMM yyyy")})</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Labour for the Month</CardTitle>
                 <CalendarDays className="h-5 w-5 text-chart-4" />
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold tabular-nums">{summary.grandMonth.toLocaleString()}</div></CardContent>
+              <CardContent><div className="text-2xl font-bold tabular-nums">{matrix.grandMonth.toLocaleString()}</div></CardContent>
             </Card>
           </div>
 
           <div className="rounded-md border overflow-x-auto">
+            <div className="px-4 py-2 border-b bg-muted/30">
+              <div className="font-semibold">KPC Projects Limited</div>
+              <div className="text-sm text-muted-foreground">
+                Manpower engaged from {format(dateFrom, "dd MMM yyyy")} to {format(dateTo, "dd MMM yyyy")}
+              </div>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead className="text-right">Total Labour</TableHead>
-                  <TableHead className="text-right">Avg / Week</TableHead>
-                  <TableHead className="text-right">Total ({format(dateTo, "MMM yyyy")})</TableHead>
-                  <TableHead className="text-right">Days Reported</TableHead>
+                  <TableHead className="sticky left-0 bg-background z-10 w-14">S.No</TableHead>
+                  <TableHead className="sticky left-14 bg-background z-10 min-w-[200px]">Project Name</TableHead>
+                  {matrix.columns.map((c) => (
+                    <TableHead
+                      key={c.key}
+                      className={cn(
+                        "text-right whitespace-nowrap",
+                        c.kind === "avg" && "bg-muted/40",
+                        c.kind === "month" && "bg-primary/10 font-semibold",
+                      )}
+                    >
+                      {c.kind === "day" && format(c.date, "d/M")}
+                      {c.kind === "avg" && `Avg W-${c.week}`}
+                      {c.kind === "month" && "Month Total"}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={2 + matrix.columns.length} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>
                 )}
-                {!loading && summary.projectRows.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No data in selected range</TableCell></TableRow>
+                {!loading && matrix.projectRows.length === 0 && (
+                  <TableRow><TableCell colSpan={2 + matrix.columns.length} className="text-center text-muted-foreground py-8">No approved data in selected range</TableCell></TableRow>
                 )}
-                {!loading && summary.projectRows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.code || "—"}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">{r.total.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.avgPerWeek.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.monthTotal.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.days.size}</TableCell>
+                {!loading && matrix.projectRows.map((p, i) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="sticky left-0 bg-background z-10 tabular-nums">{i + 1}</TableCell>
+                    <TableCell className="sticky left-14 bg-background z-10 font-medium whitespace-nowrap">
+                      {p.code ? <span className="text-muted-foreground mr-1">[{p.code}]</span> : null}{p.name}
+                    </TableCell>
+                    {matrix.columns.map((c) => {
+                      const v = c.kind === "day" ? p.dayVals[c.key] || 0
+                        : c.kind === "avg" ? p.weekAvgs[c.key] || 0
+                        : p.monthTotal;
+                      return (
+                        <TableCell
+                          key={c.key}
+                          className={cn(
+                            "text-right tabular-nums",
+                            c.kind === "avg" && "bg-muted/40",
+                            c.kind === "month" && "bg-primary/10 font-semibold",
+                          )}
+                        >{v.toLocaleString()}</TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))}
-                {!loading && summary.projectRows.length > 0 && (
-                  <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={2}>Total</TableCell>
-                    <TableCell className="text-right tabular-nums">{summary.grandTotal.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{summary.avgPerWeek.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{summary.grandMonth.toLocaleString()}</TableCell>
-                    <TableCell />
+                {!loading && matrix.projectRows.length > 0 && (
+                  <TableRow className="bg-muted/60 font-semibold">
+                    <TableCell className="sticky left-0 bg-muted/60 z-10" />
+                    <TableCell className="sticky left-14 bg-muted/60 z-10">Grand Total</TableCell>
+                    {matrix.columns.map((c) => (
+                      <TableCell
+                        key={c.key}
+                        className={cn(
+                          "text-right tabular-nums",
+                          c.kind === "avg" && "bg-muted",
+                          c.kind === "month" && "bg-primary/20",
+                        )}
+                      >{(matrix.colTotals[c.key] || 0).toLocaleString()}</TableCell>
+                    ))}
                   </TableRow>
                 )}
               </TableBody>
