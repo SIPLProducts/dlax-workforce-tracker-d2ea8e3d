@@ -1,51 +1,22 @@
-# Summary Report — May'26 Sheet Format
+## Fixes for Summary Report
 
-Add a new **Summary Report** view (alongside Daily Labour Report on `/reports`) that renders daily approved headcount in the exact matrix layout of the uploaded May'26 sheet — projects as rows, days as columns, with weekly average columns and a monthly total column. All numbers computed dynamically from `daily_manpower`.
+### Issue 1 — "All Projects" shows only 2 projects
+`SummaryTab` builds rows only from `daily_manpower` results, then filters out any project where `monthTotal === 0`. Projects that have no approved entries in the date range are dropped entirely.
 
-## Filters
-- **From Date** (default: 1st of current month)
-- **To Date** (default: today)
-- **Project**: existing `ProjectCombobox` with "All Projects" (matches the multi-project rows in the sheet); selecting one project shows just that row.
+**Fix:** When "All Projects" is selected, seed the project list from the `projects` prop (which already holds every project the user can see) so every project appears as a row, with zeros across the date columns when there's no manpower data. When a specific project is selected, show just that project (even if its total is 0). Remove the `monthTotal > 0` filter.
 
-## Layout (mirrors the screenshot)
+Grand Total row and KPI cards (Total Labour, Avg Labour/Week, Total Labour for the Month) keep using actual `daily_manpower` data, so the numbers don't change — only more rows are rendered.
 
-```text
-Header:  KPC Projects Limited
-         Manpower engaged for <From> – <To>
+### Issue 2 — Weekly average shows 0
+The current formula divides the week's sum by `dayKeys.length` (the number of days in that ISO week that fall within the selected range). For a week with no entries, that's `0 / 7 = 0`, which is mathematically correct but not what's useful in the Excel template — the May'26 sheet averages only over days that actually had labour.
 
-Columns: S.No │ Project Name │ <Day1> <Day2> … <Day7> │ Avg Week-N │ <Day8> … │ Avg Week-N+1 │ … │ Total Labour for the Month
-Rows:    One row per project (only the "Total" line — no Item Rate / NMR split)
-         Bottom "Grand Total" row summing every column
-```
+**Fix:** Compute the weekly average as `sum / count_of_days_with_headcount > 0` within that week. If no day in the week has any data, show `—` (or blank) instead of `0`, so empty weeks are visually distinct from "averaged to zero". Apply the same rule to the Grand Total avg cell and to the Excel export.
 
-- **Daily cell** = sum of approved `daily_manpower.headcount` for that project on that day (0 if none).
-- **Weekly average column** inserted after every 7 day-columns, labelled `Average per Week-NN` using ISO week number of the last day in that block. Value = mean of those 7 daily cells.
-- **Monthly Total column** = sum of all daily cells in the selected range for that project (the sheet calls it "Total labour for the month").
-- **S.No** = sequential 1..N for the projects with any data in range.
+### Files
+- `src/routes/reports.tsx` — update `SummaryTab` only:
+  - seed `byProject` from `projects` prop when `projectId === "all"` (or just from the selected project)
+  - drop the `monthTotal > 0` filter; sort by project name
+  - change weekly average denominator to "days-with-data" and render blank when denominator is 0
+  - mirror the same blank-on-empty logic in the `exportXlsx` builder
 
-## Data source
-Single query:
-```ts
-supabase.from('daily_manpower')
-  .select('entry_date, headcount, project_id, projects(name, code)')
-  .gte('entry_date', from).lte('entry_date', to)
-  .eq('status','approved')
-  .maybeEq('project_id', selected)  // when not "All"
-```
-Aggregate client-side in `useMemo` into a `Map<projectId, Map<dateISO, total>>`, then render.
-
-## UX
-- Tabs on `/reports`: keep existing tabs; add (or replace the previously-added) **Summary** tab.
-- Sticky left columns (S.No, Project Name) and sticky header row for horizontal scroll.
-- Weekly-avg columns highlighted with a subtle bg; Monthly Total column bold.
-- **Excel export** button — generates an `.xlsx` matching this layout (header rows, merged title, weekly-avg columns, totals) via the existing xlsx export pattern used elsewhere.
-- Empty state when no approved data in range.
-
-## Files
-- `src/routes/reports.tsx` — add/replace the `SummaryTab` component with the new matrix layout and export handler.
-- No DB changes, no new routes, no schema additions.
-
-## Out of scope
-- Item Rate vs NMR split (no field exists for it; would need a new column on `contractors`).
-- Contractor / department / category breakdowns inside Summary.
-- Editing approval status from this view.
+No DB changes, no schema changes, no other files touched.
