@@ -34,7 +34,7 @@ async function loadConfig(admin: ReturnType<typeof createClient>) {
     .eq("id", "default")
     .maybeSingle();
   if (error) throw new Error("Failed to load email config");
-  if (!data || !data.enabled) throw new Error("Email sending is not enabled");
+  if (!data) throw new Error("Email configuration is not set");
   if (!data.smtp_host || !data.from_email || !data.app_password) {
     throw new Error("Email configuration is incomplete");
   }
