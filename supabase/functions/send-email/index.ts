@@ -67,7 +67,7 @@ async function sendWithSmtp(opts: {
       html: opts.html,
     });
   } finally {
-    await client.close().catch(() => {});
+    try { await client.close(); } catch { /* ignore */ }
   }
   void useStartTls; // denomailer auto-negotiates STARTTLS for non-implicit TLS ports
 }
