@@ -44,6 +44,8 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       loginId,
       password: input.password,
       displayName: (input.displayName || "").trim(),
+      contactEmail: normalizeEmail(input.contactEmail),
+      mobileNo: normalizeMobile(input.mobileNo),
     };
   })
   .handler(async ({ data, context }) => {
@@ -71,6 +73,16 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) {
       throw new Error(`User ID "${data.loginId}" already exists`);
+    }
+
+    // Pre-check: contact_email must be unique
+    const { data: emailExisting } = await admin
+      .from("profiles")
+      .select("user_id")
+      .ilike("contact_email", data.contactEmail)
+      .maybeSingle();
+    if (emailExisting) {
+      throw new Error(`Email "${data.contactEmail}" is already in use`);
     }
 
     const email = `${data.loginId}@dlax.local`;
@@ -104,7 +116,9 @@ export const adminCreateUser = createServerFn({ method: "POST" })
           email,
           login_id: data.loginId,
           display_name: data.displayName || null,
-        },
+          contact_email: data.contactEmail,
+          mobile_no: data.mobileNo,
+        } as any,
         { onConflict: "user_id" },
       );
 
@@ -120,6 +134,8 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       loginId: data.loginId,
       email,
       displayName: data.displayName || null,
+      contactEmail: data.contactEmail,
+      mobileNo: data.mobileNo,
     };
   });
 
