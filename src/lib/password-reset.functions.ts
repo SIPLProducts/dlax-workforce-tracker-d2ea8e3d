@@ -172,13 +172,13 @@ export const verifyPasswordOtpAndReset = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!row) throw new Error("Invalid or expired code");
+    if (error) return { ok: false as const, error: error.message };
+    if (!row) return { ok: false as const, error: "Invalid or expired code" };
     if (new Date(row.expires_at as string).getTime() < Date.now()) {
-      throw new Error("Code has expired. Request a new one.");
+      return { ok: false as const, error: "Code has expired. Request a new one." };
     }
     if ((row.attempts as number) >= 5) {
-      throw new Error("Too many attempts. Request a new code.");
+      return { ok: false as const, error: "Too many attempts. Request a new code." };
     }
 
     if (sha256(data.otp) !== row.otp_hash) {
@@ -186,13 +186,13 @@ export const verifyPasswordOtpAndReset = createServerFn({ method: "POST" })
         .from("password_reset_otps")
         .update({ attempts: (row.attempts as number) + 1 })
         .eq("id", row.id as string);
-      throw new Error("Invalid or expired code");
+      return { ok: false as const, error: "Invalid or expired code" };
     }
 
     const { error: updErr } = await admin.auth.admin.updateUserById(row.user_id as string, {
       password: data.newPassword,
     });
-    if (updErr) throw new Error(updErr.message || "Failed to update password");
+    if (updErr) return { ok: false as const, error: updErr.message || "Failed to update password" };
 
     await admin
       .from("password_reset_otps")
