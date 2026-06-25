@@ -533,6 +533,8 @@ function UsersPage() {
                       <TableRow key={u.user_id} data-row-id={u.user_id}>
                         <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
+                        <TableCell className="text-sm">{u.contact_email || "—"}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">{u.mobile_no || "—"}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
                             {u.custom_role_ids.length === 0 && <span className="text-muted-foreground text-sm">—</span>}
