@@ -191,7 +191,7 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
 
 export const adminUpdateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { userId: string; displayName?: string; password?: string; loginId?: string }) => {
+  .inputValidator((input: { userId: string; displayName?: string; password?: string; loginId?: string; contactEmail?: string; mobileNo?: string | null }) => {
     if (!input.userId || typeof input.userId !== "string") {
       throw new Error("userId is required");
     }
@@ -204,13 +204,21 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
         throw new Error("User ID must be 2-40 chars: letters, numbers, . _ -");
       }
     }
-    if (displayName === undefined && password === undefined && loginId === undefined) {
+    let contactEmail: string | undefined;
+    if (input.contactEmail !== undefined) {
+      contactEmail = normalizeEmail(input.contactEmail);
+    }
+    let mobileNo: string | null | undefined;
+    if (input.mobileNo !== undefined) {
+      mobileNo = normalizeMobile(input.mobileNo);
+    }
+    if (displayName === undefined && password === undefined && loginId === undefined && contactEmail === undefined && mobileNo === undefined) {
       throw new Error("Provide a value to update");
     }
     if (password !== undefined && password.length < 6) {
       throw new Error("Password must be at least 6 characters");
     }
-    return { userId: input.userId, displayName, password, loginId };
+    return { userId: input.userId, displayName, password, loginId, contactEmail, mobileNo };
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
