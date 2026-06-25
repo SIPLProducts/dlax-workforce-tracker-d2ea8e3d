@@ -105,6 +105,11 @@ export function TopBar() {
                 Mode: {mode === "dark" ? "Dark" : "Light"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setChangePwdOpen(true)} className="cursor-pointer">
+                <KeyRound className="h-4 w-4 mr-2" />
+                Change Password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
@@ -113,6 +118,7 @@ export function TopBar() {
           </DropdownMenu>
         </div>
       </div>
+      <ChangePasswordDialog open={changePwdOpen} onOpenChange={setChangePwdOpen} />
     </header>
   );
 }
