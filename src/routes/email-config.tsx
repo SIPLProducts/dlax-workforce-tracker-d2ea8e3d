@@ -314,6 +314,33 @@ function EmailConfigPage() {
             addresses above are added as CC.
           </div>
 
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="space-y-1 text-muted-foreground">
+                <p className="font-medium text-foreground">Using Gmail?</p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  <li>Host <code className="rounded bg-background px-1">smtp.gmail.com</code> · Port <code className="rounded bg-background px-1">587</code> · Encryption <strong>TLS / STARTTLS</strong></li>
+                  <li>Username = your full Gmail address (e.g. <code className="rounded bg-background px-1">name@gmail.com</code>)</li>
+                  <li>Password = a 16-character <strong>App Password</strong>, not your Google account password</li>
+                  <li>
+                    Generate one at{" "}
+                    <a
+                      href="https://myaccount.google.com/apppasswords"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      myaccount.google.com/apppasswords
+                    </a>{" "}
+                    — 2-Step Verification must be ON.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2 sm:max-w-xs sm:flex-1">
               <Label>Send test to</Label>
