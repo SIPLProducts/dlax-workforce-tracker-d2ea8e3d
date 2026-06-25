@@ -13,9 +13,10 @@ import {
 import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
-import { ChevronRight, LogOut, User } from "lucide-react";
+import { ChevronRight, KeyRound, LogOut, User } from "lucide-react";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { useMemo } from "react";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
+import { useMemo, useState } from "react";
 
 const ROUTE_LABELS: Record<string, string> = {
   "": "Dashboard",
