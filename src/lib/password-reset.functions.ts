@@ -51,7 +51,7 @@ async function sendOtpEmail(opts: {
     .eq("id", "default")
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!cfg || !cfg.enabled) throw new Error("Email is not configured. Please contact your administrator.");
+  if (!cfg) throw new Error("Email is not configured. Please contact your administrator.");
   if (!cfg.smtp_host || !cfg.from_email || !cfg.app_password) {
     throw new Error("Email configuration is incomplete. Please contact your administrator.");
   }
