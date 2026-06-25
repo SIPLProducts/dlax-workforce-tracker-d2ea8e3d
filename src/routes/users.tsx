@@ -33,6 +33,8 @@ type UserWithRoles = {
   email: string | null;
   login_id: string | null;
   display_name: string | null;
+  contact_email: string | null;
+  mobile_no: string | null;
   roles: string[];
   custom_role_ids: string[];
   project_ids: string[];
@@ -61,6 +63,8 @@ function UsersPage() {
   const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
   const [editLoginId, setEditLoginId] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
+  const [editContactEmail, setEditContactEmail] = useState("");
+  const [editMobileNo, setEditMobileNo] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -69,6 +73,8 @@ function UsersPage() {
     setEditTarget(u);
     setEditLoginId(u.login_id || "");
     setEditDisplayName(u.display_name || "");
+    setEditContactEmail(u.contact_email || "");
+    setEditMobileNo(u.mobile_no || "");
     setEditPassword("");
   };
 
