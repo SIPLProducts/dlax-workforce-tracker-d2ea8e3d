@@ -1,22 +1,51 @@
-## Problem
+## Goal
 
-Clicking **Send Test Email** returns `Email sending is not enabled`. Root cause:
+Make the existing Email Configuration screen work cleanly with **Gmail SMTP + App Password**, and move the actual sending out of Supabase Edge Functions into a **TanStack server function** so the same code runs on your self-hosted deployment without needing `supabase functions deploy`.
 
-- The edge function `send-email` calls `loadConfig()` which throws when `email_config.enabled = false`.
-- The client only sends an inline SMTP override when the user just typed a new app password. If the password is already saved, it relies on server-side config — which is currently disabled.
-- Result: you can't test SMTP until you flip the toggle and save, which defeats the purpose of a test button.
+## What changes
 
-## Fix
+### 1. New TanStack server function — `src/lib/email.functions.ts`
 
-Edit **`supabase/functions/send-email/index.ts`** only:
+- `sendEmail({ to, subject, html, text?, cc?, smtp? })` — admin-only via `requireSupabaseAuth` + `has_role('admin')` check.
+- Loads SMTP config from `public.email_config` (same row the UI writes to) using the per-request authenticated client; falls back to inline `smtp` override for live test sends.
+- Uses **`nodemailer`** (works on Node, which is what self-hosted will run). `bun add nodemailer @types/nodemailer`.
+- Surfaces real SMTP errors (auth failed, connection refused, etc.) instead of swallowing them.
 
-1. In `loadConfig`, drop the `if (!data.enabled)` check. Keep the completeness check (host / from / password required).
-2. Keep the `enabled` flag meaningful: callers that send *system* emails (password reset, notifications) should check `enabled` themselves before invoking this function. The admin-only test button bypasses that gate intentionally.
+### 2. Update Email Configuration screen — `src/routes/email-config.tsx`
 
-No client changes, no schema changes, no new secrets. The function is already admin-gated, so this doesn't widen access.
+- Replace the `supabase.functions.invoke("send-email", ...)` test-send call with `useServerFn(sendEmail)`.
+- Add a small **Gmail help block** under the SMTP fields:
+  - Host: `smtp.gmail.com` · Port: `587` · Encryption: `TLS / STARTTLS`
+  - Username: your full Gmail address
+  - Password: 16-character **App Password** (not your Google account password)
+  - Link text: "Generate an App Password at myaccount.google.com → Security → 2-Step Verification → App passwords. 2-Step Verification must be ON."
+- No layout changes, no preset button — generic SMTP form stays.
+
+### 3. Retire the edge function path
+
+- Delete `supabase/functions/send-email/` so there's no second sender to keep in sync.
+- Anywhere else in the app that called `supabase.functions.invoke("send-email", ...)` (e.g. password-reset flow if any) is switched to `sendEmail` server fn.
+
+### 4. No schema or secret changes
+
+- `public.email_config` already stores host / port / encryption / username / app_password / from / cc — keep as-is.
+- No new env vars. Credentials stay in the DB so admins keep editing from the UI on both cloud and self-hosted.
+
+## Self-hosted notes
+
+- On your self-hosted server (Node runtime), `nodemailer` opens a normal SMTP socket to `smtp.gmail.com:587` — works out of the box.
+- Same code, same DB row, same UI — nothing extra to deploy alongside Supabase.
+
+## Important limitation to be aware of
+
+On the **Lovable-hosted preview / published site** the server runtime is Cloudflare Workers, which **cannot open raw SMTP sockets**. The "Send Test Email" button will fail there with a connection error. It will work:
+- on your **self-hosted** deployment (real Node), and
+- locally with `bun run dev`.
+
+If you also need test-send to work on the Lovable-hosted preview, the only options are (a) keep the Supabase edge function as a fallback sender, or (b) switch from SMTP to an HTTP email API (Resend, SendGrid, Gmail API w/ OAuth). Say the word and I'll fold one of those in.
 
 ## Verify
 
-- Save SMTP creds with **Enable No-Reply Sending = OFF**, click **Send Test Email** → expect 200 and the test mail arrives.
-- Toggle Enable ON, save, test again → still works.
-- Leave host/password empty, test → still fails with "Email configuration is incomplete" (good).
+1. Save Gmail creds (`smtp.gmail.com`, 587, TLS, full address, 16-char app password) → **Send Test Email** → mail arrives, toast shows success.
+2. Wrong password → toast shows Gmail's actual `Username and Password not accepted` error.
+3. Self-hosted deploy: same screen, same behavior.

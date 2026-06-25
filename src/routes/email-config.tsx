@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { sendEmail } from "@/lib/email.functions";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Send, Save, Eye, EyeOff, X, Loader2 } from "lucide-react";
+import { Mail, Send, Save, Eye, EyeOff, X, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/email-config")({
@@ -56,6 +58,7 @@ function EmailConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const sendEmailFn = useServerFn(sendEmail);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,9 +180,7 @@ function EmailConfigPage() {
           from_name: form.from_name,
         };
       }
-      const { data, error } = await supabase.functions.invoke("send-email", { body });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
+      await sendEmailFn({ data: body });
       toast.success(`Test email sent to ${testTo}`);
     } catch (err: any) {
       toast.error(err?.message || "Test send failed");
@@ -312,6 +313,33 @@ function EmailConfigPage() {
             This account is the <strong>From</strong> address for system emails such as password reset. The recipient is on To; the
             addresses above are added as CC.
           </div>
+
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="space-y-1 text-muted-foreground">
+                <p className="font-medium text-foreground">Using Gmail?</p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  <li>Host <code className="rounded bg-background px-1">smtp.gmail.com</code> · Port <code className="rounded bg-background px-1">587</code> · Encryption <strong>TLS / STARTTLS</strong></li>
+                  <li>Username = your full Gmail address (e.g. <code className="rounded bg-background px-1">name@gmail.com</code>)</li>
+                  <li>Password = a 16-character <strong>App Password</strong>, not your Google account password</li>
+                  <li>
+                    Generate one at{" "}
+                    <a
+                      href="https://myaccount.google.com/apppasswords"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      myaccount.google.com/apppasswords
+                    </a>{" "}
+                    — 2-Step Verification must be ON.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2 sm:max-w-xs sm:flex-1">
