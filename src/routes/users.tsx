@@ -232,8 +232,18 @@ function UsersPage() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedId = newLoginId.trim().toLowerCase();
+    const trimmedEmail = newContactEmail.trim().toLowerCase();
+    const trimmedMobile = newMobileNo.trim();
     if (!/^[a-z0-9._-]{2,40}$/.test(trimmedId)) {
       toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
+      return;
+    }
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+    if (trimmedMobile && !/^[+0-9][0-9\s\-]{6,19}$/.test(trimmedMobile)) {
+      toast.error("Invalid mobile number");
       return;
     }
     setCreating(true);
@@ -243,6 +253,8 @@ function UsersPage() {
           loginId: trimmedId,
           password: newPassword,
           displayName: newDisplayName,
+          contactEmail: trimmedEmail,
+          mobileNo: trimmedMobile || undefined,
         },
       });
       console.log("[create user] server response:", result);
@@ -254,7 +266,7 @@ function UsersPage() {
       }
 
       toast.success(`User "${trimmedId}" created — they can log in immediately`);
-      setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
+      setNewLoginId(""); setNewPassword(""); setNewDisplayName(""); setNewContactEmail(""); setNewMobileNo("");
       setCreateOpen(false);
       await fetchAll();
     } catch (err: any) {
