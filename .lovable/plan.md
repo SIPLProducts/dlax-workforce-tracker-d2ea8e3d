@@ -1,19 +1,22 @@
-## Add "Change Password" to user menu
+# Remove the leftover edge function
 
-In the TopBar user dropdown (top-right), add a **Change Password** item above Sign Out. Clicking it opens a modal with:
-- Old password
-- New password
-- Confirm new password
-- Cancel / Change button
+## Why
+All email sending in the app already runs through TanStack server functions (no edge functions involved):
 
-### Behavior
-1. Verify old password by re-authenticating: `supabase.auth.signInWithPassword({ email: user.email, password: oldPassword })`. If it fails → toast "Current password is incorrect".
-2. Validate new password (min 6 chars, max 72, matches confirm).
-3. Update via `supabase.auth.updateUser({ password: newPassword })`.
-4. On success → toast "Password updated", close modal, clear fields. Session stays signed in.
+- Forgot Password (OTP) → `requestPasswordOtp` / `verifyPasswordOtpAndReset` in `src/lib/password-reset.functions.ts`
+- Email Config "Send Test Email" → `sendEmail` in `src/lib/email.functions.ts`
 
-### Files
-- `src/components/TopBar.tsx` — add `<DropdownMenuItem>` "Change Password" that opens a new `<ChangePasswordDialog />`; add state to control open.
-- `src/components/ChangePasswordDialog.tsx` (new) — shadcn `Dialog` with three password inputs, show/hide toggle, loading state, validation, and the two-step verify + update flow above.
+Both use `nodemailer` against the SMTP credentials stored in `email_config`. Nothing in the codebase calls the edge function `send-password-reset` anymore — it's a leftover from an earlier implementation.
 
-Purely frontend — no schema, server function, or migration needed (uses existing browser Supabase client).
+## Changes
+
+1. **Delete** the edge function folder `supabase/functions/send-password-reset/` (removes `index.ts`).
+2. **Delete** the `[functions.send-password-reset]` block from `supabase/config.toml`, leaving only `project_id`.
+3. **Undeploy** the function from Lovable Cloud using `supabase--delete_edge_functions` so the published worker is also removed.
+
+## Not changing
+- No changes to `password-reset.functions.ts`, `email.functions.ts`, `login.tsx`, or `email-config.tsx` — they already use TanStack server functions exclusively.
+- No DB / RLS / schema changes.
+
+## Result
+Zero edge functions in the project. All outbound email (password reset OTP + admin test email) runs through TanStack server functions on your production server, using the SMTP settings on the Email Configuration screen.
