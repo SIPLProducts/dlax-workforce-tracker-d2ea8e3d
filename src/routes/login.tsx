@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { resetPasswordByUserId } from "@/utils/auth-reset.functions";
+import { requestPasswordOtp, verifyPasswordOtpAndReset } from "@/lib/password-reset.functions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
