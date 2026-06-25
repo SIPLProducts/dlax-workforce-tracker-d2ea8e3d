@@ -507,7 +507,8 @@ function LoginPage() {
                 if (fpNew !== fpConfirm) return toast.error("Passwords do not match");
                 setFpLoading(true);
                 try {
-                  await verifyOtpFn({ data: { email: fpEmail, otp: fpOtp, newPassword: fpNew } });
+                  const res = await verifyOtpFn({ data: { email: fpEmail, otp: fpOtp, newPassword: fpNew } });
+                  if (!res.ok) { toast.error(res.error); return; }
                   toast.success("Password updated. Please sign in.");
                   setForgotOpen(false);
                   resetForgotState();
