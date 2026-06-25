@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { sendEmail } from "@/lib/email.functions";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Send, Save, Eye, EyeOff, X, Loader2 } from "lucide-react";
+import { Mail, Send, Save, Eye, EyeOff, X, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/email-config")({
@@ -177,9 +179,7 @@ function EmailConfigPage() {
           from_name: form.from_name,
         };
       }
-      const { data, error } = await supabase.functions.invoke("send-email", { body });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
+      await sendEmailFn({ data: body });
       toast.success(`Test email sent to ${testTo}`);
     } catch (err: any) {
       toast.error(err?.message || "Test send failed");
