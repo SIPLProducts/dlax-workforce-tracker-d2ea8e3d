@@ -39,6 +39,7 @@ export function TopBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, roles, signOut } = useAuth();
   const { mode } = useTheme();
+  const [changePwdOpen, setChangePwdOpen] = useState(false);
 
   const crumbs = useMemo(() => {
     const parts = pathname.split("/").filter(Boolean);
