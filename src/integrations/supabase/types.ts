@@ -365,6 +365,39 @@ export type Database = {
         }
         Relationships: []
       }
+      password_reset_otps: {
+        Row: {
+          attempts: number
+          consumed_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          otp_hash: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          otp_hash: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          otp_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           contact_email: string | null
