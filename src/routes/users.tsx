@@ -823,6 +823,7 @@ function UsersPage() {
                   maxLength={20}
                 />
               </div>
+            </div>
             <div className="space-y-2">
               <Label>New Password</Label>
               <div className="relative">
