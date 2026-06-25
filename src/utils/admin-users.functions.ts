@@ -279,19 +279,34 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
       }
     }
 
-    const profileUpdate: { display_name?: string | null; login_id?: string; email?: string } = {};
+    const profileUpdate: { display_name?: string | null; login_id?: string; email?: string; contact_email?: string; mobile_no?: string | null } = {};
     if (data.displayName !== undefined) profileUpdate.display_name = data.displayName || null;
     if (newEmail && data.loginId) {
       profileUpdate.login_id = data.loginId;
       profileUpdate.email = newEmail;
     }
+    if (data.contactEmail !== undefined) profileUpdate.contact_email = data.contactEmail;
+    if (data.mobileNo !== undefined) profileUpdate.mobile_no = data.mobileNo;
+
+    if (data.contactEmail !== undefined) {
+      const { data: emailExisting } = await admin
+        .from("profiles")
+        .select("user_id")
+        .ilike("contact_email", data.contactEmail)
+        .neq("user_id", data.userId)
+        .maybeSingle();
+      if (emailExisting) {
+        throw new Error(`Email "${data.contactEmail}" is already in use`);
+      }
+    }
+
     if (Object.keys(profileUpdate).length > 0) {
       const { error: profErr } = await admin
         .from("profiles")
-        .update(profileUpdate)
+        .update(profileUpdate as any)
         .eq("user_id", data.userId);
       if (profErr) throw new Error(profErr.message || "Failed to update profile");
     }
 
-    return { userId: data.userId, displayName: data.displayName ?? null, loginId: data.loginId ?? null };
+    return { userId: data.userId, displayName: data.displayName ?? null, loginId: data.loginId ?? null, contactEmail: data.contactEmail ?? null, mobileNo: data.mobileNo ?? null };
   });
