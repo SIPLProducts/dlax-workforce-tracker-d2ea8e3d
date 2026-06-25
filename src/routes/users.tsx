@@ -461,6 +461,31 @@ function UsersPage() {
                   <Label>Password</Label>
                   <Input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" minLength={6} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Email <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="email"
+                    required
+                    value={newContactEmail}
+                    onChange={(e) => setNewContactEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={255}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mobile No</Label>
+                  <Input
+                    type="tel"
+                    value={newMobileNo}
+                    onChange={(e) => setNewMobileNo(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    maxLength={20}
+                  />
+                  <p className="text-xs text-muted-foreground">Optional. Digits, +, -, space.</p>
+                </div>
               </div>
               <div className="flex gap-2 justify-end pt-2">
                 <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
