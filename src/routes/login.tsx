@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { resetPasswordByUserId } from "@/utils/auth-reset.functions";
+import { requestPasswordOtp, verifyPasswordOtpAndReset } from "@/lib/password-reset.functions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,32 +27,42 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const resetFn = useServerFn(resetPasswordByUserId);
+  const requestOtpFn = useServerFn(requestPasswordOtp);
+  const verifyOtpFn = useServerFn(verifyPasswordOtpAndReset);
   const [forgotOpen, setForgotOpen] = useState(false);
-  const [fpUserId, setFpUserId] = useState("");
+  const [fpStep, setFpStep] = useState<"email" | "verify">("email");
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpOtp, setFpOtp] = useState("");
   const [fpNew, setFpNew] = useState("");
   const [fpConfirm, setFpConfirm] = useState("");
   const [fpShowNew, setFpShowNew] = useState(false);
-  const [fpShowConfirm, setFpShowConfirm] = useState(false);
   const [fpLoading, setFpLoading] = useState(false);
+  const [fpResendIn, setFpResendIn] = useState(0);
 
-  const handleForgotSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanedId = (fpUserId.includes("@") ? fpUserId.split("@")[0] : fpUserId).trim().toLowerCase();
-    if (!cleanedId) return toast.error("Please enter your User ID");
-    if (fpNew.length < 6) return toast.error("Password must be at least 6 characters");
-    if (fpNew !== fpConfirm) return toast.error("Passwords do not match");
+  useEffect(() => {
+    if (fpResendIn <= 0) return;
+    const t = setInterval(() => setFpResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [fpResendIn]);
+
+  const resetForgotState = () => {
+    setFpStep("email");
+    setFpEmail("");
+    setFpOtp("");
+    setFpNew("");
+    setFpConfirm("");
+    setFpResendIn(0);
+  };
+
+  const handleRequestOtp = async (email: string) => {
     setFpLoading(true);
     try {
-      await resetFn({ data: { loginId: cleanedId, newPassword: fpNew } });
-      toast.success("Password updated. Please sign in.");
-      setUserId(cleanedId);
-      setForgotOpen(false);
-      setFpUserId("");
-      setFpNew("");
-      setFpConfirm("");
+      await requestOtpFn({ data: { email } });
+      toast.success("Verification code sent to your email");
+      setFpStep("verify");
+      setFpResendIn(60);
     } catch (err: any) {
-      toast.error(err?.message || "Failed to reset password");
+      toast.error(err?.message || "Failed to send code");
     } finally {
       setFpLoading(false);
     }
@@ -431,61 +441,159 @@ function LoginPage() {
         </div>
       </div>
 
-      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+      <Dialog
+        open={forgotOpen}
+        onOpenChange={(open) => {
+          setForgotOpen(open);
+          if (!open) resetForgotState();
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reset your password</DialogTitle>
             <DialogDescription>
-              Enter the email address linked to your account. We'll send you a password reset link.
+              {fpStep === "email"
+                ? "Enter your registered email. We'll send a 6-digit verification code."
+                : `Enter the code sent to ${fpEmail} and choose a new password.`}
             </DialogDescription>
           </DialogHeader>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const email = fpUserId.trim().toLowerCase();
-              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                toast.error("Please enter a valid email address");
-                return;
-              }
-              setFpLoading(true);
-              try {
-                const redirectTo = (typeof window !== "undefined" ? window.location.origin : "") + "/reset-password";
-                await supabase.functions.invoke("send-password-reset", { body: { email, redirectTo } });
-                toast.success("If that email is registered, a reset link has been sent.");
-                setForgotOpen(false);
-                setFpUserId("");
-              } catch {
-                toast.success("If that email is registered, a reset link has been sent.");
-                setForgotOpen(false);
-                setFpUserId("");
-              } finally {
-                setFpLoading(false);
-              }
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="fpEmail">Email address</Label>
-              <Input
-                id="fpEmail"
-                type="email"
-                required
-                autoComplete="email"
-                value={fpUserId}
-                onChange={(e) => setFpUserId(e.target.value)}
-                placeholder="you@example.com"
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setForgotOpen(false)} disabled={fpLoading}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={fpLoading}>
-                {fpLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Send reset link
-              </Button>
-            </DialogFooter>
-          </form>
+
+          {fpStep === "email" ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const email = fpEmail.trim().toLowerCase();
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                  toast.error("Please enter a valid email address");
+                  return;
+                }
+                setFpEmail(email);
+                handleRequestOtp(email);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="fpEmail">Email address</Label>
+                <Input
+                  id="fpEmail"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={fpEmail}
+                  onChange={(e) => setFpEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setForgotOpen(false)} disabled={fpLoading}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={fpLoading}>
+                  {fpLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Send code
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!/^\d{6}$/.test(fpOtp)) return toast.error("Enter the 6-digit code");
+                if (fpNew.length < 6) return toast.error("Password must be at least 6 characters");
+                if (fpNew !== fpConfirm) return toast.error("Passwords do not match");
+                setFpLoading(true);
+                try {
+                  await verifyOtpFn({ data: { email: fpEmail, otp: fpOtp, newPassword: fpNew } });
+                  toast.success("Password updated. Please sign in.");
+                  setForgotOpen(false);
+                  resetForgotState();
+                } catch (err: any) {
+                  toast.error(err?.message || "Failed to reset password");
+                } finally {
+                  setFpLoading(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="fpOtp">Verification code</Label>
+                <Input
+                  id="fpOtp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                  value={fpOtp}
+                  onChange={(e) => setFpOtp(e.target.value.replace(/\D/g, ""))}
+                  placeholder="123456"
+                  className="tracking-[0.4em] text-center text-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fpNew">New password</Label>
+                <div className="relative">
+                  <Input
+                    id="fpNew"
+                    type={fpShowNew ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={fpNew}
+                    onChange={(e) => setFpNew(e.target.value)}
+                    placeholder="••••••••"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFpShowNew((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                    tabIndex={-1}
+                  >
+                    {fpShowNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fpConfirm">Confirm password</Label>
+                <Input
+                  id="fpConfirm"
+                  type={fpShowNew ? "text" : "password"}
+                  required
+                  minLength={6}
+                  value={fpConfirm}
+                  onChange={(e) => setFpConfirm(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  className="text-slate-600 hover:underline"
+                  onClick={() => setFpStep("email")}
+                  disabled={fpLoading}
+                >
+                  Change email
+                </button>
+                <button
+                  type="button"
+                  className="text-indigo-600 hover:underline disabled:text-slate-400 disabled:no-underline"
+                  onClick={() => handleRequestOtp(fpEmail)}
+                  disabled={fpLoading || fpResendIn > 0}
+                >
+                  {fpResendIn > 0 ? `Resend in ${fpResendIn}s` : "Resend code"}
+                </button>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setForgotOpen(false)} disabled={fpLoading}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={fpLoading}>
+                  {fpLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Reset password
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

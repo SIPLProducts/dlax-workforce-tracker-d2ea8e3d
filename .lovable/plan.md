@@ -1,52 +1,75 @@
 ## Goal
 
-Add **Email** and **Mobile No** fields to the user Create and Edit forms on `/users`. Email is required, mobile is optional. No edge functions — everything via the existing TanStack server functions.
+Replace the current "Forgot password" dialog (which asks for User ID + new password directly) with an **email-based OTP flow**:
 
-## Schema change
+1. User clicks "Forgot password?" on `/login`.
+2. Enter registered email → server checks if it exists on a profile.
+   - If not found → toast error "No account found with this email".
+3. If found → generate a 6-digit OTP, store it, send via SMTP from `email_config`.
+4. User enters OTP + new password → server verifies OTP and updates the auth password.
 
-Migration on `public.profiles`:
+No edge functions. All logic in TanStack server functions, reusing `sendEmail` (`src/lib/email.functions.ts`) and the SMTP config in `public.email_config`.
 
-- Add `contact_email text` (the user-facing email)
-- Add `mobile_no text`
-- Validation triggers (not CHECK, per project rules): basic email regex on `contact_email` when non-null; digits/`+`/`-`/space, length 7–20 on `mobile_no` when non-null
-- Optional partial unique index on `lower(contact_email)` where not null, to prevent duplicates
+## Database
 
-Leave existing `profiles.email` (the synthetic `<login>@dlax.local`) alone — login still goes by User ID, and `contact_email` is the real address.
+Migration adds one table for OTPs:
 
-## Server function changes — `src/utils/admin-users.functions.ts`
+```text
+public.password_reset_otps
+  id            uuid pk
+  user_id       uuid not null  (auth.users.id)
+  email         text not null  (lowercased)
+  otp_hash      text not null  (sha256, never store raw OTP)
+  expires_at    timestamptz    (now() + 10 min)
+  attempts      int default 0  (cap at 5)
+  consumed_at   timestamptz null
+  created_at    timestamptz default now()
+  index on (email, created_at desc)
+```
 
-`adminCreateUser` input gains:
-- `contactEmail: string` (required, trimmed, must match email regex)
-- `mobileNo?: string` (optional, normalized: trim, collapse spaces)
+- RLS enabled, **no policies** (only service-role server fns touch it).
+- GRANTs: `service_role` only (no anon/authenticated).
+- Rate limit in code: reject if a non-consumed OTP for that email was issued < 60s ago.
 
-After auth user creation, the existing `profiles` upsert writes both new columns alongside `display_name`/`login_id`. Reject on duplicate `contact_email` with a clean message.
+## Server functions (new file `src/lib/password-reset.functions.ts`)
 
-`adminUpdateUser` input gains optional `contactEmail` and `mobileNo`. If provided, included in the existing `profiles.update(...)` block. Same validation + duplicate guard.
+All public (no auth middleware), all use `supabaseAdmin` loaded inside the handler:
 
-No edge functions. No changes to `auth.users` email.
+1. **`requestPasswordOtp({ email })`**
+   - Validate email format.
+   - Look up `profiles` by `contact_email` (preferred) or fallback to `auth.users.email` for legacy accounts.
+   - If no match → throw `"No account found with this email"` (user asked for explicit alert; we accept the enumeration trade-off here).
+   - Invalidate any prior unconsumed OTPs for that email.
+   - Generate 6-digit OTP, hash with sha256, insert row with 10-min expiry.
+   - Call existing `sendEmail` server fn internally (or inline nodemailer using `email_config`) to send a branded "Your DLAX password reset code is **123456**" email.
+   - Return `{ ok: true }`.
 
-## UI changes — `src/routes/users.tsx`
+2. **`verifyPasswordOtpAndReset({ email, otp, newPassword })`**
+   - Validate inputs (`otp` is 6 digits, password >= 6 chars).
+   - Fetch latest unconsumed OTP for email; check not expired, attempts < 5.
+   - Compare hash; on mismatch increment attempts, throw `"Invalid or expired code"`.
+   - On match: mark `consumed_at = now()`, call `supabaseAdmin.auth.admin.updateUserById(user_id, { password })`.
+   - Return `{ ok: true }`.
 
-**Create form** — extend the existing grid to include two more inputs:
-- Email (required, `type="email"`, placeholder `name@example.com`)
-- Mobile No (optional, `type="tel"`, placeholder `+91 98765 43210`)
+Both work on self-hosted Supabase since they only use `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` + the SMTP row.
 
-**Edit dialog** — add the same two fields, prefilled from the row. Saved via `adminUpdateUser`.
+## UI changes (`src/routes/login.tsx`)
 
-**Users table** — add an **Email** column (between User ID and Display Name) and a **Mobile** column. Both show "—" when empty. The existing synthetic `<login>@dlax.local` is no longer displayed; the visible email is `contact_email`.
+Replace the existing forgot-password dialog body with a 2-step flow inside the same `Dialog`:
 
-`UserWithRoles` type, `fetchAll` mapper, and the rendered rows are updated to carry `contact_email` and `mobile_no`.
+- **Step 1 — Request code**: Email input + "Send code" button.
+- **Step 2 — Verify & reset**: OTP input (6 digits), new password, confirm password, "Reset password" button. "Resend code" link with 30s cooldown.
+- On success: toast "Password updated. Please sign in.", close dialog, prefill nothing (email isn't the User ID).
 
-## Validation summary
+Remove `resetPasswordByUserId` usage from this dialog (keep the server fn file untouched for now; we can delete later).
 
-- Email: trim, lowercase compare; regex `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`; max 255 chars
-- Mobile: trim; regex `/^[+0-9][0-9\s\-]{6,19}$/`; max 20 chars
-- Client-side error toasts mirror server-side errors
+## Files touched
 
-## Verify
+- new: `supabase/migrations/<ts>_password_reset_otps.sql`
+- new: `src/lib/password-reset.functions.ts`
+- edit: `src/routes/login.tsx` (dialog body + handlers + state)
 
-1. Create a new user with email + mobile → row appears with both columns filled.
-2. Create without email → blocked client-side and server-side.
-3. Create with a duplicate email → server returns clean "Email already in use".
-4. Edit existing user, change email and mobile → table updates after save.
-5. Clear mobile in edit → saves as empty (allowed).
+## Open questions
+
+1. **OTP email lookup field**: Use `profiles.contact_email` only (the new field we added), or also fall back to `auth.users.email` so legacy users created before contact_email can still reset? I plan to **check both** unless you say otherwise.
+2. **User enumeration**: You asked for an explicit "email doesn't exist" alert, which reveals whether an email is registered. Confirming this is the intended behaviour (vs. the more secure "If the email exists, a code has been sent").
