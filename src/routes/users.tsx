@@ -202,6 +202,8 @@ function UsersPage() {
         email: p.email,
         login_id: p.login_id ?? null,
         display_name: p.display_name,
+        contact_email: p.contact_email ?? null,
+        mobile_no: p.mobile_no ?? null,
         roles: (rolesRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role),
         custom_role_ids: (userCustomRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role_id),
         project_ids: userProjectsData.filter((up) => up.user_id === p.user_id).map((up) => up.project_id),
