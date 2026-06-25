@@ -58,6 +58,7 @@ function EmailConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const sendEmailFn = useServerFn(sendEmail);
 
   useEffect(() => {
     let cancelled = false;
