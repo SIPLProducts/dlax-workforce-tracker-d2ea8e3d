@@ -164,6 +164,8 @@ function UsersPage() {
   const [newLoginId, setNewLoginId] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
+  const [newContactEmail, setNewContactEmail] = useState("");
+  const [newMobileNo, setNewMobileNo] = useState("");
   const [creating, setCreating] = useState(false);
   
   const [selectedCustomRole, setSelectedCustomRole] = useState<string>("");
