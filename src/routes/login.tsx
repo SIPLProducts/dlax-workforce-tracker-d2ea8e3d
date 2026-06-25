@@ -57,7 +57,11 @@ function LoginPage() {
   const handleRequestOtp = async (email: string) => {
     setFpLoading(true);
     try {
-      await requestOtpFn({ data: { email } });
+      const res = await requestOtpFn({ data: { email } });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("Verification code sent to your email");
       setFpStep("verify");
       setFpResendIn(60);
