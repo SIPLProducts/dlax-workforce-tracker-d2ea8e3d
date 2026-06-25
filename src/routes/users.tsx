@@ -799,6 +799,30 @@ function UsersPage() {
                 placeholder="Full name"
               />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Email <span className="text-destructive">*</span></Label>
+                <Input
+                  type="email"
+                  value={editContactEmail}
+                  onChange={(e) => setEditContactEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={255}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mobile No</Label>
+                <Input
+                  type="tel"
+                  value={editMobileNo}
+                  onChange={(e) => setEditMobileNo(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  maxLength={20}
+                />
+              </div>
             <div className="space-y-2">
               <Label>New Password</Label>
               <div className="relative">
