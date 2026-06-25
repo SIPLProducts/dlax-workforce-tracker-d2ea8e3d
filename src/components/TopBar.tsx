@@ -13,9 +13,10 @@ import {
 import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
-import { ChevronRight, LogOut, User } from "lucide-react";
+import { ChevronRight, KeyRound, LogOut, User } from "lucide-react";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { useMemo } from "react";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
+import { useMemo, useState } from "react";
 
 const ROUTE_LABELS: Record<string, string> = {
   "": "Dashboard",
@@ -38,6 +39,7 @@ export function TopBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, roles, signOut } = useAuth();
   const { mode } = useTheme();
+  const [changePwdOpen, setChangePwdOpen] = useState(false);
 
   const crumbs = useMemo(() => {
     const parts = pathname.split("/").filter(Boolean);
@@ -103,6 +105,11 @@ export function TopBar() {
                 Mode: {mode === "dark" ? "Dark" : "Light"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setChangePwdOpen(true)} className="cursor-pointer">
+                <KeyRound className="h-4 w-4 mr-2" />
+                Change Password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
@@ -111,6 +118,7 @@ export function TopBar() {
           </DropdownMenu>
         </div>
       </div>
+      <ChangePasswordDialog open={changePwdOpen} onOpenChange={setChangePwdOpen} />
     </header>
   );
 }
