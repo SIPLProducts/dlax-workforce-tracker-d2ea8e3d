@@ -33,6 +33,8 @@ type UserWithRoles = {
   email: string | null;
   login_id: string | null;
   display_name: string | null;
+  contact_email: string | null;
+  mobile_no: string | null;
   roles: string[];
   custom_role_ids: string[];
   project_ids: string[];
@@ -61,6 +63,8 @@ function UsersPage() {
   const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
   const [editLoginId, setEditLoginId] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
+  const [editContactEmail, setEditContactEmail] = useState("");
+  const [editMobileNo, setEditMobileNo] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -69,6 +73,8 @@ function UsersPage() {
     setEditTarget(u);
     setEditLoginId(u.login_id || "");
     setEditDisplayName(u.display_name || "");
+    setEditContactEmail(u.contact_email || "");
+    setEditMobileNo(u.mobile_no || "");
     setEditPassword("");
   };
 
@@ -77,15 +83,27 @@ function UsersPage() {
     if (!editTarget) return;
     const trimmedName = editDisplayName.trim();
     const trimmedLogin = editLoginId.trim().toLowerCase();
+    const trimmedEmail = editContactEmail.trim().toLowerCase();
+    const trimmedMobile = editMobileNo.trim();
     const newPwd = editPassword.trim();
     const loginChanged = trimmedLogin !== (editTarget.login_id || "").toLowerCase();
     const nameChanged = trimmedName !== (editTarget.display_name || "");
-    if (!loginChanged && !nameChanged && !newPwd) {
+    const emailChanged = trimmedEmail !== (editTarget.contact_email || "").toLowerCase();
+    const mobileChanged = trimmedMobile !== (editTarget.mobile_no || "");
+    if (!loginChanged && !nameChanged && !emailChanged && !mobileChanged && !newPwd) {
       toast.info("No changes to save");
       return;
     }
     if (loginChanged && !/^[a-z0-9._-]{2,40}$/.test(trimmedLogin)) {
       toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
+      return;
+    }
+    if (emailChanged) {
+      if (!trimmedEmail) { toast.error("Email is required"); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) { toast.error("Invalid email address"); return; }
+    }
+    if (mobileChanged && trimmedMobile && !/^[+0-9][0-9\s\-]{6,19}$/.test(trimmedMobile)) {
+      toast.error("Invalid mobile number");
       return;
     }
     if (newPwd && newPwd.length < 6) {
@@ -99,6 +117,8 @@ function UsersPage() {
           userId: editTarget.user_id,
           ...(nameChanged ? { displayName: trimmedName } : {}),
           ...(loginChanged ? { loginId: trimmedLogin } : {}),
+          ...(emailChanged ? { contactEmail: trimmedEmail } : {}),
+          ...(mobileChanged ? { mobileNo: trimmedMobile || null } : {}),
           ...(newPwd ? { password: newPwd } : {}),
         },
       });
@@ -144,6 +164,8 @@ function UsersPage() {
   const [newLoginId, setNewLoginId] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
+  const [newContactEmail, setNewContactEmail] = useState("");
+  const [newMobileNo, setNewMobileNo] = useState("");
   const [creating, setCreating] = useState(false);
   
   const [selectedCustomRole, setSelectedCustomRole] = useState<string>("");
@@ -182,6 +204,8 @@ function UsersPage() {
         email: p.email,
         login_id: p.login_id ?? null,
         display_name: p.display_name,
+        contact_email: p.contact_email ?? null,
+        mobile_no: p.mobile_no ?? null,
         roles: (rolesRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role),
         custom_role_ids: (userCustomRes.data || []).filter((r) => r.user_id === p.user_id).map((r) => r.role_id),
         project_ids: userProjectsData.filter((up) => up.user_id === p.user_id).map((up) => up.project_id),
@@ -208,8 +232,18 @@ function UsersPage() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedId = newLoginId.trim().toLowerCase();
+    const trimmedEmail = newContactEmail.trim().toLowerCase();
+    const trimmedMobile = newMobileNo.trim();
     if (!/^[a-z0-9._-]{2,40}$/.test(trimmedId)) {
       toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
+      return;
+    }
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+    if (trimmedMobile && !/^[+0-9][0-9\s\-]{6,19}$/.test(trimmedMobile)) {
+      toast.error("Invalid mobile number");
       return;
     }
     setCreating(true);
@@ -219,6 +253,8 @@ function UsersPage() {
           loginId: trimmedId,
           password: newPassword,
           displayName: newDisplayName,
+          contactEmail: trimmedEmail,
+          mobileNo: trimmedMobile || undefined,
         },
       });
       console.log("[create user] server response:", result);
@@ -230,7 +266,7 @@ function UsersPage() {
       }
 
       toast.success(`User "${trimmedId}" created — they can log in immediately`);
-      setNewLoginId(""); setNewPassword(""); setNewDisplayName("");
+      setNewLoginId(""); setNewPassword(""); setNewDisplayName(""); setNewContactEmail(""); setNewMobileNo("");
       setCreateOpen(false);
       await fetchAll();
     } catch (err: any) {
@@ -425,6 +461,31 @@ function UsersPage() {
                   <Label>Password</Label>
                   <Input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" minLength={6} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Email <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="email"
+                    required
+                    value={newContactEmail}
+                    onChange={(e) => setNewContactEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={255}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mobile No</Label>
+                  <Input
+                    type="tel"
+                    value={newMobileNo}
+                    onChange={(e) => setNewMobileNo(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    maxLength={20}
+                  />
+                  <p className="text-xs text-muted-foreground">Optional. Digits, +, -, space.</p>
+                </div>
               </div>
               <div className="flex gap-2 justify-end pt-2">
                 <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -457,6 +518,8 @@ function UsersPage() {
                     <TableRow>
                       <TableHead>User ID</TableHead>
                       <TableHead>Display Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Mobile</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Projects</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -470,6 +533,8 @@ function UsersPage() {
                       <TableRow key={u.user_id} data-row-id={u.user_id}>
                         <TableCell className="font-medium">{u.login_id || u.email?.split("@")[0] || "—"}</TableCell>
                         <TableCell>{u.display_name || "—"}</TableCell>
+                        <TableCell className="text-sm">{u.contact_email || "—"}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">{u.mobile_no || "—"}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
                             {u.custom_role_ids.length === 0 && <span className="text-muted-foreground text-sm">—</span>}
@@ -525,7 +590,7 @@ function UsersPage() {
                       </TableRow>
                     );})}
                     {users.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -733,6 +798,31 @@ function UsersPage() {
                 onChange={(e) => setEditDisplayName(e.target.value)}
                 placeholder="Full name"
               />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Email <span className="text-destructive">*</span></Label>
+                <Input
+                  type="email"
+                  value={editContactEmail}
+                  onChange={(e) => setEditContactEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={255}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mobile No</Label>
+                <Input
+                  type="tel"
+                  value={editMobileNo}
+                  onChange={(e) => setEditMobileNo(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  maxLength={20}
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>New Password</Label>

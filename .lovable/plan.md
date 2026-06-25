@@ -1,51 +1,52 @@
 ## Goal
 
-Make the existing Email Configuration screen work cleanly with **Gmail SMTP + App Password**, and move the actual sending out of Supabase Edge Functions into a **TanStack server function** so the same code runs on your self-hosted deployment without needing `supabase functions deploy`.
+Add **Email** and **Mobile No** fields to the user Create and Edit forms on `/users`. Email is required, mobile is optional. No edge functions — everything via the existing TanStack server functions.
 
-## What changes
+## Schema change
 
-### 1. New TanStack server function — `src/lib/email.functions.ts`
+Migration on `public.profiles`:
 
-- `sendEmail({ to, subject, html, text?, cc?, smtp? })` — admin-only via `requireSupabaseAuth` + `has_role('admin')` check.
-- Loads SMTP config from `public.email_config` (same row the UI writes to) using the per-request authenticated client; falls back to inline `smtp` override for live test sends.
-- Uses **`nodemailer`** (works on Node, which is what self-hosted will run). `bun add nodemailer @types/nodemailer`.
-- Surfaces real SMTP errors (auth failed, connection refused, etc.) instead of swallowing them.
+- Add `contact_email text` (the user-facing email)
+- Add `mobile_no text`
+- Validation triggers (not CHECK, per project rules): basic email regex on `contact_email` when non-null; digits/`+`/`-`/space, length 7–20 on `mobile_no` when non-null
+- Optional partial unique index on `lower(contact_email)` where not null, to prevent duplicates
 
-### 2. Update Email Configuration screen — `src/routes/email-config.tsx`
+Leave existing `profiles.email` (the synthetic `<login>@dlax.local`) alone — login still goes by User ID, and `contact_email` is the real address.
 
-- Replace the `supabase.functions.invoke("send-email", ...)` test-send call with `useServerFn(sendEmail)`.
-- Add a small **Gmail help block** under the SMTP fields:
-  - Host: `smtp.gmail.com` · Port: `587` · Encryption: `TLS / STARTTLS`
-  - Username: your full Gmail address
-  - Password: 16-character **App Password** (not your Google account password)
-  - Link text: "Generate an App Password at myaccount.google.com → Security → 2-Step Verification → App passwords. 2-Step Verification must be ON."
-- No layout changes, no preset button — generic SMTP form stays.
+## Server function changes — `src/utils/admin-users.functions.ts`
 
-### 3. Retire the edge function path
+`adminCreateUser` input gains:
+- `contactEmail: string` (required, trimmed, must match email regex)
+- `mobileNo?: string` (optional, normalized: trim, collapse spaces)
 
-- Delete `supabase/functions/send-email/` so there's no second sender to keep in sync.
-- Anywhere else in the app that called `supabase.functions.invoke("send-email", ...)` (e.g. password-reset flow if any) is switched to `sendEmail` server fn.
+After auth user creation, the existing `profiles` upsert writes both new columns alongside `display_name`/`login_id`. Reject on duplicate `contact_email` with a clean message.
 
-### 4. No schema or secret changes
+`adminUpdateUser` input gains optional `contactEmail` and `mobileNo`. If provided, included in the existing `profiles.update(...)` block. Same validation + duplicate guard.
 
-- `public.email_config` already stores host / port / encryption / username / app_password / from / cc — keep as-is.
-- No new env vars. Credentials stay in the DB so admins keep editing from the UI on both cloud and self-hosted.
+No edge functions. No changes to `auth.users` email.
 
-## Self-hosted notes
+## UI changes — `src/routes/users.tsx`
 
-- On your self-hosted server (Node runtime), `nodemailer` opens a normal SMTP socket to `smtp.gmail.com:587` — works out of the box.
-- Same code, same DB row, same UI — nothing extra to deploy alongside Supabase.
+**Create form** — extend the existing grid to include two more inputs:
+- Email (required, `type="email"`, placeholder `name@example.com`)
+- Mobile No (optional, `type="tel"`, placeholder `+91 98765 43210`)
 
-## Important limitation to be aware of
+**Edit dialog** — add the same two fields, prefilled from the row. Saved via `adminUpdateUser`.
 
-On the **Lovable-hosted preview / published site** the server runtime is Cloudflare Workers, which **cannot open raw SMTP sockets**. The "Send Test Email" button will fail there with a connection error. It will work:
-- on your **self-hosted** deployment (real Node), and
-- locally with `bun run dev`.
+**Users table** — add an **Email** column (between User ID and Display Name) and a **Mobile** column. Both show "—" when empty. The existing synthetic `<login>@dlax.local` is no longer displayed; the visible email is `contact_email`.
 
-If you also need test-send to work on the Lovable-hosted preview, the only options are (a) keep the Supabase edge function as a fallback sender, or (b) switch from SMTP to an HTTP email API (Resend, SendGrid, Gmail API w/ OAuth). Say the word and I'll fold one of those in.
+`UserWithRoles` type, `fetchAll` mapper, and the rendered rows are updated to carry `contact_email` and `mobile_no`.
+
+## Validation summary
+
+- Email: trim, lowercase compare; regex `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`; max 255 chars
+- Mobile: trim; regex `/^[+0-9][0-9\s\-]{6,19}$/`; max 20 chars
+- Client-side error toasts mirror server-side errors
 
 ## Verify
 
-1. Save Gmail creds (`smtp.gmail.com`, 587, TLS, full address, 16-char app password) → **Send Test Email** → mail arrives, toast shows success.
-2. Wrong password → toast shows Gmail's actual `Username and Password not accepted` error.
-3. Self-hosted deploy: same screen, same behavior.
+1. Create a new user with email + mobile → row appears with both columns filled.
+2. Create without email → blocked client-side and server-side.
+3. Create with a duplicate email → server returns clean "Email already in use".
+4. Edit existing user, change email and mobile → table updates after save.
+5. Clear mobile in edit → saves as empty (allowed).

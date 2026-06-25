@@ -7,7 +7,28 @@ type CreateUserInput = {
   loginId: string;
   password: string;
   displayName: string;
+  contactEmail: string;
+  mobileNo?: string;
 };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_RE = /^[+0-9][0-9\s\-]{6,19}$/;
+
+function normalizeEmail(raw: unknown): string {
+  const v = String(raw ?? "").trim().toLowerCase();
+  if (!v) throw new Error("Email is required");
+  if (v.length > 255 || !EMAIL_RE.test(v)) throw new Error("Invalid email address");
+  return v;
+}
+
+function normalizeMobile(raw: unknown): string | null {
+  const v = String(raw ?? "").trim();
+  if (!v) return null;
+  if (v.length > 20 || !MOBILE_RE.test(v)) {
+    throw new Error("Invalid mobile number (7-20 chars; digits, +, -, space)");
+  }
+  return v;
+}
 
 export const adminCreateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -23,6 +44,8 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       loginId,
       password: input.password,
       displayName: (input.displayName || "").trim(),
+      contactEmail: normalizeEmail(input.contactEmail),
+      mobileNo: normalizeMobile(input.mobileNo),
     };
   })
   .handler(async ({ data, context }) => {
@@ -50,6 +73,16 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) {
       throw new Error(`User ID "${data.loginId}" already exists`);
+    }
+
+    // Pre-check: contact_email must be unique
+    const { data: emailExisting } = await admin
+      .from("profiles")
+      .select("user_id")
+      .ilike("contact_email", data.contactEmail)
+      .maybeSingle();
+    if (emailExisting) {
+      throw new Error(`Email "${data.contactEmail}" is already in use`);
     }
 
     const email = `${data.loginId}@dlax.local`;
@@ -83,7 +116,9 @@ export const adminCreateUser = createServerFn({ method: "POST" })
           email,
           login_id: data.loginId,
           display_name: data.displayName || null,
-        },
+          contact_email: data.contactEmail,
+          mobile_no: data.mobileNo,
+        } as any,
         { onConflict: "user_id" },
       );
 
@@ -99,6 +134,8 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       loginId: data.loginId,
       email,
       displayName: data.displayName || null,
+      contactEmail: data.contactEmail,
+      mobileNo: data.mobileNo,
     };
   });
 
@@ -154,7 +191,7 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
 
 export const adminUpdateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { userId: string; displayName?: string; password?: string; loginId?: string }) => {
+  .inputValidator((input: { userId: string; displayName?: string; password?: string; loginId?: string; contactEmail?: string; mobileNo?: string | null }) => {
     if (!input.userId || typeof input.userId !== "string") {
       throw new Error("userId is required");
     }
@@ -167,13 +204,21 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
         throw new Error("User ID must be 2-40 chars: letters, numbers, . _ -");
       }
     }
-    if (displayName === undefined && password === undefined && loginId === undefined) {
+    let contactEmail: string | undefined;
+    if (input.contactEmail !== undefined) {
+      contactEmail = normalizeEmail(input.contactEmail);
+    }
+    let mobileNo: string | null | undefined;
+    if (input.mobileNo !== undefined) {
+      mobileNo = normalizeMobile(input.mobileNo);
+    }
+    if (displayName === undefined && password === undefined && loginId === undefined && contactEmail === undefined && mobileNo === undefined) {
       throw new Error("Provide a value to update");
     }
     if (password !== undefined && password.length < 6) {
       throw new Error("Password must be at least 6 characters");
     }
-    return { userId: input.userId, displayName, password, loginId };
+    return { userId: input.userId, displayName, password, loginId, contactEmail, mobileNo };
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -234,19 +279,34 @@ export const adminUpdateUser = createServerFn({ method: "POST" })
       }
     }
 
-    const profileUpdate: { display_name?: string | null; login_id?: string; email?: string } = {};
+    const profileUpdate: { display_name?: string | null; login_id?: string; email?: string; contact_email?: string; mobile_no?: string | null } = {};
     if (data.displayName !== undefined) profileUpdate.display_name = data.displayName || null;
     if (newEmail && data.loginId) {
       profileUpdate.login_id = data.loginId;
       profileUpdate.email = newEmail;
     }
+    if (data.contactEmail !== undefined) profileUpdate.contact_email = data.contactEmail;
+    if (data.mobileNo !== undefined) profileUpdate.mobile_no = data.mobileNo;
+
+    if (data.contactEmail !== undefined) {
+      const { data: emailExisting } = await admin
+        .from("profiles")
+        .select("user_id")
+        .ilike("contact_email", data.contactEmail)
+        .neq("user_id", data.userId)
+        .maybeSingle();
+      if (emailExisting) {
+        throw new Error(`Email "${data.contactEmail}" is already in use`);
+      }
+    }
+
     if (Object.keys(profileUpdate).length > 0) {
       const { error: profErr } = await admin
         .from("profiles")
-        .update(profileUpdate)
+        .update(profileUpdate as any)
         .eq("user_id", data.userId);
       if (profErr) throw new Error(profErr.message || "Failed to update profile");
     }
 
-    return { userId: data.userId, displayName: data.displayName ?? null, loginId: data.loginId ?? null };
+    return { userId: data.userId, displayName: data.displayName ?? null, loginId: data.loginId ?? null, contactEmail: data.contactEmail ?? null, mobileNo: data.mobileNo ?? null };
   });
