@@ -83,15 +83,27 @@ function UsersPage() {
     if (!editTarget) return;
     const trimmedName = editDisplayName.trim();
     const trimmedLogin = editLoginId.trim().toLowerCase();
+    const trimmedEmail = editContactEmail.trim().toLowerCase();
+    const trimmedMobile = editMobileNo.trim();
     const newPwd = editPassword.trim();
     const loginChanged = trimmedLogin !== (editTarget.login_id || "").toLowerCase();
     const nameChanged = trimmedName !== (editTarget.display_name || "");
-    if (!loginChanged && !nameChanged && !newPwd) {
+    const emailChanged = trimmedEmail !== (editTarget.contact_email || "").toLowerCase();
+    const mobileChanged = trimmedMobile !== (editTarget.mobile_no || "");
+    if (!loginChanged && !nameChanged && !emailChanged && !mobileChanged && !newPwd) {
       toast.info("No changes to save");
       return;
     }
     if (loginChanged && !/^[a-z0-9._-]{2,40}$/.test(trimmedLogin)) {
       toast.error("User ID: 2-40 chars, letters, numbers, . _ - only");
+      return;
+    }
+    if (emailChanged) {
+      if (!trimmedEmail) { toast.error("Email is required"); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) { toast.error("Invalid email address"); return; }
+    }
+    if (mobileChanged && trimmedMobile && !/^[+0-9][0-9\s\-]{6,19}$/.test(trimmedMobile)) {
+      toast.error("Invalid mobile number");
       return;
     }
     if (newPwd && newPwd.length < 6) {
@@ -105,6 +117,8 @@ function UsersPage() {
           userId: editTarget.user_id,
           ...(nameChanged ? { displayName: trimmedName } : {}),
           ...(loginChanged ? { loginId: trimmedLogin } : {}),
+          ...(emailChanged ? { contactEmail: trimmedEmail } : {}),
+          ...(mobileChanged ? { mobileNo: trimmedMobile || null } : {}),
           ...(newPwd ? { password: newPwd } : {}),
         },
       });
