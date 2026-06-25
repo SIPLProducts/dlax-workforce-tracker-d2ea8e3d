@@ -518,6 +518,8 @@ function UsersPage() {
                     <TableRow>
                       <TableHead>User ID</TableHead>
                       <TableHead>Display Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Mobile</TableHead>
                       <TableHead>Custom Roles</TableHead>
                       <TableHead>Projects</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
