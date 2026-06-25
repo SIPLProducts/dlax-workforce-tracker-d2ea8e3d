@@ -105,7 +105,7 @@ export const requestPasswordOtp = createServerFn({ method: "POST" })
     const admin = adminClient();
 
     const found = await findUserByEmail(admin, data.email);
-    if (!found) throw new Error("No account found with this email");
+    if (!found) return { ok: false as const, error: "No account found with this email" };
 
     // 60s rate limit on resends
     const { data: recent } = await admin
@@ -119,7 +119,7 @@ export const requestPasswordOtp = createServerFn({ method: "POST" })
     if (recent?.created_at) {
       const ageSec = (Date.now() - new Date(recent.created_at as string).getTime()) / 1000;
       if (ageSec < 60) {
-        throw new Error(`Please wait ${Math.ceil(60 - ageSec)}s before requesting another code`);
+        return { ok: false as const, error: `Please wait ${Math.ceil(60 - ageSec)}s before requesting another code` };
       }
     }
 
@@ -139,9 +139,13 @@ export const requestPasswordOtp = createServerFn({ method: "POST" })
       otp_hash: sha256(otp),
       expires_at: expiresAt,
     });
-    if (insErr) throw new Error(insErr.message);
+    if (insErr) return { ok: false as const, error: insErr.message };
 
-    await sendOtpEmail({ to: data.email, otp, name: found.name });
+    try {
+      await sendOtpEmail({ to: data.email, otp, name: found.name });
+    } catch (e) {
+      return { ok: false as const, error: e instanceof Error ? e.message : "Failed to send email" };
+    }
 
     return { ok: true as const };
   });
