@@ -7,7 +7,28 @@ type CreateUserInput = {
   loginId: string;
   password: string;
   displayName: string;
+  contactEmail: string;
+  mobileNo?: string;
 };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_RE = /^[+0-9][0-9\s\-]{6,19}$/;
+
+function normalizeEmail(raw: unknown): string {
+  const v = String(raw ?? "").trim().toLowerCase();
+  if (!v) throw new Error("Email is required");
+  if (v.length > 255 || !EMAIL_RE.test(v)) throw new Error("Invalid email address");
+  return v;
+}
+
+function normalizeMobile(raw: unknown): string | null {
+  const v = String(raw ?? "").trim();
+  if (!v) return null;
+  if (v.length > 20 || !MOBILE_RE.test(v)) {
+    throw new Error("Invalid mobile number (7-20 chars; digits, +, -, space)");
+  }
+  return v;
+}
 
 export const adminCreateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
