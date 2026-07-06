@@ -20,7 +20,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { DlrDailyPreview } from "@/components/DlrDailyPreview";
 import { getDlrDailyMatrix, downloadDlrXlsx, downloadDlrCsv } from "@/lib/dlr-daily";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { downloadDlrMatrixXlsx } from "@/lib/dlr-daily-matrix";
+import { downloadSummaryMatrixXlsx } from "@/lib/summary-matrix-xlsx";
+import { FileSpreadsheet, FileText, LayoutGrid } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
@@ -516,19 +518,26 @@ function DlrTab({ projects }: { projects: any[] }) {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="flex gap-2 sm:col-span-2 lg:col-span-2">
+            <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-2">
               <Button
                 onClick={() => matrix && downloadDlrXlsx(matrix, `${fileBase}.xlsx`)}
                 disabled={!matrix}
               >
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Download Excel
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => matrix && downloadDlrMatrixXlsx(matrix, project?.project_group, `${fileBase}-Matrix.xlsx`)}
+                disabled={!matrix}
+              >
+                <LayoutGrid className="mr-2 h-4 w-4" /> Matrix Format
               </Button>
               <Button
                 variant="outline"
                 onClick={() => matrix && downloadDlrCsv(matrix, `${fileBase}.csv`)}
                 disabled={!matrix}
               >
-                <FileText className="mr-2 h-4 w-4" /> Download CSV
+                <FileText className="mr-2 h-4 w-4" /> CSV
               </Button>
             </div>
           </div>
@@ -572,7 +581,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
       setLoading(true);
       let q = supabase
         .from("daily_manpower")
-        .select("entry_date, headcount, project_id, projects(name, code)")
+        .select("entry_date, headcount, project_id, projects(name, code, project_group)")
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
         .lte("entry_date", format(dateTo, "yyyy-MM-dd"))
         .eq("status", "approved");
@@ -620,18 +629,18 @@ function SummaryTab({ projects }: { projects: any[] }) {
     columns.push({ kind: "month", key: "month-total" });
 
     // Aggregate: project -> dateKey -> total headcount
-    const byProject = new Map<string, { id: string; name: string; code: string; daily: Map<string, number> }>();
+    const byProject = new Map<string, { id: string; name: string; code: string; group: string | null; daily: Map<string, number> }>();
     // Seed from selected projects so rows appear even with no data
     const seedProjects = projectId === "all"
       ? projects
       : projects.filter((p: any) => p.id === projectId);
     for (const p of seedProjects) {
-      byProject.set(p.id, { id: p.id, name: p.name || "—", code: p.code || "", daily: new Map() });
+      byProject.set(p.id, { id: p.id, name: p.name || "—", code: p.code || "", group: p.project_group || null, daily: new Map() });
     }
     for (const r of rows) {
       const pid = r.project_id || "—";
       const p: any = r.projects;
-      if (!byProject.has(pid)) byProject.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", daily: new Map() });
+      if (!byProject.has(pid)) byProject.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", group: p?.project_group || null, daily: new Map() });
       const proj = byProject.get(pid)!;
       proj.daily.set(r.entry_date, (proj.daily.get(r.entry_date) || 0) + (r.headcount || 0));
     }
@@ -720,14 +729,34 @@ function SummaryTab({ projects }: { projects: any[] }) {
     XLSX.writeFile(wb, `summary-${format(dateFrom, "yyyyMMdd")}-${format(dateTo, "yyyyMMdd")}.xlsx`);
   };
 
+  const exportMatrix = () => {
+    downloadSummaryMatrixXlsx(
+      {
+        dateFrom, dateTo,
+        columns: matrix.columns,
+        projectRows: matrix.projectRows.map((p: any) => ({
+          id: p.id, name: p.name, code: p.code, group: p.group,
+          dayVals: p.dayVals, weekAvgs: p.weekAvgs, monthTotal: p.monthTotal,
+        })),
+        colTotals: matrix.colTotals,
+      },
+      `Summary-${format(dateFrom, "yyyyMMdd")}-${format(dateTo, "yyyyMMdd")}-Matrix.xlsx`,
+    );
+  };
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-base">Summary Report</CardTitle>
-          <Button size="sm" variant="outline" onClick={exportXlsx} disabled={loading || matrix.projectRows.length === 0}>
-            <Download className="h-4 w-4 mr-2" />Export Excel
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={exportXlsx} disabled={loading || matrix.projectRows.length === 0}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />Excel
+            </Button>
+            <Button size="sm" onClick={exportMatrix} disabled={loading || matrix.projectRows.length === 0}>
+              <LayoutGrid className="h-4 w-4 mr-2" />Matrix Format
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
