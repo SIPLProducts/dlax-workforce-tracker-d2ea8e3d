@@ -7,26 +7,23 @@ export type DlrDept = { name: string; isNmr: boolean; categories: DlrCategory[] 
 export type DlrInput = {
   project: { id: string; code?: string | null; name: string; project_group?: string | null };
   date: Date;
-  rows: any[]; // daily_manpower joined to contractors, departments, worker_categories
-  departments: DlrDept[]; // dynamic per-project structure
-  natureOfWorkValues: string[]; // distinct values from contractors for this project
-  contractorNatureMap: Record<string, string>; // contractor_id -> nature_of_work
+  rows: any[]; // daily_manpower joined to departments, worker_categories
+  departments: DlrDept[]; // dynamic per-project structure (with a stable id for aggregation)
+  departmentIds: string[]; // parallel to `departments`, one id per dept in the same order
 };
 
 export type HeaderBands = {
-  depts: DlrDept[]; // ordered department bands
+  depts: DlrDept[]; // ordered department bands (category leaves)
   catCols: { id: string; name: string; deptName: string }[]; // ordered category leaf columns
-  catStart: number; // first category col index (2)
+  catStart: number;
   catWidth: number;
-  natureValues: string[]; // ordered Total Labour sub-columns
+  deptTotalNames: string[]; // Total Labour leaf columns — one per department, in `depts` order
+  deptTotalIds: string[]; // parallel ids for aggregation
   totalLabourStart: number;
   totalLabourWidth: number;
   totalCol: number;
-  pctTotalCol: number | null; // only if NMR present in natureValues
   remarksCol: number;
   numCols: number;
-  hasNmr: boolean;
-  nmrIndex: number; // index within natureValues that is NMR, -1 if none
 };
 
 export type DlrMatrix = {
@@ -41,51 +38,49 @@ export type DlrMatrix = {
 
 const HEADER_ROWS = 3;
 
-function buildBands(departments: DlrDept[], natureOfWorkValues: string[]): HeaderBands {
+function buildBands(departments: DlrDept[], departmentIds: string[]): HeaderBands {
   const depts = departments.filter((d) => d.categories.length > 0);
+  const keptIds = departments
+    .map((d, i) => ({ d, id: departmentIds[i] }))
+    .filter((x) => x.d.categories.length > 0)
+    .map((x) => x.id);
   const catCols: HeaderBands["catCols"] = [];
   for (const d of depts) for (const c of d.categories) catCols.push({ id: c.id, name: c.name, deptName: d.name });
   const catStart = 2;
   const catWidth = catCols.length;
-  const natureValues = [...natureOfWorkValues].sort((a, b) => a.localeCompare(b));
-  const nmrIndex = natureValues.findIndex((v) => /^nmr$/i.test(v.trim()));
-  const hasNmr = nmrIndex >= 0;
+  const deptTotalNames = depts.map((d) => d.name);
+  const deptTotalIds = keptIds;
   const totalLabourStart = catStart + catWidth;
-  const totalLabourWidth = Math.max(natureValues.length, 1);
+  const totalLabourWidth = Math.max(deptTotalNames.length, 1);
   const totalCol = totalLabourStart + totalLabourWidth;
-  const pctTotalCol = hasNmr ? totalCol + 1 : null;
-  const remarksCol = (pctTotalCol ?? totalCol) + 1;
+  const remarksCol = totalCol + 1;
   const numCols = remarksCol + 1;
-  return { depts, catCols, catStart, catWidth, natureValues, totalLabourStart, totalLabourWidth, totalCol, pctTotalCol, remarksCol, numCols, hasNmr, nmrIndex };
+  return { depts, catCols, catStart, catWidth, deptTotalNames, deptTotalIds, totalLabourStart, totalLabourWidth, totalCol, remarksCol, numCols };
 }
 
-export function getDlrDailyMatrix({ project, date, rows, departments, natureOfWorkValues, contractorNatureMap }: DlrInput): DlrMatrix {
+export function getDlrDailyMatrix({ project, date, rows, departments, departmentIds }: DlrInput): DlrMatrix {
   const dateLabel = format(date, "dd-MM-yyyy");
   const title = `${project.name}${project.code ? ` [${project.code}]` : ""}\nDAILY LABOUR REPORT — ${dateLabel}`;
-  const bands = buildBands(departments, natureOfWorkValues);
+  const bands = buildBands(departments, departmentIds);
   const NUM = bands.numCols;
   const blank = (): (string | number | null)[] => Array(NUM).fill(null);
 
   // Aggregate
   const catTotals: Record<string, number> = {};
-  const natureTotals: Record<string, number> = {};
-  for (const v of bands.natureValues) natureTotals[v] = 0;
+  const deptTotals: Record<string, number> = {};
   const remarksSet = new Set<string>();
   for (const r of rows) {
     const hc = Number(r.headcount || 0);
     if (r.category_id) catTotals[r.category_id] = (catTotals[r.category_id] || 0) + hc;
-    const nature = (contractorNatureMap[r.contractor_id] || r.contractors?.nature_of_work || "").toString().trim();
-    if (nature && nature in natureTotals) natureTotals[nature] += hc;
+    if (r.department_id) deptTotals[r.department_id] = (deptTotals[r.department_id] || 0) + hc;
     if (r.remarks && String(r.remarks).trim()) remarksSet.add(String(r.remarks).trim());
   }
-  const total = bands.natureValues.reduce((s, v) => s + (natureTotals[v] || 0), 0);
-  const nmrTotal = bands.hasNmr ? natureTotals[bands.natureValues[bands.nmrIndex]] || 0 : 0;
-  const pctOnTotal = bands.hasNmr && total > 0 ? nmrTotal / total : null;
+  const total = bands.deptTotalIds.reduce((s, id) => s + (deptTotals[id] || 0), 0);
 
   // r0 title
   const r0 = blank(); r0[0] = title;
 
-  // r1: Sl.No | Name | dept names | Total Labour | Total | [NMR % on Total] | Remarks
+  // r1: Sl.No | Name | dept names | Total Labour | Total | Remarks
   const r1 = blank();
   r1[0] = "Sl.No.";
   r1[1] = "Name of the Project";
@@ -93,16 +88,15 @@ export function getDlrDailyMatrix({ project, date, rows, departments, natureOfWo
   for (const d of bands.depts) { r1[cur] = d.name; cur += d.categories.length; }
   r1[bands.totalLabourStart] = "Total Labour";
   r1[bands.totalCol] = "Total";
-  if (bands.pctTotalCol !== null) r1[bands.pctTotalCol] = "NMR % on Total";
   r1[bands.remarksCol] = "Remarks";
 
-  // r2: category leaves | nature_of_work leaves
+  // r2: category leaves | dept-total leaves
   const r2 = blank();
   bands.catCols.forEach((c, i) => { r2[bands.catStart + i] = c.name; });
-  if (bands.natureValues.length === 0) {
+  if (bands.deptTotalNames.length === 0) {
     r2[bands.totalLabourStart] = "Total";
   } else {
-    bands.natureValues.forEach((v, i) => { r2[bands.totalLabourStart + i] = v; });
+    bands.deptTotalNames.forEach((v, i) => { r2[bands.totalLabourStart + i] = v; });
   }
 
   const cells: (string | number | null)[][] = [r0, r1, r2];
@@ -120,13 +114,12 @@ export function getDlrDailyMatrix({ project, date, rows, departments, natureOfWo
   d[0] = 1;
   d[1] = project.name;
   bands.catCols.forEach((c, i) => { d[bands.catStart + i] = catTotals[c.id] || 0; });
-  if (bands.natureValues.length === 0) {
+  if (bands.deptTotalNames.length === 0) {
     d[bands.totalLabourStart] = total;
   } else {
-    bands.natureValues.forEach((v, i) => { d[bands.totalLabourStart + i] = natureTotals[v] || 0; });
+    bands.deptTotalIds.forEach((id, i) => { d[bands.totalLabourStart + i] = deptTotals[id] || 0; });
   }
   d[bands.totalCol] = total;
-  if (bands.pctTotalCol !== null) d[bands.pctTotalCol] = pctOnTotal;
   d[bands.remarksCol] = remarksSet.size ? Array.from(remarksSet).join("; ") : "";
   cells.push(d);
 
@@ -146,8 +139,7 @@ export function buildDlrDailyWorkbook(matrix: DlrMatrix): XLSX.WorkBook {
     { s: { r: 1, c: b.totalCol }, e: { r: 2, c: b.totalCol } },
     { s: { r: 1, c: b.remarksCol }, e: { r: 2, c: b.remarksCol } },
   ];
-  if (b.pctTotalCol !== null) merges.push({ s: { r: 1, c: b.pctTotalCol }, e: { r: 2, c: b.pctTotalCol } });
-  // Total Labour band over nature_of_work leaves
+  // Total Labour band over dept-total leaves
   if (b.totalLabourWidth > 1) {
     merges.push({ s: { r: 1, c: b.totalLabourStart }, e: { r: 1, c: b.totalLabourStart + b.totalLabourWidth - 1 } });
   } else {
@@ -166,21 +158,18 @@ export function buildDlrDailyWorkbook(matrix: DlrMatrix): XLSX.WorkBook {
   for (let i = 0; i < b.catWidth; i++) cols.push({ wch: 12 });
   for (let i = 0; i < b.totalLabourWidth; i++) cols.push({ wch: 14 });
   cols.push({ wch: 10 }); // Total
-  if (b.pctTotalCol !== null) cols.push({ wch: 14 });
   cols.push({ wch: 28 }); // Remarks
   ws["!cols"] = cols;
   ws["!rows"] = [{ hpt: 36 }, { hpt: 28 }, { hpt: 28 }];
 
   const intFmt = '#,##0;(#,##0);"-"';
-  const pctFmt = "0%";
   for (let r = matrix.headerRows; r < matrix.cells.length; r++) {
     if (matrix.sectionRows.includes(r)) continue;
     for (let c = 2; c < NUM; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = ws[addr];
       if (!cell) continue;
-      if (b.pctTotalCol !== null && c === b.pctTotalCol) { cell.t = "n"; cell.z = pctFmt; }
-      else if (c === b.remarksCol) { /* text */ }
+      if (c === b.remarksCol) { /* text */ }
       else if (typeof cell.v === "number") { cell.t = "n"; cell.z = intFmt; }
     }
   }
@@ -203,9 +192,6 @@ export function buildDlrDailyCsv(matrix: DlrMatrix): string {
         .map((v, ci) => {
           if (v === null || v === undefined) return "";
           const isData = ri >= matrix.headerRows && !matrix.sectionRows.includes(ri);
-          if (isData && b.pctTotalCol !== null && ci === b.pctTotalCol) {
-            return typeof v === "number" ? csvEscape(`${Math.round(v * 100)}%`) : "";
-          }
           if (isData && ci >= 2 && ci !== b.remarksCol && typeof v === "number" && v === 0) {
             return csvEscape("-");
           }
