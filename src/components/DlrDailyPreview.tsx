@@ -20,26 +20,29 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
             </th>
           </tr>
           <tr>
-            <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Sl.No.</th>
-            <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Name of the Project</th>
+            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle">Sl.No.</th>
+            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle">Name of the Project</th>
             {b.depts.map((d, i) => (
               <th key={i} colSpan={d.categories.length} className="border bg-muted px-2 py-1 text-center">{d.name}</th>
             ))}
-            {b.totalLabourWidth > 1 ? (
-              <th colSpan={b.totalLabourWidth} className="border bg-muted px-2 py-1 text-center">Total Labour</th>
-            ) : (
-              <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle text-center">Total Labour</th>
-            )}
-            <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Total</th>
-            <th rowSpan={2} className="border bg-muted px-2 py-1 align-middle">Remarks</th>
+            <th colSpan={2} className="border bg-muted px-2 py-1 text-center">Total Labour</th>
+            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle text-center">Total</th>
+            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle text-center">Security</th>
+            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle">Remarks</th>
+          </tr>
+          <tr>
+            {b.catCols.map((_c, i) => (
+              <th key={`p-${i}`} className="border bg-muted px-2 py-1" />
+            ))}
+            <th className="border bg-muted px-2 py-1" />
+            <th className="border bg-muted px-2 py-1" />
           </tr>
           <tr>
             {b.catCols.map((c) => (
-              <th key={c.id} className="border bg-muted px-2 py-1">{c.name}</th>
+              <th key={c.id} className="border bg-muted px-2 py-1 text-center">{c.name}</th>
             ))}
-            {b.totalLabourWidth > 1 && b.deptTotalNames.map((v, i) => (
-              <th key={i} className="border bg-muted px-2 py-1">{v}</th>
-            ))}
+            <th className="border bg-muted px-2 py-1 text-center">Sub Contractors/ Job Work</th>
+            <th className="border bg-muted px-2 py-1 text-center">NMR</th>
           </tr>
         </thead>
         <tbody>
