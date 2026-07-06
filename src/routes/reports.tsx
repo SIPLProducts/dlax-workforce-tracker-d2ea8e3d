@@ -581,7 +581,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
       setLoading(true);
       let q = supabase
         .from("daily_manpower")
-        .select("entry_date, headcount, project_id, projects(name, code)")
+        .select("entry_date, headcount, project_id, projects(name, code, project_group)")
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
         .lte("entry_date", format(dateTo, "yyyy-MM-dd"))
         .eq("status", "approved");
