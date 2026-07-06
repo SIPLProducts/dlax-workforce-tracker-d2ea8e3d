@@ -703,6 +703,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
   const exportXlsx = async () => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
+    const totalCols = 2 + matrix.columns.length + 1; // S.No + Project + cols + Remarks
     const header1: any[] = ["KPC Projects Limited"];
     const header2: any[] = [`Manpower engaged from ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`];
     const head: any[] = ["S.No", "Project Name"];
@@ -711,17 +712,41 @@ function SummaryTab({ projects }: { projects: any[] }) {
       else if (c.kind === "avg") head.push(`Avg Week-${c.week}`);
       else head.push("Total Labour for the Month");
     }
-    const body = matrix.projectRows.map((p, i) => {
-      const row: any[] = [i + 1, p.code ? `[${p.code}] ${p.name}` : p.name];
-      for (const c of matrix.columns) {
-        if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
-        else if (c.kind === "avg") row.push(p.weekAvgs[c.key] ?? "");
-        else row.push(p.monthTotal);
+    head.push("Remarks");
+
+    // Group projects by project_group (same ordering as Matrix Format)
+    const grouped = new Map<string, any[]>();
+    for (const p of matrix.projectRows) {
+      const g = p.group || "";
+      if (!grouped.has(g)) grouped.set(g, []);
+      grouped.get(g)!.push(p);
+    }
+    const groups = Array.from(grouped.keys()).sort();
+
+    const body: any[][] = [];
+    let sno = 0;
+    for (const g of groups) {
+      if (g) {
+        const groupRow: any[] = ["", g];
+        for (let i = 2; i < totalCols; i++) groupRow.push("");
+        body.push(groupRow);
       }
-      return row;
-    });
+      for (const p of grouped.get(g)!) {
+        sno++;
+        const row: any[] = [sno, p.code ? `[${p.code}] ${p.name}` : p.name];
+        for (const c of matrix.columns) {
+          if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
+          else if (c.kind === "avg") row.push(p.weekAvgs[c.key] ?? "");
+          else row.push(p.monthTotal);
+        }
+        row.push("");
+        body.push(row);
+      }
+    }
+
     const totalRow: any[] = ["", "Grand Total"];
     for (const c of matrix.columns) totalRow.push(matrix.colTotals[c.key] ?? "");
+    totalRow.push("");
 
     const aoa = [header1, header2, [], head, ...body, totalRow];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
