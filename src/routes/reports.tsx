@@ -20,7 +20,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { DlrDailyPreview } from "@/components/DlrDailyPreview";
 import { getDlrDailyMatrix, downloadDlrXlsx, downloadDlrCsv } from "@/lib/dlr-daily";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { downloadDlrMatrixXlsx } from "@/lib/dlr-daily-matrix";
+import { downloadSummaryMatrixXlsx } from "@/lib/summary-matrix-xlsx";
+import { FileSpreadsheet, FileText, LayoutGrid } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
