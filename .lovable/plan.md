@@ -1,54 +1,33 @@
-## Restyle the Summary matrix table to match the Excel reference
 
-Visual-only changes to the "KPC Projects Limited" matrix in `SummaryTab` (`src/routes/reports.tsx`, ~lines 775-853). Data, columns, computation, sticky behavior, and XLSX/CSV export stay exactly as-is.
+## Fix sticky S.No + Project Name columns in Summary matrix
 
-Reference cues taken from the uploaded Excel screenshot:
-- Solid, single-weight grid lines around every cell (spreadsheet look).
-- Bold, centered header labels with the S.No / Project Name columns treated as tall left-aligned cells.
-- Average / Month-total columns tinted a warm peach so they stand out from data columns.
-- Generous cell padding, uniform column widths, tabular numbers.
+**File:** `src/routes/reports.tsx` (lines ~783–899, table only)
 
-### Changes
+### Root cause
+Sticky left cells use translucent tokens (`bg-muted/20`, `bg-card` over a themed surface, `bg-muted/70`). During horizontal scroll, day/avg/month cells slide underneath and bleed through the sticky S.No and Project Name cells because the backgrounds aren't opaque. The header row has the same issue on vertical scroll.
 
-**Container**
-- Replace `rounded-md border` with `rounded-lg border border-border bg-card shadow-sm overflow-hidden`.
-- Header strip: `px-5 py-3 border-b bg-muted/40`, title `text-base font-semibold tracking-tight`, subtitle `text-xs text-muted-foreground` with a small `CalendarDays` icon prefix.
+### Changes (visual/structural only — no data or logic changes)
 
-**Table shell**
-- Wrap scroller: `relative max-h-[65vh] overflow-auto`.
-- Table: `w-full text-sm border-separate border-spacing-0` so every cell can draw its own border cleanly.
-- Give every `th`/`td` these base classes via a shared const: `border-r border-b border-border/70 px-3 py-2 align-middle`. Last column drops the right border via `last:border-r-0`.
+1. **Opaque sticky backgrounds**
+   - Introduce two solid, theme-aware helpers (inline classes only, no new tokens):
+     - Sticky header cells: `bg-background` (fully opaque) instead of `bg-muted/70`. Add a subtle inner tone via a wrapping `::after` isn't needed — use `bg-secondary` if we want the muted look, but solid.
+     - Sticky body cells: replace `rowBg` (`bg-card` / `bg-muted/20`) on the sticky `<td>`s with solid `bg-background` for odd rows and `bg-muted` (solid) for zebra rows. Keep the non-sticky cells using the existing translucent `rowBg` so zebra striping stays visible across scrollable area.
+     - Grand Total sticky cells: use solid `bg-secondary` instead of `bg-muted/60`.
 
-**Header (thead)**
-- Two visual tiers using existing single header row: `bg-muted/60 text-foreground` for all header cells; `font-semibold text-xs uppercase tracking-wide`.
-- S.No: `w-14 text-center`. Project Name: `min-w-[240px] text-left`.
-- Day headers: centered, format kept as `d/M` but rendered in two lines — day number bold on top (`text-sm`), month muted below (`text-[10px] text-muted-foreground`). Keeps existing data.
-- Avg columns: `bg-[oklch(0.94_0.05_55)] text-foreground` (soft peach, matches reference). Add `border-l-2 border-border` on the leftmost avg cell of each week block for visual grouping.
-- Month Total column: `bg-[oklch(0.9_0.08_55)] text-foreground` (deeper peach) with `border-l-2 border-border`.
+2. **Z-index layering (locked order)**
+   - Top-left corner header cells (S.No, Project Name in `<thead>`): `z-40` (already correct).
+   - Scrolling column headers (day/avg/month): `z-30` (already correct).
+   - Sticky left body cells: bump from `z-10` to `z-20` so they always sit above scrolling body cells (`z-0`) and below headers.
+   - Grand Total sticky cells: `z-20` to match.
 
-**Body rows**
-- Row height via `py-2.5` on cells. Zebra `[&>tr:nth-child(even)>td]:bg-muted/15`.
-- Hover: `hover:[&>td]:bg-primary/5 transition-colors`.
-- S.No cell: `text-center tabular-nums text-muted-foreground`.
-- Project Name cell: code as monospace muted pill `inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground mr-2`; name in `font-medium text-foreground`. `whitespace-nowrap` stays.
-- Number cells: `text-right tabular-nums px-3`. Zero shown in `text-muted-foreground/50`; non-zero in `text-foreground`. Null continues to render `—` in `text-muted-foreground/50`.
-- Avg cells: same soft peach `bg-[oklch(0.97_0.03_55)]`. Month Total cells: `bg-[oklch(0.94_0.06_55)] font-semibold text-foreground`. Both keep left-emphasis border to match header grouping.
+3. **Sticky offsets & sizing**
+   - Keep `left-0` for S.No (`w-14`) and `left-14` for Project Name (`min-w-[240px]`).
+   - Ensure `border-separate border-spacing-0` stays (required for sticky borders).
+   - Preserve the right-edge separator on Project Name via `shadow-[1px_0_0_0_hsl(var(--border))]` on both header and body cells (already present); keep `group-hover:bg-primary/5` but apply it as an overlay class that still respects opacity — since bg is now solid, hover works cleanly.
 
-**Sticky columns**
-- Keep sticky positions for S.No (`left-0 w-14`) and Project Name (`left-14 min-w-[240px]`).
-- Sticky cells always paint an opaque background (`bg-card`), plus `shadow-[1px_0_0_0_hsl(var(--border))]` on the Project Name column to visually pin the divider even when scrolled.
-- Sticky header cells: `sticky top-0 z-30`, background `bg-muted/70` so they stay readable over data.
-
-**Grand Total row**
-- `[&>td]:bg-muted/60 [&>td]:font-semibold [&>td]:border-t-2 [&>td]:border-border`.
-- Label "Grand Total" left-aligned in the sticky Project Name cell, uppercase tracking-wide `text-xs`.
-- Number cells: `text-foreground tabular-nums`. Month Total total cell keeps deeper peach + bold.
-
-**Empty / loading states**
-- Center block `py-12 text-center`. Loading: small spinning `Loader2` icon (`h-5 w-5 animate-spin text-muted-foreground/60`) + "Loading…" muted. Empty: `Users` icon (`h-8 w-8 text-muted-foreground/40`) above "No approved data in selected range" in `text-sm text-muted-foreground`.
-- Rendered inside a single `td` with `colSpan={2 + matrix.columns.length}` (unchanged).
+4. **Scroll container**
+   - Keep single `div.relative.max-h-[65vh].overflow-auto` wrapper (one scroll area handles both axes; sticky headers pin top, sticky cols pin left).
+   - Add `isolate` to the wrapper so sticky z-index stacking is self-contained and doesn't compete with sibling cards.
 
 ### Out of scope
-- No changes to `matrix` computation, week grouping, filters, KPI cards, or exports.
-- No new dependencies. Reuse Tailwind tokens and lucide icons already imported in the file (`CalendarDays`, `Users`; add `Loader2` from the existing `lucide-react` import list).
-- No structural markup changes beyond swapping classes and splitting the day header into two lines.
+No changes to `matrix` computation, column definitions, KPI cards, filters, week-wise table, or CSV/XLSX export. Purely CSS class adjustments on the existing table markup.
