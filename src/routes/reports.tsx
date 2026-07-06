@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { CalendarIcon, Download, Users, CalendarDays, HardHat, TrendingUp } from "lucide-react";
+import { CalendarIcon, Download, Users, CalendarDays, HardHat, TrendingUp, Loader2 } from "lucide-react";
 
 import { format, subDays, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -772,79 +772,129 @@ function SummaryTab({ projects }: { projects: any[] }) {
             </Card>
           </div>
 
-          <div className="rounded-md border">
-            <div className="px-4 py-2 border-b bg-muted/30">
-              <div className="font-semibold">KPC Projects Limited</div>
-              <div className="text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b bg-muted/40">
+              <div className="text-base font-semibold tracking-tight">KPC Projects Limited</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <CalendarDays className="h-3.5 w-3.5" />
                 Manpower engaged from {format(dateFrom, "dd MMM yyyy")} to {format(dateTo, "dd MMM yyyy")}
               </div>
             </div>
-            <div className="relative max-h-[60vh] overflow-auto">
-              <table className="w-full caption-bottom text-sm border-collapse">
-                <thead className="sticky top-0 z-20 bg-background [&_th]:border-b">
+            <div className="relative max-h-[65vh] overflow-auto">
+              <table className="w-full text-sm border-separate border-spacing-0">
+                <thead>
                   <tr>
-                    <th className="sticky left-0 top-0 z-30 bg-background w-14 h-10 px-2 text-left align-middle font-medium text-muted-foreground">S.No</th>
-                    <th className="sticky left-14 top-0 z-30 bg-background min-w-[200px] h-10 px-2 text-left align-middle font-medium text-muted-foreground">Project Name</th>
-                    {matrix.columns.map((c) => (
-                      <th
-                        key={c.key}
-                        className={cn(
-                          "h-10 px-2 align-middle font-medium text-muted-foreground text-right whitespace-nowrap",
-                          c.kind === "avg" && "bg-muted/40",
-                          c.kind === "month" && "bg-primary/10 font-semibold",
-                        )}
-                      >
-                        {c.kind === "day" && format(c.date, "d/M")}
-                        {c.kind === "avg" && `Avg W-${c.week}`}
-                        {c.kind === "month" && "Month Total"}
-                      </th>
-                    ))}
+                    <th className="sticky left-0 top-0 z-40 w-14 bg-muted/70 border-r border-b border-border px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide">S.No</th>
+                    <th className="sticky left-14 top-0 z-40 min-w-[240px] bg-muted/70 border-r border-b border-border px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide shadow-[1px_0_0_0_hsl(var(--border))]">Project Name</th>
+                    {matrix.columns.map((c) => {
+                      const base = "sticky top-0 z-30 border-r border-b border-border px-3 py-2 last:border-r-0 whitespace-nowrap text-center align-middle";
+                      if (c.kind === "day") {
+                        return (
+                          <th key={c.key} className={cn(base, "bg-muted/70 min-w-[56px]")}>
+                            <div className="text-sm font-bold leading-tight tabular-nums">{format(c.date, "d")}</div>
+                            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground leading-tight">{format(c.date, "MMM")}</div>
+                          </th>
+                        );
+                      }
+                      if (c.kind === "avg") {
+                        return (
+                          <th key={c.key} className={cn(base, "bg-[oklch(0.94_0.05_55)] border-l-2 border-l-border min-w-[72px] text-[11px] font-semibold uppercase tracking-wide")}>
+                            <div className="leading-tight">Avg</div>
+                            <div className="leading-tight text-[10px] text-muted-foreground">W-{c.week}</div>
+                          </th>
+                        );
+                      }
+                      return (
+                        <th key={c.key} className={cn(base, "bg-[oklch(0.9_0.08_55)] border-l-2 border-l-border min-w-[100px] text-[11px] font-semibold uppercase tracking-wide")}>
+                          <div className="leading-tight">Month</div>
+                          <div className="leading-tight">Total</div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
-                <tbody className="[&_tr]:border-b [&_tr:last-child]:border-0">
+                <tbody>
                   {loading && (
-                    <tr><td colSpan={2 + matrix.columns.length} className="p-2 text-center text-muted-foreground py-8">Loading…</td></tr>
+                    <tr>
+                      <td colSpan={2 + matrix.columns.length} className="border-b border-border p-0">
+                        <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+                          <span className="text-sm">Loading…</span>
+                        </div>
+                      </td>
+                    </tr>
                   )}
                   {!loading && matrix.projectRows.length === 0 && (
-                    <tr><td colSpan={2 + matrix.columns.length} className="p-2 text-center text-muted-foreground py-8">No approved data in selected range</td></tr>
-                  )}
-                  {!loading && matrix.projectRows.map((p, i) => (
-                    <tr key={p.id} className="hover:bg-muted/50">
-                      <td className="sticky left-0 bg-background z-10 p-2 align-middle tabular-nums">{i + 1}</td>
-                      <td className="sticky left-14 bg-background z-10 p-2 align-middle font-medium whitespace-nowrap">
-                        {p.code ? <span className="text-muted-foreground mr-1">[{p.code}]</span> : null}{p.name}
+                    <tr>
+                      <td colSpan={2 + matrix.columns.length} className="border-b border-border p-0">
+                        <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                          <Users className="h-8 w-8 text-muted-foreground/40" />
+                          <span className="text-sm">No approved data in selected range</span>
+                        </div>
                       </td>
+                    </tr>
+                  )}
+                  {!loading && matrix.projectRows.map((p, i) => {
+                    const zebra = i % 2 === 1;
+                    const rowBg = zebra ? "bg-muted/20" : "bg-card";
+                    return (
+                      <tr key={p.id} className="group">
+                        <td className={cn("sticky left-0 z-10 w-14 border-r border-b border-border px-3 py-2.5 text-center text-xs tabular-nums text-muted-foreground group-hover:bg-primary/5", rowBg)}>{i + 1}</td>
+                        <td className={cn("sticky left-14 z-10 min-w-[240px] border-r border-b border-border px-3 py-2.5 whitespace-nowrap shadow-[1px_0_0_0_hsl(var(--border))] group-hover:bg-primary/5", rowBg)}>
+                          {p.code ? (
+                            <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground mr-2 align-middle">{p.code}</span>
+                          ) : null}
+                          <span className="font-medium text-foreground align-middle">{p.name}</span>
+                        </td>
+                        {matrix.columns.map((c) => {
+                          const v = c.kind === "day" ? p.dayVals[c.key] || 0
+                            : c.kind === "avg" ? p.weekAvgs[c.key]
+                            : p.monthTotal;
+                          const isNullish = v == null;
+                          const isZero = typeof v === "number" && v === 0;
+                          const bg = c.kind === "avg" ? "bg-[oklch(0.97_0.03_55)]"
+                            : c.kind === "month" ? "bg-[oklch(0.94_0.06_55)] font-semibold"
+                            : "";
+                          const leftBorder = c.kind === "avg" || c.kind === "month" ? "border-l-2 border-l-border" : "";
+                          const numClass = isNullish || isZero ? "text-muted-foreground/50" : "text-foreground";
+                          return (
+                            <td
+                              key={c.key}
+                              className={cn(
+                                "border-r border-b border-border px-3 py-2.5 last:border-r-0 text-right tabular-nums group-hover:bg-primary/5",
+                                rowBg, bg, leftBorder, numClass,
+                              )}
+                            >
+                              {isNullish ? "—" : (v as number).toLocaleString()}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                  {!loading && matrix.projectRows.length > 0 && (
+                    <tr>
+                      <td className="sticky left-0 z-10 w-14 bg-muted/60 border-r border-t-2 border-b border-border px-3 py-2.5" />
+                      <td className="sticky left-14 z-10 min-w-[240px] bg-muted/60 border-r border-t-2 border-b border-border px-3 py-2.5 text-xs font-semibold uppercase tracking-wide shadow-[1px_0_0_0_hsl(var(--border))]">Grand Total</td>
                       {matrix.columns.map((c) => {
-                        const v = c.kind === "day" ? p.dayVals[c.key] || 0
-                          : c.kind === "avg" ? p.weekAvgs[c.key]
-                          : p.monthTotal;
+                        const v = matrix.colTotals[c.key];
+                        const isNullish = v == null;
+                        const bg = c.kind === "avg" ? "bg-[oklch(0.9_0.06_55)]"
+                          : c.kind === "month" ? "bg-[oklch(0.86_0.09_55)]"
+                          : "bg-muted/60";
+                        const leftBorder = c.kind === "avg" || c.kind === "month" ? "border-l-2 border-l-border" : "";
                         return (
                           <td
                             key={c.key}
                             className={cn(
-                              "p-2 align-middle text-right tabular-nums",
-                              c.kind === "avg" && "bg-muted/40",
-                              c.kind === "month" && "bg-primary/10 font-semibold",
+                              "border-r border-t-2 border-b border-border px-3 py-2.5 last:border-r-0 text-right tabular-nums font-semibold text-foreground",
+                              bg, leftBorder,
                             )}
-                          >{v == null ? "—" : v.toLocaleString()}</td>
+                          >
+                            {isNullish ? "—" : (v as number).toLocaleString()}
+                          </td>
                         );
                       })}
-                    </tr>
-                  ))}
-                  {!loading && matrix.projectRows.length > 0 && (
-                    <tr className="bg-muted/60 font-semibold">
-                      <td className="sticky left-0 bg-muted/60 z-10 p-2 align-middle" />
-                      <td className="sticky left-14 bg-muted/60 z-10 p-2 align-middle">Grand Total</td>
-                      {matrix.columns.map((c) => (
-                        <td
-                          key={c.key}
-                          className={cn(
-                            "p-2 align-middle text-right tabular-nums",
-                            c.kind === "avg" && "bg-muted",
-                            c.kind === "month" && "bg-primary/20",
-                          )}
-                        >{matrix.colTotals[c.key] == null ? "—" : (matrix.colTotals[c.key] as number).toLocaleString()}</td>
-                      ))}
                     </tr>
                   )}
                 </tbody>
