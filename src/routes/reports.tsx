@@ -9,9 +9,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CalendarIcon, Download, Users, CalendarDays, HardHat, TrendingUp } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend } from "recharts";
+
 import { format, subDays, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -99,7 +98,7 @@ function ReportsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [drill, setDrill] = useState<{ type: "project" | "contractor"; key: string; label: string } | null>(null);
+  
 
   useEffect(() => { loadMasters(); }, []);
   useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup]);
@@ -192,32 +191,8 @@ function ReportsPage() {
   const byContractor = useMemo(() => groupBy((r) => getName(r.contractors)), [filtered]);
   const byCategory = useMemo(() => groupBy((r) => getName(r.worker_categories)), [filtered]);
 
-  // Aggregated rows for Project-wise / Contractor-wise tabs
-  type AggRow = { key: string; label: string; sub?: string; headcount: number; days: Set<string>; entries: number };
-  const aggregate = (keyFn: (r: any) => { key: string; label: string; sub?: string }) => {
-    const map = new Map<string, AggRow>();
-    filtered.forEach((r) => {
-      const { key, label, sub } = keyFn(r);
-      if (!map.has(key)) map.set(key, { key, label, sub, headcount: 0, days: new Set(), entries: 0 });
-      const row = map.get(key)!;
-      row.headcount += r.headcount || 0;
-      row.days.add(r.entry_date);
-      row.entries += 1;
-    });
-    return Array.from(map.values()).sort((a, b) => b.headcount - a.headcount);
-  };
 
-  const projectAgg = useMemo(() => aggregate((r) => ({
-    key: r.project_id || "—",
-    label: getName(r.projects),
-    sub: r.projects?.code || r.projects?.project_group || "",
-  })), [filtered]);
 
-  const contractorAgg = useMemo(() => aggregate((r) => ({
-    key: r.contractor_id || "—",
-    label: getName(r.contractors),
-    sub: r.contractors?.nature_of_work || "",
-  })), [filtered]);
 
   const applyPreset = (preset: string) => {
     const today = new Date();
@@ -268,13 +243,12 @@ function ReportsPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-5 sm:flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
           <TabsTrigger value="daily">Daily</TabsTrigger>
-          <TabsTrigger value="project">Project</TabsTrigger>
-          <TabsTrigger value="contractor">Contractor</TabsTrigger>
           <TabsTrigger value="dlr">Daily Labour Report</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
+
 
         {tab === "dlr" && <DlrTab projects={projects} />}
         {tab === "summary" && <SummaryTab projects={projects} />}
@@ -385,9 +359,8 @@ function ReportsPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">
                 {tab === "daily" && `Daily Entries (${filtered.length})`}
-                {tab === "project" && `Project-wise Summary (${projectAgg.length})`}
-                {tab === "contractor" && `Contractor-wise Summary (${contractorAgg.length})`}
               </CardTitle>
+
               <div className="flex gap-4 text-sm flex-wrap">
                 <span>Workers: <strong>{stats.total}</strong></span>
               </div>
@@ -430,47 +403,7 @@ function ReportsPage() {
                 </Table>
               )}
 
-              {(tab === "project" || tab === "contractor") && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{tab === "project" ? "Project" : "Contractor"}</TableHead>
-                      <TableHead>{tab === "project" ? "Code / Group" : "Nature of Work"}</TableHead>
-                      <TableHead className="text-right">Total Workers</TableHead>
-                      <TableHead className="text-right">Active Days</TableHead>
-                      <TableHead className="text-right">Avg / Day</TableHead>
-                      <TableHead className="text-right">Entries</TableHead>
-                      <TableHead className="text-right">% of Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>}
-                    {!loading && (tab === "project" ? projectAgg : contractorAgg).map((row) => {
-                      const days = row.days.size;
-                      const avg = days ? Math.round(row.headcount / days) : 0;
-                      const pct = stats.total ? Math.round((row.headcount / stats.total) * 100) : 0;
-                      return (
-                        <TableRow
-                          key={row.key}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => setDrill({ type: tab as "project" | "contractor", key: row.key, label: row.label })}
-                        >
-                          <TableCell className="font-medium text-primary underline-offset-2 hover:underline">{row.label}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{row.sub || "—"}</TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums">{row.headcount}</TableCell>
-                          <TableCell className="text-right tabular-nums">{days}</TableCell>
-                          <TableCell className="text-right tabular-nums">{avg}</TableCell>
-                          <TableCell className="text-right tabular-nums">{row.entries}</TableCell>
-                          <TableCell className="text-right tabular-nums">{pct}%</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {!loading && (tab === "project" ? projectAgg : contractorAgg).length === 0 && (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
+
             </div>
           </CardContent>
         </Card>
@@ -478,133 +411,8 @@ function ReportsPage() {
         )}
       </Tabs>
 
-      <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
-        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {drill?.type === "project" ? "Project" : "Contractor"} Detail — {drill?.label}
-            </DialogTitle>
-          </DialogHeader>
-          {drill && (() => {
-            const rows = filtered.filter((r) =>
-              drill.type === "project" ? r.project_id === drill.key : r.contractor_id === drill.key
-            );
-            const total = rows.reduce((s, r) => s + (r.headcount || 0), 0);
-            // Split-by axis: contractor when drilling into a project, project when drilling into a contractor
-            const splitKeyOf = (r: any) =>
-              drill.type === "project"
-                ? { id: r.contractor_id || "—", name: getName(r.contractors) }
-                : { id: r.project_id || "—", name: getName(r.projects) };
-            // Compute totals per split to pick top series + sort dates
-            const splitTotals = new Map<string, { name: string; total: number }>();
-            const dateSet = new Set<string>();
-            rows.forEach((r) => {
-              const s = splitKeyOf(r);
-              dateSet.add(r.entry_date);
-              const cur = splitTotals.get(s.id) || { name: s.name, total: 0 };
-              cur.total += r.headcount || 0;
-              splitTotals.set(s.id, cur);
-            });
-            const TOP_N = 6;
-            const sortedSplits = Array.from(splitTotals.entries()).sort((a, b) => b[1].total - a[1].total);
-            const topSplits = sortedSplits.slice(0, TOP_N);
-            const otherIds = new Set(sortedSplits.slice(TOP_N).map(([id]) => id));
-            const seriesKeys = topSplits.map(([id, v]) => ({ id, name: v.name }));
-            if (otherIds.size > 0) seriesKeys.push({ id: "__other__", name: "Other" });
-            // Build per-date stacked datapoints
-            const dates = Array.from(dateSet).sort();
-            const trend = dates.map((date) => {
-              const point: Record<string, any> = { date: format(new Date(date), "dd MMM"), _total: 0 };
-              seriesKeys.forEach((s) => (point[s.id] = 0));
-              return { date, point };
-            });
-            const trendIdx = new Map(trend.map((t, i) => [t.date, i]));
-            rows.forEach((r) => {
-              const idx = trendIdx.get(r.entry_date);
-              if (idx === undefined) return;
-              const s = splitKeyOf(r);
-              const key = otherIds.has(s.id) ? "__other__" : s.id;
-              trend[idx].point[key] = (trend[idx].point[key] || 0) + (r.headcount || 0);
-              trend[idx].point._total += r.headcount || 0;
-            });
-            const chartData = trend.map((t) => t.point);
-            const peak = chartData.reduce((m, p) => Math.max(m, p._total || 0), 0);
-            // Palette using design tokens
-            const palette = [
-              "hsl(var(--primary))",
-              "hsl(var(--accent))",
-              "hsl(var(--chart-3))",
-              "hsl(var(--chart-4))",
-              "hsl(var(--chart-5))",
-              "hsl(var(--chart-2))",
-              "hsl(var(--muted-foreground))",
-            ];
-            return (
-              <div className="space-y-3">
-                <div className="text-sm text-muted-foreground">
-                  {rows.length} entries · <strong className="text-foreground">{total}</strong> total workers · Peak day: <strong className="text-foreground">{peak}</strong> · Split by {drill.type === "project" ? "contractor" : "project"}
-                </div>
-                {chartData.length > 0 && (
-                  <div className="h-64 w-full rounded-md border bg-muted/20 p-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                        <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={32} />
-                        <RTooltip
-                          contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 12 }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        {seriesKeys.map((s, i) => (
-                          <Area
-                            key={s.id}
-                            type="monotone"
-                            dataKey={s.id}
-                            name={s.name}
-                            stackId="1"
-                            stroke={palette[i % palette.length]}
-                            fill={palette[i % palette.length]}
-                            fillOpacity={0.55}
-                            strokeWidth={1.5}
-                          />
-                        ))}
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      {drill.type === "project" ? <TableHead>Contractor</TableHead> : <TableHead>Project</TableHead>}
-                      <TableHead>Department</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Count</TableHead>
-                      <TableHead>Remarks</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{r.entry_date}</TableCell>
-                        <TableCell>{drill.type === "project" ? getName(r.contractors) : getName(r.projects)}</TableCell>
-                        <TableCell>{getName(r.departments)}</TableCell>
-                        <TableCell>{getName(r.worker_categories)}</TableCell>
-                        <TableCell className="text-right font-medium">{r.headcount}</TableCell>
-                        <TableCell className="text-muted-foreground">{r.remarks || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                    {rows.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No entries</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+
+
     </div>
   );
 }
