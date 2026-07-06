@@ -703,6 +703,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
   const exportXlsx = async () => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
+    const totalCols = 2 + matrix.columns.length + 1; // S.No + Project + cols + Remarks
     const header1: any[] = ["KPC Projects Limited"];
     const header2: any[] = [`Manpower engaged from ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`];
     const head: any[] = ["S.No", "Project Name"];
@@ -711,17 +712,41 @@ function SummaryTab({ projects }: { projects: any[] }) {
       else if (c.kind === "avg") head.push(`Avg Week-${c.week}`);
       else head.push("Total Labour for the Month");
     }
-    const body = matrix.projectRows.map((p, i) => {
-      const row: any[] = [i + 1, p.code ? `[${p.code}] ${p.name}` : p.name];
-      for (const c of matrix.columns) {
-        if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
-        else if (c.kind === "avg") row.push(p.weekAvgs[c.key] ?? "");
-        else row.push(p.monthTotal);
+    head.push("Remarks");
+
+    // Group projects by project_group (same ordering as Matrix Format)
+    const grouped = new Map<string, any[]>();
+    for (const p of matrix.projectRows) {
+      const g = p.group || "";
+      if (!grouped.has(g)) grouped.set(g, []);
+      grouped.get(g)!.push(p);
+    }
+    const groups = Array.from(grouped.keys()).sort();
+
+    const body: any[][] = [];
+    let sno = 0;
+    for (const g of groups) {
+      if (g) {
+        const groupRow: any[] = ["", g];
+        for (let i = 2; i < totalCols; i++) groupRow.push("");
+        body.push(groupRow);
       }
-      return row;
-    });
+      for (const p of grouped.get(g)!) {
+        sno++;
+        const row: any[] = [sno, p.code ? `[${p.code}] ${p.name}` : p.name];
+        for (const c of matrix.columns) {
+          if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
+          else if (c.kind === "avg") row.push(p.weekAvgs[c.key] ?? "");
+          else row.push(p.monthTotal);
+        }
+        row.push("");
+        body.push(row);
+      }
+    }
+
     const totalRow: any[] = ["", "Grand Total"];
     for (const c of matrix.columns) totalRow.push(matrix.colTotals[c.key] ?? "");
+    totalRow.push("");
 
     const aoa = [header1, header2, [], head, ...body, totalRow];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -840,12 +865,13 @@ function SummaryTab({ projects }: { projects: any[] }) {
                         </th>
                       );
                     })}
+                    <th className="sticky top-0 z-30 bg-secondary border-b border-border px-3 py-2 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wide">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading && (
                     <tr>
-                      <td colSpan={2 + matrix.columns.length} className="border-b border-border p-0">
+                      <td colSpan={3 + matrix.columns.length} className="border-b border-border p-0">
                         <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
                           <span className="text-sm">Loading…</span>
@@ -855,7 +881,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                   )}
                   {!loading && matrix.projectRows.length === 0 && (
                     <tr>
-                      <td colSpan={2 + matrix.columns.length} className="border-b border-border p-0">
+                      <td colSpan={3 + matrix.columns.length} className="border-b border-border p-0">
                         <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                           <Users className="h-8 w-8 text-muted-foreground/40" />
                           <span className="text-sm">No approved data in selected range</span>
@@ -863,45 +889,77 @@ function SummaryTab({ projects }: { projects: any[] }) {
                       </td>
                     </tr>
                   )}
-                  {!loading && matrix.projectRows.map((p, i) => {
-                    const zebra = i % 2 === 1;
-                    const rowBg = zebra ? "bg-muted/20" : "bg-card";
-                    const stickyBg = zebra ? "bg-muted" : "bg-background";
-                    return (
-                      <tr key={p.id} className="group">
-                        <td className={cn("sticky left-0 z-20 w-14 border-r border-b border-border px-3 py-2.5 text-center text-xs tabular-nums text-muted-foreground", stickyBg)}>{i + 1}</td>
-                        <td className={cn("sticky left-14 z-20 min-w-[240px] border-r border-b border-border px-3 py-2.5 whitespace-nowrap shadow-[1px_0_0_0_hsl(var(--border))]", stickyBg)}>
-                          {p.code ? (
-                            <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground mr-2 align-middle">{p.code}</span>
-                          ) : null}
-                          <span className="font-medium text-foreground align-middle">{p.name}</span>
-                        </td>
-                        {matrix.columns.map((c) => {
-                          const v = c.kind === "day" ? p.dayVals[c.key] || 0
-                            : c.kind === "avg" ? p.weekAvgs[c.key]
-                            : p.monthTotal;
-                          const isNullish = v == null;
-                          const isZero = typeof v === "number" && v === 0;
-                          const bg = c.kind === "avg" ? "bg-[oklch(0.97_0.03_55)]"
-                            : c.kind === "month" ? "bg-[oklch(0.94_0.06_55)] font-semibold"
-                            : "";
-                          const leftBorder = c.kind === "avg" || c.kind === "month" ? "border-l-2 border-l-border" : "";
-                          const numClass = isNullish || isZero ? "text-muted-foreground/50" : "text-foreground";
-                          return (
+                  {!loading && (() => {
+                    // Group projects by project_group (mirror Matrix Format ordering)
+                    const grouped = new Map<string, any[]>();
+                    for (const p of matrix.projectRows) {
+                      const g = p.group || "";
+                      if (!grouped.has(g)) grouped.set(g, []);
+                      grouped.get(g)!.push(p);
+                    }
+                    const groups = Array.from(grouped.keys()).sort();
+                    const out: any[] = [];
+                    let sno = 0;
+                    let rowIdx = 0;
+                    for (const g of groups) {
+                      if (g) {
+                        out.push(
+                          <tr key={`grp-${g}`}>
+                            <td className="sticky left-0 z-20 w-14 bg-[oklch(0.96_0.04_85)] border-r border-b border-border px-3 py-2" />
                             <td
-                              key={c.key}
-                              className={cn(
-                                "border-r border-b border-border px-3 py-2.5 last:border-r-0 text-right tabular-nums group-hover:bg-primary/5",
-                                rowBg, bg, leftBorder, numClass,
-                              )}
+                              colSpan={1 + matrix.columns.length + 1}
+                              className="sticky-none bg-[oklch(0.96_0.04_85)] border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground shadow-[1px_0_0_0_hsl(var(--border))]"
                             >
-                              {isNullish ? "—" : (v as number).toLocaleString()}
+                              {g}
                             </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
+                          </tr>
+                        );
+                      }
+                      for (const p of grouped.get(g)!) {
+                        sno++;
+                        const zebra = rowIdx % 2 === 1;
+                        rowIdx++;
+                        const rowBg = zebra ? "bg-muted/20" : "bg-card";
+                        const stickyBg = zebra ? "bg-muted" : "bg-background";
+                        out.push(
+                          <tr key={p.id} className="group">
+                            <td className={cn("sticky left-0 z-20 w-14 border-r border-b border-border px-3 py-2.5 text-center text-xs tabular-nums text-muted-foreground", stickyBg)}>{sno}</td>
+                            <td className={cn("sticky left-14 z-20 min-w-[240px] border-r border-b border-border px-3 py-2.5 whitespace-nowrap shadow-[1px_0_0_0_hsl(var(--border))]", stickyBg)}>
+                              {p.code ? (
+                                <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground mr-2 align-middle">{p.code}</span>
+                              ) : null}
+                              <span className="font-medium text-foreground align-middle">{p.name}</span>
+                            </td>
+                            {matrix.columns.map((c) => {
+                              const v = c.kind === "day" ? p.dayVals[c.key] || 0
+                                : c.kind === "avg" ? p.weekAvgs[c.key]
+                                : p.monthTotal;
+                              const isNullish = v == null;
+                              const isZero = typeof v === "number" && v === 0;
+                              const bg = c.kind === "avg" ? "bg-[oklch(0.97_0.03_55)]"
+                                : c.kind === "month" ? "bg-[oklch(0.94_0.06_55)] font-semibold"
+                                : "";
+                              const leftBorder = c.kind === "avg" || c.kind === "month" ? "border-l-2 border-l-border" : "";
+                              const numClass = isNullish || isZero ? "text-muted-foreground/50" : "text-foreground";
+                              return (
+                                <td
+                                  key={c.key}
+                                  className={cn(
+                                    "border-r border-b border-border px-3 py-2.5 last:border-r-0 text-right tabular-nums group-hover:bg-primary/5",
+                                    rowBg, bg, leftBorder, numClass,
+                                  )}
+                                >
+                                  {isNullish ? "—" : (v as number).toLocaleString()}
+                                </td>
+                              );
+                            })}
+                            <td className={cn("border-b border-border px-3 py-2.5 text-xs text-muted-foreground min-w-[160px]", rowBg)} />
+                          </tr>
+                        );
+                      }
+                    }
+                    return out;
+                  })()}
                   {!loading && matrix.projectRows.length > 0 && (
                     <tr>
                       <td className="sticky left-0 z-20 w-14 bg-secondary border-r border-t-2 border-b border-border px-3 py-2.5" />
@@ -925,6 +983,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                           </td>
                         );
                       })}
+                      <td className="bg-secondary border-t-2 border-b border-border px-3 py-2.5 min-w-[160px]" />
                     </tr>
                   )}
                 </tbody>
