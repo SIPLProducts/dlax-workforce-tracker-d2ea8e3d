@@ -384,9 +384,8 @@ function ReportsPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">
                 {tab === "daily" && `Daily Entries (${filtered.length})`}
-                {tab === "project" && `Project-wise Summary (${projectAgg.length})`}
-                {tab === "contractor" && `Contractor-wise Summary (${contractorAgg.length})`}
               </CardTitle>
+
               <div className="flex gap-4 text-sm flex-wrap">
                 <span>Workers: <strong>{stats.total}</strong></span>
               </div>
