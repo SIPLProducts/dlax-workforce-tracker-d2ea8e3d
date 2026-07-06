@@ -629,18 +629,18 @@ function SummaryTab({ projects }: { projects: any[] }) {
     columns.push({ kind: "month", key: "month-total" });
 
     // Aggregate: project -> dateKey -> total headcount
-    const byProject = new Map<string, { id: string; name: string; code: string; daily: Map<string, number> }>();
+    const byProject = new Map<string, { id: string; name: string; code: string; group: string | null; daily: Map<string, number> }>();
     // Seed from selected projects so rows appear even with no data
     const seedProjects = projectId === "all"
       ? projects
       : projects.filter((p: any) => p.id === projectId);
     for (const p of seedProjects) {
-      byProject.set(p.id, { id: p.id, name: p.name || "—", code: p.code || "", daily: new Map() });
+      byProject.set(p.id, { id: p.id, name: p.name || "—", code: p.code || "", group: p.project_group || null, daily: new Map() });
     }
     for (const r of rows) {
       const pid = r.project_id || "—";
       const p: any = r.projects;
-      if (!byProject.has(pid)) byProject.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", daily: new Map() });
+      if (!byProject.has(pid)) byProject.set(pid, { id: pid, name: p?.name || "—", code: p?.code || "", group: p?.project_group || null, daily: new Map() });
       const proj = byProject.get(pid)!;
       proj.daily.set(r.entry_date, (proj.daily.get(r.entry_date) || 0) + (r.headcount || 0));
     }
