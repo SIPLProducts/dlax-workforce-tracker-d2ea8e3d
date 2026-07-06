@@ -518,19 +518,26 @@ function DlrTab({ projects }: { projects: any[] }) {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="flex gap-2 sm:col-span-2 lg:col-span-2">
+            <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-2">
               <Button
                 onClick={() => matrix && downloadDlrXlsx(matrix, `${fileBase}.xlsx`)}
                 disabled={!matrix}
               >
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Download Excel
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => matrix && downloadDlrMatrixXlsx(matrix, project?.project_group, `${fileBase}-Matrix.xlsx`)}
+                disabled={!matrix}
+              >
+                <LayoutGrid className="mr-2 h-4 w-4" /> Matrix Format
               </Button>
               <Button
                 variant="outline"
                 onClick={() => matrix && downloadDlrCsv(matrix, `${fileBase}.csv`)}
                 disabled={!matrix}
               >
-                <FileText className="mr-2 h-4 w-4" /> Download CSV
+                <FileText className="mr-2 h-4 w-4" /> CSV
               </Button>
             </div>
           </div>
