@@ -114,14 +114,9 @@ export function buildDlrMatrixWorkbook(matrix: DlrMatrix, projectGroup?: string 
 
   set(r, subLeaf, num(subTotal, { fill: FILL_TOTALS, font: FONT_B }));
   set(r, nmrLeaf, num(nmrTotal, { fill: FILL_TOTALS, font: FONT_B }));
-  // Total = M + N as formula
-  const rr = r + 1; // 1-indexed
-  const subAddr = XLSX.utils.encode_cell({ r, c: subLeaf });
-  const nmrAddr = XLSX.utils.encode_cell({ r, c: nmrLeaf });
-  set(r, totalCol, fml(`${subAddr}+${nmrAddr}`, { fill: FILL_TOTALS, font: FONT_B }));
+  set(r, totalCol, num(subTotal + nmrTotal, { fill: FILL_TOTALS, font: FONT_B }));
   set(r, securityCol, num(0));
   set(r, remarksCol, txt(remarks || "", { alignment: { horizontal: "left", vertical: "center", wrapText: true } }));
-  void rr;
   r++;
 
   ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r - 1, c: NUM - 1 } });
