@@ -428,47 +428,7 @@ function ReportsPage() {
                 </Table>
               )}
 
-              {(tab === "project" || tab === "contractor") && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{tab === "project" ? "Project" : "Contractor"}</TableHead>
-                      <TableHead>{tab === "project" ? "Code / Group" : "Nature of Work"}</TableHead>
-                      <TableHead className="text-right">Total Workers</TableHead>
-                      <TableHead className="text-right">Active Days</TableHead>
-                      <TableHead className="text-right">Avg / Day</TableHead>
-                      <TableHead className="text-right">Entries</TableHead>
-                      <TableHead className="text-right">% of Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Loading...</TableCell></TableRow>}
-                    {!loading && (tab === "project" ? projectAgg : contractorAgg).map((row) => {
-                      const days = row.days.size;
-                      const avg = days ? Math.round(row.headcount / days) : 0;
-                      const pct = stats.total ? Math.round((row.headcount / stats.total) * 100) : 0;
-                      return (
-                        <TableRow
-                          key={row.key}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => setDrill({ type: tab as "project" | "contractor", key: row.key, label: row.label })}
-                        >
-                          <TableCell className="font-medium text-primary underline-offset-2 hover:underline">{row.label}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{row.sub || "—"}</TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums">{row.headcount}</TableCell>
-                          <TableCell className="text-right tabular-nums">{days}</TableCell>
-                          <TableCell className="text-right tabular-nums">{avg}</TableCell>
-                          <TableCell className="text-right tabular-nums">{row.entries}</TableCell>
-                          <TableCell className="text-right tabular-nums">{pct}%</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {!loading && (tab === "project" ? projectAgg : contractorAgg).length === 0 && (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No data found for selected filters</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
+
             </div>
           </CardContent>
         </Card>
