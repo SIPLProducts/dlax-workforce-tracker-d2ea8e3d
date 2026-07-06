@@ -729,14 +729,34 @@ function SummaryTab({ projects }: { projects: any[] }) {
     XLSX.writeFile(wb, `summary-${format(dateFrom, "yyyyMMdd")}-${format(dateTo, "yyyyMMdd")}.xlsx`);
   };
 
+  const exportMatrix = () => {
+    downloadSummaryMatrixXlsx(
+      {
+        dateFrom, dateTo,
+        columns: matrix.columns,
+        projectRows: matrix.projectRows.map((p: any) => ({
+          id: p.id, name: p.name, code: p.code, group: p.group,
+          dayVals: p.dayVals, weekAvgs: p.weekAvgs, monthTotal: p.monthTotal,
+        })),
+        colTotals: matrix.colTotals,
+      },
+      `Summary-${format(dateFrom, "yyyyMMdd")}-${format(dateTo, "yyyyMMdd")}-Matrix.xlsx`,
+    );
+  };
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-base">Summary Report</CardTitle>
-          <Button size="sm" variant="outline" onClick={exportXlsx} disabled={loading || matrix.projectRows.length === 0}>
-            <Download className="h-4 w-4 mr-2" />Export Excel
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={exportXlsx} disabled={loading || matrix.projectRows.length === 0}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />Excel
+            </Button>
+            <Button size="sm" onClick={exportMatrix} disabled={loading || matrix.projectRows.length === 0}>
+              <LayoutGrid className="h-4 w-4 mr-2" />Matrix Format
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
