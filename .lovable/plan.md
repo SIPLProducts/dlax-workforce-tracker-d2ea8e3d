@@ -1,12 +1,29 @@
-## Remove Project and Contractor tabs from Reports
+## Make "Total Labour" columns dynamic (per department) in Daily Labour Report
 
-On `/reports`, the tab bar currently shows: Daily • Project • Contractor • Daily Labour Report • Summary. Remove the two middle tabs so it becomes: Daily • Daily Labour Report • Summary.
+Currently the "Total Labour" sub-columns come from `contractors.nature_of_work` (Fabrication works, NMR works, Shuttering rod bending & casting work), which is unrelated to the actual Daily Entry Sheet.
 
-### Changes (single file: `src/routes/reports.tsx`)
+Replace them with **one sub-column per department** that appears in the Daily Entry for the selected project + date. Each cell = total headcount for that department. Example: Civil = 6, Electrical = 7.
 
-1. In the `TabsList` (around line 271), delete the `<TabsTrigger value="project">` and `<TabsTrigger value="contractor">` entries, and update the grid class from `sm:grid-cols-5` to `sm:grid-cols-3`.
-2. Remove the corresponding tab-body sections rendered further down the file for `tab === "project"` and `tab === "contractor"` (the aggregated tables using `projectAgg` / `contractorAgg`), plus the drill-down dialog if it is only triggered from those tabs.
-3. Clean up now-unused helpers if nothing else references them: `projectAgg`, `contractorAgg`, `aggregate`, and the `drill` state / dialog. Keep `byProject` / `byContractor` because the Daily tab's Breakdown cards still use them.
+### Changes
+
+**1. `src/lib/dlr-daily.ts`**
+- `DlrInput`: remove `natureOfWorkValues` and `contractorNatureMap`.
+- `HeaderBands`: replace the `natureValues` band with a `deptTotals` band — one leaf column per department, in the same order as the existing `depts` array. Drop the NMR-index / `pctTotalCol` ("NMR % on Total") logic.
+- `getDlrDailyMatrix`: sum `headcount` per `department_id` from `rows`. Emit one leaf column per department under the merged "Total Labour" header (single "Total" cell if only one dept). Grand `Total` column = sum across departments (unchanged behavior).
+
+**2. `src/routes/reports.tsx` — `DlrTab` (~lines 420-496)**
+- Remove `natureOfWorkValues`, `contractorNatureMap`, and the code that builds them from `dmRows`.
+- Update the `getDlrDailyMatrix` call to match the new input shape (departments still drive both the category band and the new Total Labour band).
+
+**3. `src/components/DlrDailyPreview.tsx`**
+- Replace `b.natureValues` header rendering with the new dept-totals band (label each sub-column with the department name).
+- Remove the `pctTotalCol` / `fmtPct` "NMR % on Total" column.
+
+**4. Excel/CSV export (`buildDlrDailyWorkbook`, `buildDlrDailyCsv`)**
+- Drop the `pctTotalCol` merges and percent formatting.
+- Merges/column widths continue to work off the same band metadata (now dept-based instead of nature-of-work-based).
 
 ### Out of scope
-No filter changes, no data-loading changes, no styling changes beyond the grid column count. Default `tab` remains `"daily"`, so no landing-tab adjustment needed.
+- No schema changes; `contractors.nature_of_work` stays in the DB, it just no longer drives this report.
+- No changes to filters, KPI cards, Daily tab, or Summary tab.
+- Category columns (Painting, Structural Steel Work, Street Lighting, ...) already come from the Daily Entry Sheet and are unchanged.
