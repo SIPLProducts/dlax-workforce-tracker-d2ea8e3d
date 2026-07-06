@@ -780,17 +780,17 @@ function SummaryTab({ projects }: { projects: any[] }) {
                 Manpower engaged from {format(dateFrom, "dd MMM yyyy")} to {format(dateTo, "dd MMM yyyy")}
               </div>
             </div>
-            <div className="relative max-h-[65vh] overflow-auto">
+            <div className="relative isolate max-h-[65vh] overflow-auto">
               <table className="w-full text-sm border-separate border-spacing-0">
                 <thead>
                   <tr>
-                    <th className="sticky left-0 top-0 z-40 w-14 bg-muted/70 border-r border-b border-border px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide">S.No</th>
-                    <th className="sticky left-14 top-0 z-40 min-w-[240px] bg-muted/70 border-r border-b border-border px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide shadow-[1px_0_0_0_hsl(var(--border))]">Project Name</th>
+                    <th className="sticky left-0 top-0 z-40 w-14 bg-secondary border-r border-b border-border px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide">S.No</th>
+                    <th className="sticky left-14 top-0 z-40 min-w-[240px] bg-secondary border-r border-b border-border px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide shadow-[1px_0_0_0_hsl(var(--border))]">Project Name</th>
                     {matrix.columns.map((c) => {
                       const base = "sticky top-0 z-30 border-r border-b border-border px-3 py-2 last:border-r-0 whitespace-nowrap text-center align-middle";
                       if (c.kind === "day") {
                         return (
-                          <th key={c.key} className={cn(base, "bg-muted/70 min-w-[56px]")}>
+                          <th key={c.key} className={cn(base, "bg-secondary min-w-[56px]")}>
                             <div className="text-sm font-bold leading-tight tabular-nums">{format(c.date, "d")}</div>
                             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground leading-tight">{format(c.date, "MMM")}</div>
                           </th>
@@ -837,10 +837,11 @@ function SummaryTab({ projects }: { projects: any[] }) {
                   {!loading && matrix.projectRows.map((p, i) => {
                     const zebra = i % 2 === 1;
                     const rowBg = zebra ? "bg-muted/20" : "bg-card";
+                    const stickyBg = zebra ? "bg-muted" : "bg-background";
                     return (
                       <tr key={p.id} className="group">
-                        <td className={cn("sticky left-0 z-10 w-14 border-r border-b border-border px-3 py-2.5 text-center text-xs tabular-nums text-muted-foreground group-hover:bg-primary/5", rowBg)}>{i + 1}</td>
-                        <td className={cn("sticky left-14 z-10 min-w-[240px] border-r border-b border-border px-3 py-2.5 whitespace-nowrap shadow-[1px_0_0_0_hsl(var(--border))] group-hover:bg-primary/5", rowBg)}>
+                        <td className={cn("sticky left-0 z-20 w-14 border-r border-b border-border px-3 py-2.5 text-center text-xs tabular-nums text-muted-foreground", stickyBg)}>{i + 1}</td>
+                        <td className={cn("sticky left-14 z-20 min-w-[240px] border-r border-b border-border px-3 py-2.5 whitespace-nowrap shadow-[1px_0_0_0_hsl(var(--border))]", stickyBg)}>
                           {p.code ? (
                             <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground mr-2 align-middle">{p.code}</span>
                           ) : null}
@@ -874,14 +875,14 @@ function SummaryTab({ projects }: { projects: any[] }) {
                   })}
                   {!loading && matrix.projectRows.length > 0 && (
                     <tr>
-                      <td className="sticky left-0 z-10 w-14 bg-muted/60 border-r border-t-2 border-b border-border px-3 py-2.5" />
-                      <td className="sticky left-14 z-10 min-w-[240px] bg-muted/60 border-r border-t-2 border-b border-border px-3 py-2.5 text-xs font-semibold uppercase tracking-wide shadow-[1px_0_0_0_hsl(var(--border))]">Grand Total</td>
+                      <td className="sticky left-0 z-20 w-14 bg-secondary border-r border-t-2 border-b border-border px-3 py-2.5" />
+                      <td className="sticky left-14 z-20 min-w-[240px] bg-secondary border-r border-t-2 border-b border-border px-3 py-2.5 text-xs font-semibold uppercase tracking-wide shadow-[1px_0_0_0_hsl(var(--border))]">Grand Total</td>
                       {matrix.columns.map((c) => {
                         const v = matrix.colTotals[c.key];
                         const isNullish = v == null;
                         const bg = c.kind === "avg" ? "bg-[oklch(0.9_0.06_55)]"
                           : c.kind === "month" ? "bg-[oklch(0.86_0.09_55)]"
-                          : "bg-muted/60";
+                          : "bg-muted";
                         const leftBorder = c.kind === "avg" || c.kind === "month" ? "border-l-2 border-l-border" : "";
                         return (
                           <td
@@ -898,6 +899,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                     </tr>
                   )}
                 </tbody>
+
               </table>
             </div>
           </div>
