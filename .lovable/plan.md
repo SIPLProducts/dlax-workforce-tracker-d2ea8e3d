@@ -1,29 +1,18 @@
-## Problem
+## Fix Available Contractors list scope
 
-The OT Entry grid header shows the same white strip between the department row (Civil) and category row (Painting, Structural Steel Work), with weak group separation and cramped category text — matching the previous Daily Entry issue.
+In `src/components/ProjectAssignments.tsx`, the Contractors tab currently shows every contractor that isn't already assigned to another project in the Available column. The user wants the Available column to be scoped only to the currently selected project — i.e. never surface contractors that belong to (or were created outside of) this project.
 
-## Fix (single file: `src/routes/ot-entry.tsx`, presentation-only)
+### Change
 
-Mirror the Daily Entry pass:
+In `AssignmentSection` (kind === `contractors` branch of `load()`):
+- Treat every contractor NOT already assigned to this project as "not related" and hide them from the Available list.
+- Result: Assigned column keeps showing this project's 115 contractors; Available column shows 0 entries with the existing "No more available." empty state.
+- Users add new contractors to the project exclusively via the existing **Add & Assign** dialog (which already creates the contractor and links it to the current project in one step).
 
-1. **Two-row department header** (lines ~1016–1036)
-   - Fixed row heights: `<tr className="h-9">` for both header rows.
-   - Frozen left cells (`Sl.no`, `SC Code`, `Name of the Contractor`, `Contact No`, `Work Place`): keep `rowSpan={2}`, ensure background stays `bg-slate-100`, add matching `border-b border-t`.
-   - Department `<th>`s: apply `g.headerClass`, `border-b border-t border-r-2 border-r-slate-300`, `text-[13px] font-semibold uppercase tracking-wide`, `bg-clip-padding`.
-   - Category `<th>`s: apply `g.headerClass`, `sticky top-9` (instead of `top-[36px]`), `text-[11px] font-medium min-w-[84px] whitespace-normal leading-tight align-middle`, and `border-r-2 border-r-slate-300` on the last cell of each group; other cells `border-r border-r-slate-200`.
-   - Trailing `Total` / `Time (OT Hrs)` / `Remarks` / `Weather`: keep `rowSpan={2}`, add `bg-clip-padding` and matching padding for a shared baseline.
+Departments and Categories tabs are unchanged — those masters are shared across projects by design.
 
-2. **Body group dividers** (lines ~1053–1069)
-   - Track `isLastInGroup` per cell in the map; add `border-r-2 border-r-slate-300` on the last cell of each department group, `border-r border-r-slate-200` elsewhere, alongside the existing `g.cellClass` tint.
+### Technical detail
 
-3. **Footer/totals row** (if present near line ~1082+)
-   - Apply the same group-separator border logic so the totals row aligns visually.
+Replace the visibility filter for `kind === "contractors"` so `visible` only contains contractors whose id is in `assignedHere`. Drop the now-unused `get_globally_assigned_contractor_ids` RPC call for this screen (the DB function stays; only this caller is removed).
 
-## Out of scope
-
-- No data, save/submit, sticky column widths, or OT-hours logic changes.
-- No changes to Saved Entries tab or any other route.
-
-## Verification
-
-- Reload `/ot-entry`, pick a project with multiple departments → header shows continuous tinted blocks per department, no white strip, wrapped category names, visible group dividers on header/body/footer, frozen left columns still stick correctly on scroll.
+No schema, RLS, or migration changes required.
