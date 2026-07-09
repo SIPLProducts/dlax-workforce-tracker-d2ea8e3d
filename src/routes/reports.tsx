@@ -22,7 +22,11 @@ import { DlrDailyPreview } from "@/components/DlrDailyPreview";
 import { getDlrDailyMatrix, downloadDlrXlsx, downloadDlrCsv } from "@/lib/dlr-daily";
 import { downloadDlrMatrixXlsx } from "@/lib/dlr-daily-matrix";
 import { downloadSummaryMatrixXlsx } from "@/lib/summary-matrix-xlsx";
-import { FileSpreadsheet, FileText, LayoutGrid } from "lucide-react";
+import { buildWeeklyMatrix, weeklyDateRangeLabel, type WeeklyMatrix } from "@/lib/weekly-report";
+import { downloadWeeklyReportPdf } from "@/lib/weekly-report-pdf";
+import { downloadWeeklyReportXlsx } from "@/lib/weekly-report-xlsx";
+import { addDays } from "date-fns";
+import { FileSpreadsheet, FileText, LayoutGrid, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
@@ -245,16 +249,18 @@ function ReportsPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
           <TabsTrigger value="daily">Daily</TabsTrigger>
           <TabsTrigger value="dlr">Daily Labour Report</TabsTrigger>
+          <TabsTrigger value="weekly">Weekly</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
 
 
         {tab === "dlr" && <DlrTab projects={projects} />}
+        {tab === "weekly" && <WeeklyTab projects={projects} />}
         {tab === "summary" && <SummaryTab projects={projects} />}
-        {tab !== "dlr" && tab !== "summary" && (
+        {tab !== "dlr" && tab !== "summary" && tab !== "weekly" && (
         <>
 
 
@@ -991,6 +997,190 @@ function SummaryTab({ projects }: { projects: any[] }) {
               </table>
             </div>
           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function WeeklyTab({ projects }: { projects: any[] }) {
+  const [projectId, setProjectId] = useState<string>("");
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    const d = new Date();
+    // Default to Wednesday-anchored week like the reference (fall back to today)
+    return d;
+  });
+  const [loading, setLoading] = useState(false);
+  const [matrix, setMatrix] = useState<WeeklyMatrix | null>(null);
+
+  const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
+
+  useEffect(() => {
+    if (!projectId || !project) { setMatrix(null); return; }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const start = format(weekStart, "yyyy-MM-dd");
+      const end = format(addDays(weekStart, 6), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("daily_manpower")
+        .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code), departments(name)")
+        .eq("project_id", projectId)
+        .gte("entry_date", start)
+        .lte("entry_date", end);
+      if (cancelled) return;
+      if (error) console.error(error);
+      const m = buildWeeklyMatrix({
+        project: { id: project.id, code: project.code, name: project.name },
+        weekStart,
+        entries: (data || []) as any,
+      });
+      setMatrix(m);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, project, weekStart]);
+
+  const fileBase = project
+    ? `Weekly-Labour-Report-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(weekStart, "ddMMyyyy")}`
+    : "Weekly-Labour-Report";
+
+  const fmt = (n: number) => (n ? n.toLocaleString() : "");
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Weekly Labour Report</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <div className="space-y-1 min-w-0">
+              <Label>Project</Label>
+              <ProjectCombobox
+                value={projectId}
+                onChange={setProjectId}
+                projects={projects}
+                className="w-full"
+                formatLabel={(p) => [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
+              />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <Label>Week Starting</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(weekStart, "dd MMM yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={weekStart} onSelect={(d) => d && setWeekStart(d)} className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-2">
+              <Button
+                onClick={() => matrix && downloadWeeklyReportPdf(matrix, `${fileBase}.pdf`)}
+                disabled={!matrix || matrix.rows.length === 0}
+              >
+                <FileDown className="mr-2 h-4 w-4" /> PDF
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => matrix && downloadWeeklyReportXlsx(matrix, `${fileBase}.xlsx`)}
+                disabled={!matrix || matrix.rows.length === 0}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+              </Button>
+            </div>
+          </div>
+
+          {!projectId && (
+            <p className="text-sm text-muted-foreground">Select a project and week to preview the weekly labour report.</p>
+          )}
+          {projectId && loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {projectId && !loading && matrix && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 border rounded-md p-3 text-sm">
+                <div>
+                  <div className="font-semibold">Name of the Project:</div>
+                  <div className="text-muted-foreground">{project?.code ? `[${project.code}] ${project.name}` : project?.name}</div>
+                  <div className="mt-1 font-semibold">Date:</div>
+                  <div className="text-muted-foreground">{weeklyDateRangeLabel(matrix)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-base">KPC PROJECTS LTD</div>
+                  <div className="font-semibold mt-1">WEEKLY LABOUR REPORT</div>
+                </div>
+                <div className="text-right">
+                  <div className="inline-block border rounded px-3 py-1 font-bold text-lg">KPC</div>
+                </div>
+              </div>
+
+              <div className="overflow-auto border rounded-md">
+                <table className="border-collapse text-xs w-full">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle">S.No</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle">SC Code</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-left">Name of the Contractor</th>
+                      {matrix.days.map((d, i) => (
+                        <th key={i} colSpan={2} className="border px-2 py-1 text-center">{format(d, "EEE dd.MM")}</th>
+                      ))}
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total IR</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total NMR</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total Week Labour</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Per Week (Total/7)</th>
+                    </tr>
+                    <tr>
+                      {matrix.days.flatMap((_, i) => [
+                        <th key={`ir-${i}`} className="border px-2 py-1 text-center">IR</th>,
+                        <th key={`nmr-${i}`} className="border px-2 py-1 text-center">NMR</th>,
+                      ])}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matrix.rows.length === 0 && (
+                      <tr>
+                        <td colSpan={3 + 14 + 4} className="border text-center py-6 text-muted-foreground">
+                          No entries for this project in the selected week.
+                        </td>
+                      </tr>
+                    )}
+                    {matrix.rows.map((r, i) => (
+                      <tr key={r.contractorId} className={i % 2 ? "bg-muted/20" : ""}>
+                        <td className="border px-2 py-1 text-center">{i + 1}</td>
+                        <td className="border px-2 py-1 text-center">{r.code}</td>
+                        <td className="border px-2 py-1">{r.name}</td>
+                        {r.days.flatMap((d, j) => [
+                          <td key={`ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>,
+                          <td key={`nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>,
+                        ])}
+                        <td className="border px-2 py-1 text-right tabular-nums font-semibold">{fmt(r.totalIR)}</td>
+                        <td className="border px-2 py-1 text-right tabular-nums font-semibold">{fmt(r.totalNMR)}</td>
+                        <td className="border px-2 py-1 text-right tabular-nums font-semibold">{fmt(r.totalWeek)}</td>
+                        <td className="border px-2 py-1 text-right tabular-nums font-semibold">{r.perWeek ? r.perWeek.toFixed(2) : ""}</td>
+                      </tr>
+                    ))}
+                    {matrix.rows.length > 0 && (
+                      <tr className="bg-muted font-semibold">
+                        <td colSpan={3} className="border px-2 py-1 text-right">Totals</td>
+                        {matrix.totals.days.flatMap((d, j) => [
+                          <td key={`t-ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>,
+                          <td key={`t-nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>,
+                        ])}
+                        <td className="border px-2 py-1 text-right tabular-nums">{fmt(matrix.totals.totalIR)}</td>
+                        <td className="border px-2 py-1 text-right tabular-nums">{fmt(matrix.totals.totalNMR)}</td>
+                        <td className="border px-2 py-1 text-right tabular-nums">{fmt(matrix.totals.totalWeek)}</td>
+                        <td className="border px-2 py-1 text-right tabular-nums">{matrix.totals.perWeek ? matrix.totals.perWeek.toFixed(2) : ""}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
