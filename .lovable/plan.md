@@ -1,44 +1,29 @@
 ## Problem
 
-On the Daily Entry screen, the Departments / Categories header area of the entry grid looks broken:
+The OT Entry grid header shows the same white strip between the department row (Civil) and category row (Painting, Structural Steel Work), with weak group separation and cramped category text — matching the previous Daily Entry issue.
 
-- A visible white strip appears between the department header row (Civil, Electrical) and the category header row (Painting, Structural Steel Work, Street Lighting), so the two rows feel detached from the frozen left columns.
-- Department group tint (blue for Civil, green for Electrical) doesn't carry cleanly across both header rows, and the divider between department groups is weak, making it hard to see where Civil ends and Electrical begins.
-- The category sub-header cells are short, unpadded, and center-aligned with tight text, so longer names like "Structural Steel Work" and "Street Lighting" look cramped.
-- Body cells under each department don't inherit the group tint, so once you scroll the header context is lost.
+## Fix (single file: `src/routes/ot-entry.tsx`, presentation-only)
 
-Data, columns, sticky behavior, totals, and save logic stay exactly as-is. This is a presentation-only pass on `src/routes/daily-entry.tsx`.
+Mirror the Daily Entry pass:
 
-## Changes (single file: `src/routes/daily-entry.tsx`)
+1. **Two-row department header** (lines ~1016–1036)
+   - Fixed row heights: `<tr className="h-9">` for both header rows.
+   - Frozen left cells (`Sl.no`, `SC Code`, `Name of the Contractor`, `Contact No`, `Work Place`): keep `rowSpan={2}`, ensure background stays `bg-slate-100`, add matching `border-b border-t`.
+   - Department `<th>`s: apply `g.headerClass`, `border-b border-t border-r-2 border-r-slate-300`, `text-[13px] font-semibold uppercase tracking-wide`, `bg-clip-padding`.
+   - Category `<th>`s: apply `g.headerClass`, `sticky top-9` (instead of `top-[36px]`), `text-[11px] font-medium min-w-[84px] whitespace-normal leading-tight align-middle`, and `border-r-2 border-r-slate-300` on the last cell of each group; other cells `border-r border-r-slate-200`.
+   - Trailing `Total` / `Time (OT Hrs)` / `Remarks` / `Weather`: keep `rowSpan={2}`, add `bg-clip-padding` and matching padding for a shared baseline.
 
-1. **Unified two-row department header**
-   - Keep the existing two-row `<thead>` structure (dept row + category row) and the current `displayGroups` data.
-   - Give both header rows the same group tint via `g.headerClass` so Civil's blue and Electrical's green form one solid block spanning dept name + its categories.
-   - Add a stronger right border between department groups (e.g. `border-r-2 border-r-slate-300`) on the last cell of each group in both rows to visually separate Civil vs Electrical.
-   - Remove the residual white gap by ensuring both `<tr>`s use the tint background (not `bg-slate-100`) and the sticky `top` offset on the category row matches the actual dept-row height.
+2. **Body group dividers** (lines ~1053–1069)
+   - Track `isLastInGroup` per cell in the map; add `border-r-2 border-r-slate-300` on the last cell of each department group, `border-r border-r-slate-200` elsewhere, alongside the existing `g.cellClass` tint.
 
-2. **Better typography and spacing in headers**
-   - Dept row: `py-2 text-[13px] font-semibold tracking-wide uppercase`.
-   - Category row: `py-2 min-w-[80px] text-[11px] font-medium` with `whitespace-normal leading-tight` so two-word names like "Structural Steel Work" wrap cleanly instead of clipping.
-
-3. **Body cells keep group context**
-   - Apply a very light version of the group tint to body cells via `g.cellClass` (already exists) — bump the tint slightly (e.g. `bg-blue-50/40`, `bg-green-50/40`) so each department's column band is visible while scrolling, without overpowering the input.
-   - Keep the stronger right border between groups on body rows too, mirroring the header separator.
-
-4. **Frozen left header alignment**
-   - The 5 sticky left columns use `rowSpan={2}`. Ensure their background stays `bg-slate-100` and their bottom border aligns with the category row's bottom border so the seam between frozen area and scrollable header disappears.
-
-5. **Totals / Remarks / Weather headers**
-   - Give the trailing `Total` / `Remarks` / `Weather` header cells the same `rowSpan={2}` height + padding as the dept block so all header cells share one visual baseline.
+3. **Footer/totals row** (if present near line ~1082+)
+   - Apply the same group-separator border logic so the totals row aligns visually.
 
 ## Out of scope
 
-- No changes to data fetching, `displayGroups` / `displayCells` computation, orphan handling, save/submit flow, or Saved Entries tab.
-- No column additions/removals; sticky column widths stay identical.
-- No styling changes outside the entry grid header + body cell tint.
+- No data, save/submit, sticky column widths, or OT-hours logic changes.
+- No changes to Saved Entries tab or any other route.
 
 ## Verification
 
-- Reload `/daily-entry`, pick a project with multiple departments (e.g. Civil + Electrical) → header shows two continuous tinted blocks, categories wrap without clipping, no white strip between the two header rows, group separator visible.
-- Horizontal + vertical scroll: frozen left columns still stick, dept + category header rows both stick to top, body column tint stays aligned under its department.
-- Editing headcount, remarks, weather and saving still works (unchanged).
+- Reload `/ot-entry`, pick a project with multiple departments → header shows continuous tinted blocks per department, no white strip, wrapped category names, visible group dividers on header/body/footer, frozen left columns still stick correctly on scroll.
