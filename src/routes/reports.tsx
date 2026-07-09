@@ -249,16 +249,18 @@ function ReportsPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4 md:space-y-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
           <TabsTrigger value="daily">Daily</TabsTrigger>
           <TabsTrigger value="dlr">Daily Labour Report</TabsTrigger>
+          <TabsTrigger value="weekly">Weekly</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
 
 
         {tab === "dlr" && <DlrTab projects={projects} />}
+        {tab === "weekly" && <WeeklyTab projects={projects} />}
         {tab === "summary" && <SummaryTab projects={projects} />}
-        {tab !== "dlr" && tab !== "summary" && (
+        {tab !== "dlr" && tab !== "summary" && tab !== "weekly" && (
         <>
 
 
