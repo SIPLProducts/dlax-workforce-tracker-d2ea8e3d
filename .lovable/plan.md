@@ -1,83 +1,44 @@
-## Weekly Labour Report — new Reports tab + PDF export only
+## Problem
 
-Add a fourth tab **Weekly** in `/reports` that renders and exports the exact 7-day contractor grid from the attached reference. The tab will offer **PDF export only**; Excel export is not required.
+On the Daily Entry screen, the Departments / Categories header area of the entry grid looks broken:
 
-### 1. New tab in `src/routes/reports.tsx`
+- A visible white strip appears between the department header row (Civil, Electrical) and the category header row (Painting, Structural Steel Work, Street Lighting), so the two rows feel detached from the frozen left columns.
+- Department group tint (blue for Civil, green for Electrical) doesn't carry cleanly across both header rows, and the divider between department groups is weak, making it hard to see where Civil ends and Electrical begins.
+- The category sub-header cells are short, unpadded, and center-aligned with tight text, so longer names like "Structural Steel Work" and "Street Lighting" look cramped.
+- Body cells under each department don't inherit the group tint, so once you scroll the header context is lost.
 
-- Extend the `TabsList` with `<TabsTrigger value="weekly">Weekly</TabsTrigger>` (grid becomes `grid-cols-4`).
-- Render `<WeeklyTab projects={projects} />` when `tab === "weekly"`.
-- Add a new `WeeklyTab` component with these controls (styled like `DlrTab`):
-  - **Project** — `ProjectCombobox` (single project, required).
-  - **Week starting** — date picker; the report always spans the picked date + 6 days (matching the Wed→Tue window shown in the reference, but week-start is user-selectable so it works for any week).
-  - Button: **PDF** (primary). No Excel button.
+Data, columns, sticky behavior, totals, and save logic stay exactly as-is. This is a presentation-only pass on `src/routes/daily-entry.tsx`.
 
-### 2. Data fetch
+## Changes (single file: `src/routes/daily-entry.tsx`)
 
-On (project, weekStart) change:
-```
-supabase
-  .from("daily_manpower")
-  .select("headcount, entry_date, contractor_id, departments(name), contractors(id, company_name, contractor_code)")
-  .eq("project_id", projectId)
-  .gte("entry_date", weekStart)
-  .lte("entry_date", weekStart + 6d)
-```
+1. **Unified two-row department header**
+   - Keep the existing two-row `<thead>` structure (dept row + category row) and the current `displayGroups` data.
+   - Give both header rows the same group tint via `g.headerClass` so Civil's blue and Electrical's green form one solid block spanning dept name + its categories.
+   - Add a stronger right border between department groups (e.g. `border-r-2 border-r-slate-300`) on the last cell of each group in both rows to visually separate Civil vs Electrical.
+   - Remove the residual white gap by ensuring both `<tr>`s use the tint background (not `bg-slate-100`) and the sticky `top` offset on the category row matches the actual dept-row height.
 
-Aggregation (in memory):
-- 7 day columns keyed by `entry_date`.
-- For each row, classify as **NMR** if `departments.name` matches `/nmr/i` (same rule used in `DlrTab`), else **IR** (Item Rate / Sub-contractor).
-- Group by `contractor_id`; per contractor per day, sum headcount into `{ ir, nmr }`.
-- Sort contractors by `contractor_code` then `company_name`.
-- Compute per-row: `totalIR`, `totalNMR`, `totalWeek = totalIR + totalNMR`, `perWeek = round(totalWeek / 7)`.
-- Compute column totals + grand totals row.
+2. **Better typography and spacing in headers**
+   - Dept row: `py-2 text-[13px] font-semibold tracking-wide uppercase`.
+   - Category row: `py-2 min-w-[80px] text-[11px] font-medium` with `whitespace-normal leading-tight` so two-word names like "Structural Steel Work" wrap cleanly instead of clipping.
 
-### 3. On-screen table
+3. **Body cells keep group context**
+   - Apply a very light version of the group tint to body cells via `g.cellClass` (already exists) — bump the tint slightly (e.g. `bg-blue-50/40`, `bg-green-50/40`) so each department's column band is visible while scrolling, without overpowering the input.
+   - Keep the stronger right border between groups on body rows too, mirroring the header separator.
 
-Sticky-header table replicating the reference exactly:
+4. **Frozen left header alignment**
+   - The 5 sticky left columns use `rowSpan={2}`. Ensure their background stays `bg-slate-100` and their bottom border aligns with the category row's bottom border so the seam between frozen area and scrollable header disappears.
 
-```text
-┌─────┬───────┬──────────────┬────┬────┬────┬────┬───┬───┬───┬───┬───┬───┬───┬───┬───────┬───────┬────────┬──────────┐
-│S.No │SC Code│Contractor    │Day1     │Day2     │…                                          │Total  │Total  │ Total   │ Per Week │
-│     │       │              │IR │NMR │IR │NMR │                                             │  IR   │ NMR   │Week Lab │(Total/7) │
-└─────┴───────┴──────────────┴────┴────┴────┴────┴───┴───┴───┴───┴───┴───┴───┴───┴───────┴───────┴────────┴──────────┘
-```
+5. **Totals / Remarks / Weather headers**
+   - Give the trailing `Total` / `Remarks` / `Weather` header cells the same `rowSpan={2}` height + padding as the dept block so all header cells share one visual baseline.
 
-- Two header rows with rowspans/colspans identical to the PDF.
-- Zebra body rows, right-aligned numeric cells (blank cells show `""`, not `0`, to match the reference).
-- Bottom **Totals** row (bold, tinted background).
-- Above the table: two-line project + date-range banner ("Name of the Project: {name}" · "KPC PROJECTS LTD" · "KPC" logo mark · "Date: dd.mm.yyyy to dd.mm.yyyy" · centered title "WEEKLY LABOUR REPORT") — laid out like the reference PDF.
+## Out of scope
 
-Empty state: "Select a project and week to preview the weekly labour report."
+- No changes to data fetching, `displayGroups` / `displayCells` computation, orphan handling, save/submit flow, or Saved Entries tab.
+- No column additions/removals; sticky column widths stay identical.
+- No styling changes outside the entry grid header + body cell tint.
 
-### 4. PDF export — pixel-close to the reference
+## Verification
 
-Install `jspdf` and `jspdf-autotable` (`bun add jspdf jspdf-autotable`).
-
-New file `src/lib/weekly-report-pdf.ts`:
-
-- Landscape A4, small margins (10mm).
-- Top band (3-column layout using `doc.text` + rectangles):
-  - Left cell: `Name of the Project: {name}\nDate: dd.mm.yyyy to dd.mm.yyyy`
-  - Middle cell: `KPC PROJECTS LTD` (bold, centered) with `WEEKLY LABOUR REPORT` beneath.
-  - Right cell: `KPC` logo text (bold, boxed) — keeps the exact reference framing without needing an image asset.
-- Body via `autoTable`:
-  - `head`: two rows, using `rowSpan`/`colSpan` to build S.No, SC Code, Contractor, seven `{Wed|Thu|Fri|Sat|Sun|Mon|Tue}` day headers (labels derived from `weekStart`) with IR/NMR leaves, Total IR/NMR, Total Week Labour, Per Week.
-  - `body`: one row per contractor; empty numeric cells rendered as `""`.
-  - `foot`: totals row (bold).
-  - Thin grid lines, Helvetica 8pt, header fill light grey — matches the reference styling.
-- Filename: `Weekly-Labour-Report-{projectCode|name}-{weekStart:ddMMyyyy}.pdf`.
-
-### 5. Notes
-
-- No Excel export for the Weekly tab; existing Excel exports for other tabs remain unchanged.
-- No schema changes; reuses `daily_manpower`, `contractors.contractor_code`, `departments.name`.
-- No changes to Daily / DLR / Summary tabs.
-- All formatting stays in presentation code (`WeeklyTab`, `weekly-report-pdf.ts`).
-- Screens permission gating already handled by `ScreenGuard` on the route.
-
-### Files touched
-
-- `src/routes/reports.tsx` — new `WeeklyTab`, extra `TabsTrigger`, PDF button only.
-- `src/lib/weekly-report-pdf.ts` — new.
-- `src/lib/weekly-report.ts` — shared matrix builder (reused by Weekly tab and PDF).
-- `package.json` / lockfile — adds `jspdf`, `jspdf-autotable`.
+- Reload `/daily-entry`, pick a project with multiple departments (e.g. Civil + Electrical) → header shows two continuous tinted blocks, categories wrap without clipping, no white strip between the two header rows, group separator visible.
+- Horizontal + vertical scroll: frozen left columns still stick, dept + category header rows both stick to top, body column tint stays aligned under its department.
+- Editing headcount, remarks, weather and saving still works (unchanged).
