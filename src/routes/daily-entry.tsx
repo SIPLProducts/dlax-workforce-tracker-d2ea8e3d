@@ -961,19 +961,21 @@ function DailyEntryPage() {
                       <td style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border-r border-b px-2 sticky left-[148px] bg-background bg-clip-padding z-20 box-border font-medium truncate" title={c.company_name}>{c.company_name}</td>
                       <td style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border-r border-b px-2 text-center sticky left-[368px] bg-background bg-clip-padding z-20 box-border truncate">{c.contact_number || ""}</td>
                       <td style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border-b px-2 sticky left-[488px] bg-background bg-clip-padding z-30 box-border border-r-2 border-r-slate-300 truncate" title={c.work_place || ""}>{c.work_place || ""}</td>
-                      {displayGroups.map((g) => g.cells.map((col) => {
+                      {displayGroups.map((g) => g.cells.map((col, ci) => {
                         const isOrphan = orphanKeySet.has(col.key);
+                        const isLastInGroup = ci === g.cells.length - 1;
                         const val = r.cells[col.key] || 0;
+                        const borderCls = isLastInGroup ? "border-r-2 border-r-slate-300" : "border-r border-r-slate-200";
                         if (isOrphan) {
                           return (
-                            <td key={col.key} className={cn("border-r border-b text-center text-amber-900", g.cellClass)}
+                            <td key={col.key} className={cn("border-b text-center text-amber-900", borderCls, g.cellClass)}
                                 title="Department/category no longer assigned to this project — re-assign in Masters → Project Assignments to edit.">
                               {val || ""}
                             </td>
                           );
                         }
                         return (
-                          <td key={col.key} className={cn("border-r border-b", g.cellClass)}>
+                          <td key={col.key} className={cn("border-b", borderCls, g.cellClass)}>
                             {numCell(val, (n) => updateCell(c.id, col.key, n))}
                           </td>
                         );
