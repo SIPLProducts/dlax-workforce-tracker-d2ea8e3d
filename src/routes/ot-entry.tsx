@@ -1116,7 +1116,12 @@ function OtEntryPage() {
                     <td style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="border sticky left-[148px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
                     <td style={{ width: 120, minWidth: 120, maxWidth: 120 }} className="border sticky left-[368px] bg-yellow-100 bg-clip-padding z-20 box-border"></td>
                     <td style={{ width: 160, minWidth: 160, maxWidth: 160 }} className="border sticky left-[488px] bg-yellow-100 bg-clip-padding z-30 box-border border-r-2 border-r-slate-300"></td>
-                    {displayCells.map((c) => (<td key={c.key} className="border text-center">{colTotals[c.key] || ""}</td>))}
+                    {displayGroups.flatMap((g) => g.cells.map((col, ci) => {
+                      const isLastInGroup = ci === g.cells.length - 1;
+                      const borderCls = isLastInGroup ? "border-r-2 border-r-slate-300" : "border-r border-r-slate-200";
+                      return (<td key={col.key} className={cn("border-b border-t text-center", borderCls)}>{colTotals[col.key] || ""}</td>);
+                    }))}
+
                     <td className="border text-center bg-green-200">{colTotals.total || ""}</td>
                     <td className="border"></td>
                     <td className="border"></td>
