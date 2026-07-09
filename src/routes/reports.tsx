@@ -24,7 +24,6 @@ import { downloadDlrMatrixXlsx } from "@/lib/dlr-daily-matrix";
 import { downloadSummaryMatrixXlsx } from "@/lib/summary-matrix-xlsx";
 import { buildWeeklyMatrix, weeklyDateRangeLabel, type WeeklyMatrix } from "@/lib/weekly-report";
 import { downloadWeeklyReportPdf } from "@/lib/weekly-report-pdf";
-import { downloadWeeklyReportXlsx } from "@/lib/weekly-report-xlsx";
 import { addDays } from "date-fns";
 import { FileSpreadsheet, FileText, LayoutGrid, FileDown } from "lucide-react";
 
@@ -1085,13 +1084,6 @@ function WeeklyTab({ projects }: { projects: any[] }) {
                 disabled={!matrix || matrix.rows.length === 0}
               >
                 <FileDown className="mr-2 h-4 w-4" /> PDF
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => matrix && downloadWeeklyReportXlsx(matrix, `${fileBase}.xlsx`)}
-                disabled={!matrix || matrix.rows.length === 0}
-              >
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
               </Button>
             </div>
           </div>

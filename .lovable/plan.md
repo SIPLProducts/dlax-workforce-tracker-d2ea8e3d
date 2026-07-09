@@ -1,7 +1,6 @@
+## Weekly Labour Report — new Reports tab + PDF export only
 
-## Weekly Labour Report — new Reports tab + PDF export
-
-Add a fourth tab **Weekly** in `/reports` that renders and exports the exact 7-day contractor grid from the attached reference (IR / NMR sub-columns per weekday, Total IR, Total NMR, Total Week Labour, Per Week average, project + date-range header, KPC branding, totals row).
+Add a fourth tab **Weekly** in `/reports` that renders and exports the exact 7-day contractor grid from the attached reference. The tab will offer **PDF export only**; Excel export is not required.
 
 ### 1. New tab in `src/routes/reports.tsx`
 
@@ -10,7 +9,7 @@ Add a fourth tab **Weekly** in `/reports` that renders and exports the exact 7-d
 - Add a new `WeeklyTab` component with these controls (styled like `DlrTab`):
   - **Project** — `ProjectCombobox` (single project, required).
   - **Week starting** — date picker; the report always spans the picked date + 6 days (matching the Wed→Tue window shown in the reference, but week-start is user-selectable so it works for any week).
-  - Buttons: **PDF** (primary), **Excel**.
+  - Button: **PDF** (primary). No Excel button.
 
 ### 2. Data fetch
 
@@ -68,20 +67,17 @@ New file `src/lib/weekly-report-pdf.ts`:
   - Thin grid lines, Helvetica 8pt, header fill light grey — matches the reference styling.
 - Filename: `Weekly-Labour-Report-{projectCode|name}-{weekStart:ddMMyyyy}.pdf`.
 
-### 5. Excel export
+### 5. Notes
 
-New file `src/lib/weekly-report-xlsx.ts` using existing `xlsx-js-style` (already a dep). Same layout as the PDF (title banner rows + merged two-row header + totals). Bordered cells, frozen top rows, landscape page setup. Filename mirrors the PDF.
-
-### 6. Notes
-
+- No Excel export for the Weekly tab; existing Excel exports for other tabs remain unchanged.
 - No schema changes; reuses `daily_manpower`, `contractors.contractor_code`, `departments.name`.
 - No changes to Daily / DLR / Summary tabs.
-- All formatting stays in presentation code (`WeeklyTab`, `weekly-report-pdf.ts`, `weekly-report-xlsx.ts`).
+- All formatting stays in presentation code (`WeeklyTab`, `weekly-report-pdf.ts`).
 - Screens permission gating already handled by `ScreenGuard` on the route.
 
 ### Files touched
 
-- `src/routes/reports.tsx` — new `WeeklyTab`, extra `TabsTrigger`.
+- `src/routes/reports.tsx` — new `WeeklyTab`, extra `TabsTrigger`, PDF button only.
 - `src/lib/weekly-report-pdf.ts` — new.
-- `src/lib/weekly-report-xlsx.ts` — new.
+- `src/lib/weekly-report.ts` — shared matrix builder (reused by Weekly tab and PDF).
 - `package.json` / lockfile — adds `jspdf`, `jspdf-autotable`.
