@@ -1134,12 +1134,10 @@ function WeeklyTab({ projects }: { projects: any[] }) {
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Per Week (Total/7)</th>
                     </tr>
                     <tr>
-                      {matrix.days.map((_, i) => (
-                        <>
-                          <th key={`ir-${i}`} className="border px-2 py-1 text-center">IR</th>
-                          <th key={`nmr-${i}`} className="border px-2 py-1 text-center">NMR</th>
-                        </>
-                      ))}
+                      {matrix.days.flatMap((_, i) => [
+                        <th key={`ir-${i}`} className="border px-2 py-1 text-center">IR</th>,
+                        <th key={`nmr-${i}`} className="border px-2 py-1 text-center">NMR</th>,
+                      ])}
                     </tr>
                   </thead>
                   <tbody>
