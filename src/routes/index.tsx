@@ -101,7 +101,7 @@ function DashboardContent() {
   const initial = loadFilters();
 
   const [rangeDays, setRangeDays] = useState<number>(initial.rangeDays);
-  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), initial.rangeDays - 1));
+  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), (initial.rangeDays > 0 ? initial.rangeDays : 30) - 1));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [projectId, setProjectId] = useState(initial.projectId);
   const [contractorId, setContractorId] = useState(initial.contractorId);
@@ -121,7 +121,7 @@ function DashboardContent() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays, projectId, contractorId, departmentId }));
+      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectId, contractorId, departmentId }));
     } catch {}
   }, [rangeDays, projectId, contractorId, departmentId, user?.id]);
 
