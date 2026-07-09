@@ -1,18 +1,28 @@
-## Fix Available Contractors list scope
+## Fix: Dashboard "From Date" defaulting to tomorrow
 
-In `src/components/ProjectAssignments.tsx`, the Contractors tab currently shows every contractor that isn't already assigned to another project in the Available column. The user wants the Available column to be scoped only to the currently selected project — i.e. never surface contractors that belong to (or were created outside of) this project.
+### Root cause
+In `src/routes/index.tsx`:
 
-### Change
+- Line 313/314 sets `rangeDays = 0` whenever the user picks a From/To date, and this `0` is persisted to `localStorage` (line 124).
+- On next load, line 104 computes `dateFrom = subDays(new Date(), initial.rangeDays - 1)` → `subDays(today, -1)` → **tomorrow**.
 
-In `AssignmentSection` (kind === `contractors` branch of `load()`):
-- Treat every contractor NOT already assigned to this project as "not related" and hide them from the Available list.
-- Result: Assigned column keeps showing this project's 115 contractors; Available column shows 0 entries with the existing "No more available." empty state.
-- Users add new contractors to the project exclusively via the existing **Add & Assign** dialog (which already creates the contractor and links it to the current project in one step).
+That matches the screenshot: From = 10 Jul, To = 09 Jul.
 
-Departments and Categories tabs are unchanged — those masters are shared across projects by design.
+### Fix
+Clamp the initial `rangeDays` to a safe minimum when computing the default `dateFrom`, so a persisted `0` (custom range) no longer produces a future date.
 
-### Technical detail
+Change line 104 to use an effective range of at least 1 day:
+```ts
+const effectiveRange = initial.rangeDays > 0 ? initial.rangeDays : 30;
+const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), effectiveRange - 1));
+```
 
-Replace the visibility filter for `kind === "contractors"` so `visible` only contains contractors whose id is in `assignedHere`. Drop the now-unused `get_globally_assigned_contractor_ids` RPC call for this screen (the DB function stays; only this caller is removed).
+Also stop persisting `rangeDays: 0` (custom) — only persist when it's one of the preset ranges — so reopening the dashboard restores a valid preset window instead of a broken one:
+```ts
+localStorage.setItem(FILTER_KEY, JSON.stringify({
+  rangeDays: rangeDays > 0 ? rangeDays : 30,
+  projectId, contractorId, departmentId,
+}));
+```
 
-No schema, RLS, or migration changes required.
+No other logic (data loading, filters, exports) changes.
