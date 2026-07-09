@@ -1153,12 +1153,10 @@ function WeeklyTab({ projects }: { projects: any[] }) {
                         <td className="border px-2 py-1 text-center">{i + 1}</td>
                         <td className="border px-2 py-1 text-center">{r.code}</td>
                         <td className="border px-2 py-1">{r.name}</td>
-                        {r.days.map((d, j) => (
-                          <>
-                            <td key={`ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>
-                            <td key={`nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>
-                          </>
-                        ))}
+                        {r.days.flatMap((d, j) => [
+                          <td key={`ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>,
+                          <td key={`nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>,
+                        ])}
                         <td className="border px-2 py-1 text-right tabular-nums font-semibold">{fmt(r.totalIR)}</td>
                         <td className="border px-2 py-1 text-right tabular-nums font-semibold">{fmt(r.totalNMR)}</td>
                         <td className="border px-2 py-1 text-right tabular-nums font-semibold">{fmt(r.totalWeek)}</td>
