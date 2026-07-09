@@ -22,7 +22,11 @@ import { DlrDailyPreview } from "@/components/DlrDailyPreview";
 import { getDlrDailyMatrix, downloadDlrXlsx, downloadDlrCsv } from "@/lib/dlr-daily";
 import { downloadDlrMatrixXlsx } from "@/lib/dlr-daily-matrix";
 import { downloadSummaryMatrixXlsx } from "@/lib/summary-matrix-xlsx";
-import { FileSpreadsheet, FileText, LayoutGrid } from "lucide-react";
+import { buildWeeklyMatrix, weeklyDateRangeLabel, type WeeklyMatrix } from "@/lib/weekly-report";
+import { downloadWeeklyReportPdf } from "@/lib/weekly-report-pdf";
+import { downloadWeeklyReportXlsx } from "@/lib/weekly-report-xlsx";
+import { addDays } from "date-fns";
+import { FileSpreadsheet, FileText, LayoutGrid, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: () => (
