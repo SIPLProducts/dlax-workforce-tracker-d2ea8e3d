@@ -1,28 +1,56 @@
-## Fix: Dashboard "From Date" defaulting to tomorrow
+## Problem
 
-### Root cause
-In `src/routes/index.tsx`:
+On the self-hosted server, Daily Entry and OT Entry show no contractor rows even though Project Assignments shows all 97 contractors, 5 departments, and 49 categories are assigned to the project (GENMNGR). The screenshot of Daily Entry confirms the category header columns render (so category loading works), but the body table has no rows — meaning the contractor fetch is returning empty.
 
-- Line 313/314 sets `rangeDays = 0` whenever the user picks a From/To date, and this `0` is persisted to `localStorage` (line 124).
-- On next load, line 104 computes `dateFrom = subDays(new Date(), initial.rangeDays - 1)` → `subDays(today, -1)` → **tomorrow**.
+## Root cause
 
-That matches the screenshot: From = 10 Jul, To = 09 Jul.
+Both `src/routes/daily-entry.tsx` and `src/routes/ot-entry.tsx` load contractors in a two-step pattern:
 
-### Fix
-Clamp the initial `rangeDays` to a safe minimum when computing the default `dateFrom`, so a persisted `0` (custom range) no longer produces a future date.
+1. Fetch all `project_contractors` rows for the project → collect ~97 contractor UUIDs.
+2. Call `supabase.from("contractors").select(...).in("id", [<97 UUIDs>])`.
 
-Change line 104 to use an effective range of at least 1 day:
+Step 2 turns into a GET request with a query string containing all 97 UUIDs (~3.7 KB just for the `id=in.(...)` filter). Self-hosted Kong / PostgREST on the customer's stack rejects or truncates URLs this long — the same class of failure we already hit and fixed on the Project Assignments screen (the earlier 502 with 104 UUIDs). Managed Supabase tolerates the long URL, so it works in preview but fails in the self-hosted deployment: the request errors out and the code falls into the empty-array branch silently.
+
+The same pattern exists for departments (`.in("id", deptIds)`) and categories (`.in("id", catIds)`); Assignments UI shows 49 assigned categories, which will also blow the URL budget.
+
+## Fix
+
+Replace the two-step "fetch IDs then `.in(...)`" with a single embedded-relation query for each of the three lists, matching the pattern already used elsewhere. This keeps the URL short (one `project_id=eq.<uuid>` filter) and lets PostgREST return the joined master rows in one round trip.
+
+Files: `src/routes/daily-entry.tsx` and `src/routes/ot-entry.tsx` — the two `useEffect` blocks that load contractors and assignments (lines ~199–260 in daily-entry, ~261–320 in ot-entry).
+
+New shape for contractors:
+
 ```ts
-const effectiveRange = initial.rangeDays > 0 ? initial.rangeDays : 30;
-const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), effectiveRange - 1));
+supabase
+  .from("project_contractors")
+  .select("contractor:contractors(id,company_name,contact_number,work_place,contractor_code)")
+  .eq("project_id", projectId);
+// then map rows -> row.contractor, filter nulls, sort by company_name in JS
 ```
 
-Also stop persisting `rangeDays: 0` (custom) — only persist when it's one of the preset ranges — so reopening the dashboard restores a valid preset window instead of a broken one:
+New shape for departments and categories (single query each):
+
 ```ts
-localStorage.setItem(FILTER_KEY, JSON.stringify({
-  rangeDays: rangeDays > 0 ? rangeDays : 30,
-  projectId, contractorId, departmentId,
-}));
+supabase
+  .from("project_departments")
+  .select("department:departments(id,name)")
+  .eq("project_id", projectId);
+
+supabase
+  .from("project_categories")
+  .select("category:worker_categories(id,name,display_order)")
+  .eq("project_id", projectId);
 ```
 
-No other logic (data loading, filters, exports) changes.
+`department_categories` (all links) stays as-is — it's a small global table, no `.in()` involved.
+
+State setters, downstream logic, realtime subscriptions, and UI remain unchanged. Only the fetch shape changes.
+
+## Verification
+
+After the change, on the self-hosted server the Daily Entry and OT Entry screens for the GENMNGR project should render all 97 assigned contractors as rows, with all 5 department groups and 49 category columns in the header — matching what Project Assignments already shows.
+
+## Out of scope
+
+No schema, RLS, or Kong/nginx changes are required — the assignment data already exists in the DB and Project Assignments proves it is readable. This is purely a client-side query refactor.

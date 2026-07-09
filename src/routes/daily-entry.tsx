@@ -201,18 +201,16 @@ function DailyEntryPage() {
       // Strict project scope: only show contractors assigned to this project via Masters → Project Assignments.
       if (!projectId) { setContractors([]); setContractorsReady(true); return; }
       setContractorsReady(false);
+      // Single embedded-relation query — keeps URL short on self-hosted stacks (avoids giant .in() lists).
       const { data: joins } = await supabase
         .from("project_contractors")
-        .select("contractor_id")
+        .select("contractor:contractors(id,company_name,contact_number,work_place,contractor_code)")
         .eq("project_id", projectId);
-      const ids = (joins || []).map((j: any) => j.contractor_id);
-      if (ids.length === 0) { setContractors([]); setContractorsReady(true); return; }
-      const { data } = await supabase
-        .from("contractors")
-        .select("id,company_name,contact_number,work_place,contractor_code")
-        .in("id", ids)
-        .order("company_name");
-      setContractors(data || []);
+      const list = ((joins || []) as any[])
+        .map((r) => r.contractor)
+        .filter((c): c is any => !!c && !!c.id);
+      list.sort((a, b) => String(a.company_name || "").localeCompare(String(b.company_name || "")));
+      setContractors(list);
       setContractorsReady(true);
     };
     fetchContractors();
@@ -229,22 +227,16 @@ function DailyEntryPage() {
       if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); setAssignmentsReady(true); return; }
       setAssignmentsReady(false);
       const [{ data: pd }, { data: pc }, { data: dc }] = await Promise.all([
-        supabase.from("project_departments").select("department_id").eq("project_id", projectId),
-        supabase.from("project_categories").select("category_id").eq("project_id", projectId),
+        supabase.from("project_departments").select("department:departments(id,name)").eq("project_id", projectId),
+        supabase.from("project_categories").select("category:worker_categories(id,name,display_order)").eq("project_id", projectId),
         supabase.from("department_categories").select("department_id, category_id"),
       ]);
-      const deptIds = (pd || []).map((r: any) => r.department_id);
-      const catIds = (pc || []).map((r: any) => r.category_id);
-      const [{ data: depts }, { data: cats }] = await Promise.all([
-        deptIds.length
-          ? supabase.from("departments").select("id,name").in("id", deptIds).order("name")
-          : Promise.resolve({ data: [] as any[] }),
-        catIds.length
-          ? supabase.from("worker_categories").select("id,name,display_order").in("id", catIds).order("display_order").order("name")
-          : Promise.resolve({ data: [] as any[] }),
-      ]);
-      setAssignedDepts(depts || []);
-      setAssignedCats(cats || []);
+      const depts = ((pd || []) as any[]).map((r) => r.department).filter((d): d is any => !!d && !!d.id);
+      depts.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+      const cats = ((pc || []) as any[]).map((r) => r.category).filter((c): c is any => !!c && !!c.id);
+      cats.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || String(a.name || "").localeCompare(String(b.name || "")));
+      setAssignedDepts(depts);
+      setAssignedCats(cats);
       setDeptCatLinks(dc || []);
       setAssignmentsReady(true);
     };
