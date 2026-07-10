@@ -1,56 +1,87 @@
-## Problem
+## Cause
 
-On the self-hosted server, Daily Entry and OT Entry show no contractor rows even though Project Assignments shows all 97 contractors, 5 departments, and 49 categories are assigned to the project (GENMNGR). The screenshot of Daily Entry confirms the category header columns render (so category loading works), but the body table has no rows — meaning the contractor fetch is returning empty.
+The request URL and response confirm this is not a frontend URL issue. The insert reaches PostgREST, but the database rejects it because the `daily_manpower` INSERT RLS policy fails.
 
-## Root cause
+The current insert policy depends on:
 
-Both `src/routes/daily-entry.tsx` and `src/routes/ot-entry.tsx` load contractors in a two-step pattern:
+```sql
+public.has_project_access(auth.uid(), project_id)
+```
 
-1. Fetch all `project_contractors` rows for the project → collect ~97 contractor UUIDs.
-2. Call `supabase.from("contractors").select(...).in("id", [<97 UUIDs>])`.
+Your existing `has_project_access` function only gives admin/user-management users all-project access when they have **no rows** in `user_projects`. If the admin account has even one assigned project but not the selected project, `has_project_access` returns `false`, so saving `daily_manpower` fails with:
 
-Step 2 turns into a GET request with a query string containing all 97 UUIDs (~3.7 KB just for the `id=in.(...)` filter). Self-hosted Kong / PostgREST on the customer's stack rejects or truncates URLs this long — the same class of failure we already hit and fixed on the Project Assignments screen (the earlier 502 with 104 UUIDs). Managed Supabase tolerates the long URL, so it works in preview but fails in the self-hosted deployment: the request errors out and the code falls into the empty-array branch silently.
-
-The same pattern exists for departments (`.in("id", deptIds)`) and categories (`.in("id", catIds)`); Assignments UI shows 49 assigned categories, which will also blow the URL budget.
+```json
+{
+  "code": "42501",
+  "message": "new row violates row-level security policy for table \"daily_manpower\""
+}
+```
 
 ## Fix
 
-Replace the two-step "fetch IDs then `.in(...)`" with a single embedded-relation query for each of the three lists, matching the pattern already used elsewhere. This keeps the URL short (one `project_id=eq.<uuid>` filter) and lets PostgREST return the joined master rows in one round trip.
+Update the database function `public.has_project_access` so:
 
-Files: `src/routes/daily-entry.tsx` and `src/routes/ot-entry.tsx` — the two `useEffect` blocks that load contractors and assignments (lines ~199–260 in daily-entry, ~261–320 in ot-entry).
+- Admin users always have access to all projects.
+- Users with `user_management` edit access keep all-project access.
+- Non-admin/non-user-management users remain scoped only to projects assigned in `user_projects`.
 
-New shape for contractors:
+New function logic:
 
-```ts
-supabase
-  .from("project_contractors")
-  .select("contractor:contractors(id,company_name,contact_number,work_place,contractor_code)")
-  .eq("project_id", projectId);
-// then map rows -> row.contractor, filter nulls, sort by company_name in JS
+```sql
+CREATE OR REPLACE FUNCTION public.has_project_access(_user_id uuid, _project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT
+    public.has_role(_user_id, 'admin'::app_role)
+    OR public.has_screen_edit(_user_id, 'user_management')
+    OR EXISTS (
+      SELECT 1
+      FROM public.user_projects
+      WHERE user_id = _user_id
+        AND project_id = _project_id
+    );
+$$;
 ```
 
-New shape for departments and categories (single query each):
+## Why this is safe
 
-```ts
-supabase
-  .from("project_departments")
-  .select("department:departments(id,name)")
-  .eq("project_id", projectId);
+This does not open access to normal users. It only restores expected global access for admin/user-management users. Existing RLS policies for `daily_manpower`, `worker_attendance`, project assignments, and sheets will automatically use the corrected function.
 
-supabase
-  .from("project_categories")
-  .select("category:worker_categories(id,name,display_order)")
-  .eq("project_id", projectId);
+## Self-hosted SQL to run
+
+Run this in your self-hosted database using `psql` inside the `dlax-db` container:
+
+```bash
+docker exec -i dlax-db psql -U postgres -d postgres <<'SQL'
+CREATE OR REPLACE FUNCTION public.has_project_access(_user_id uuid, _project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT
+    public.has_role(_user_id, 'admin'::app_role)
+    OR public.has_screen_edit(_user_id, 'user_management')
+    OR EXISTS (
+      SELECT 1
+      FROM public.user_projects
+      WHERE user_id = _user_id
+        AND project_id = _project_id
+    );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.has_project_access(uuid, uuid) TO authenticated;
+NOTIFY pgrst, 'reload schema';
+SQL
 ```
 
-`department_categories` (all links) stays as-is — it's a small global table, no `.in()` involved.
+## Verify
 
-State setters, downstream logic, realtime subscriptions, and UI remain unchanged. Only the fetch shape changes.
-
-## Verification
-
-After the change, on the self-hosted server the Daily Entry and OT Entry screens for the GENMNGR project should render all 97 assigned contractors as rows, with all 5 department groups and 49 category columns in the header — matching what Project Assignments already shows.
-
-## Out of scope
-
-No schema, RLS, or Kong/nginx changes are required — the assignment data already exists in the DB and Project Assignments proves it is readable. This is purely a client-side query refactor.
+1. Refresh the app.
+2. Open Daily Entry for the same project/date.
+3. Click Save.
+4. The RLS error should be gone.
+5. Also test OT Entry because it uses similar project-access logic.
