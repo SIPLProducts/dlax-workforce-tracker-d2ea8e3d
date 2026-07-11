@@ -7,12 +7,13 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export async function fetchHeadcountTotals(
   sheetIds: string[],
-  chunkSize = 100,
+  chunkSize = 25,
 ): Promise<Record<string, number>> {
   const totals: Record<string, number> = {};
   if (!sheetIds || sheetIds.length === 0) return totals;
-  for (let i = 0; i < sheetIds.length; i += chunkSize) {
-    const chunk = sheetIds.slice(i, i + chunkSize);
+  const unique = Array.from(new Set(sheetIds.filter(Boolean)));
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
     const { data, error } = await supabase
       .from("daily_manpower")
       .select("sheet_id, headcount")
