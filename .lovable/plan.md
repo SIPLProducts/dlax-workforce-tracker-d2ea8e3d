@@ -1,87 +1,61 @@
-## Cause
+## Diagnosis
 
-The request URL and response confirm this is not a frontend URL issue. The insert reaches PostgREST, but the database rejects it because the `daily_manpower` INSERT RLS policy fails.
+Root cause of the empty Daily Entry / OT Entry screens: the assignment queries use **PostgREST embedded relations** (`department:departments(id,name)`, `category:worker_categories(...)`, `contractor:contractors(...)`), and on the self-hosted stack those nested objects come back as `null` — so the mapped arrays end up empty. Meanwhile the **Project Assignments** screen works because it never uses embedded relations: it queries the master table (`contractors` / `departments` / `worker_categories`) and the join table (`project_contractors` / `_departments` / `_categories`) as two separate reads, then joins in JS.
 
-The current insert policy depends on:
+The self-hosted PostgREST doesn't reliably detect the FKs (schema cache) or apply grants through the embed. That's why counts show in the Assignments screen but the Data Entry / OT screens show "No departments or categories assigned to this project."
 
-```sql
-public.has_project_access(auth.uid(), project_id)
-```
-
-Your existing `has_project_access` function only gives admin/user-management users all-project access when they have **no rows** in `user_projects`. If the admin account has even one assigned project but not the selected project, `has_project_access` returns `false`, so saving `daily_manpower` fails with:
-
-```json
-{
-  "code": "42501",
-  "message": "new row violates row-level security policy for table \"daily_manpower\""
-}
-```
+There is **no code-side limit on contractors per project**. The 55 you see all render in Project Assignments; the two `.limit(500)` values in Daily/OT Entry are on the *saved-sheets history table*, not contractors. Once the query pattern is fixed, all assigned contractors will appear.
 
 ## Fix
 
-Update the database function `public.has_project_access` so:
+Match the pattern that already works in `ProjectAssignments.tsx`. In both `src/routes/daily-entry.tsx` and `src/routes/ot-entry.tsx`, replace each embedded-relation fetch with two parallel non-embedded fetches, then join client-side.
 
-- Admin users always have access to all projects.
-- Users with `user_management` edit access keep all-project access.
-- Non-admin/non-user-management users remain scoped only to projects assigned in `user_projects`.
+### `src/routes/daily-entry.tsx`
 
-New function logic:
-
-```sql
-CREATE OR REPLACE FUNCTION public.has_project_access(_user_id uuid, _project_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT
-    public.has_role(_user_id, 'admin'::app_role)
-    OR public.has_screen_edit(_user_id, 'user_management')
-    OR EXISTS (
-      SELECT 1
-      FROM public.user_projects
-      WHERE user_id = _user_id
-        AND project_id = _project_id
-    );
-$$;
+**Contractors fetch (around line 205):**
+```ts
+const [{ data: joins }, { data: masters }] = await Promise.all([
+  supabase.from("project_contractors").select("contractor_id").eq("project_id", projectId),
+  supabase.from("contractors").select("id,company_name,contact_number,work_place,contractor_code"),
+]);
+const idSet = new Set((joins || []).map((j: any) => j.contractor_id).filter(Boolean));
+const list = (masters || []).filter((c: any) => idSet.has(c.id));
+list.sort((a, b) => String(a.company_name || "").localeCompare(String(b.company_name || "")));
+setContractors(list);
 ```
 
-## Why this is safe
-
-This does not open access to normal users. It only restores expected global access for admin/user-management users. Existing RLS policies for `daily_manpower`, `worker_attendance`, project assignments, and sheets will automatically use the corrected function.
-
-## Self-hosted SQL to run
-
-Run this in your self-hosted database using `psql` inside the `dlax-db` container:
-
-```bash
-docker exec -i dlax-db psql -U postgres -d postgres <<'SQL'
-CREATE OR REPLACE FUNCTION public.has_project_access(_user_id uuid, _project_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT
-    public.has_role(_user_id, 'admin'::app_role)
-    OR public.has_screen_edit(_user_id, 'user_management')
-    OR EXISTS (
-      SELECT 1
-      FROM public.user_projects
-      WHERE user_id = _user_id
-        AND project_id = _project_id
-    );
-$$;
-
-GRANT EXECUTE ON FUNCTION public.has_project_access(uuid, uuid) TO authenticated;
-NOTIFY pgrst, 'reload schema';
-SQL
+**Assignments fetch (around line 229):**
+```ts
+const [{ data: pd }, { data: pc }, { data: dc }, { data: dept }, { data: cat }] = await Promise.all([
+  supabase.from("project_departments").select("department_id").eq("project_id", projectId),
+  supabase.from("project_categories").select("category_id").eq("project_id", projectId),
+  supabase.from("department_categories").select("department_id, category_id"),
+  supabase.from("departments").select("id,name"),
+  supabase.from("worker_categories").select("id,name,display_order"),
+]);
+const deptIds = new Set((pd || []).map((r: any) => r.department_id).filter(Boolean));
+const catIds  = new Set((pc || []).map((r: any) => r.category_id).filter(Boolean));
+const depts = (dept || []).filter((d: any) => deptIds.has(d.id));
+const cats  = (cat  || []).filter((c: any) => catIds.has(c.id));
+depts.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+cats.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || String(a.name || "").localeCompare(String(b.name || "")));
+setAssignedDepts(depts);
+setAssignedCats(cats);
+setDeptCatLinks(dc || []);
 ```
 
-## Verify
+### `src/routes/ot-entry.tsx`
 
-1. Refresh the app.
-2. Open Daily Entry for the same project/date.
-3. Click Save.
-4. The RLS error should be gone.
-5. Also test OT Entry because it uses similar project-access logic.
+Apply the exact same two changes at the analogous positions (lines ~268 for contractors and ~292 for assignments).
+
+### No limits touched
+
+No `.limit()` on contractor queries exists anywhere — nothing to remove. After the fix, all 55 (or any number of) assigned contractors will render.
+
+## Verification
+
+1. On the self-hosted deployment, open **Daily Entry** with the BHELSTPP project selected — table should list all 55 contractors with the Civil / Electrical department groups and their 3 category columns.
+2. Open **OT Entry Sheet** — same list appears.
+3. Assign a new contractor from Project Assignments → it appears live in Daily / OT Entry (realtime subscription is untouched).
+
+Approve and I'll apply the two file edits.
