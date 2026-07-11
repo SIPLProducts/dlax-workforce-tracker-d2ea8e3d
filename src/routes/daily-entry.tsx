@@ -201,14 +201,13 @@ function DailyEntryPage() {
       // Strict project scope: only show contractors assigned to this project via Masters → Project Assignments.
       if (!projectId) { setContractors([]); setContractorsReady(true); return; }
       setContractorsReady(false);
-      // Single embedded-relation query — keeps URL short on self-hosted stacks (avoids giant .in() lists).
-      const { data: joins } = await supabase
-        .from("project_contractors")
-        .select("contractor:contractors(id,company_name,contact_number,work_place,contractor_code)")
-        .eq("project_id", projectId);
-      const list = ((joins || []) as any[])
-        .map((r) => r.contractor)
-        .filter((c): c is any => !!c && !!c.id);
+      // Two-step fetch (no embedded relations) — works reliably on self-hosted PostgREST.
+      const [{ data: joins }, { data: masters }] = await Promise.all([
+        supabase.from("project_contractors").select("contractor_id").eq("project_id", projectId),
+        supabase.from("contractors").select("id,company_name,contact_number,work_place,contractor_code"),
+      ]);
+      const idSet = new Set(((joins || []) as any[]).map((j) => j.contractor_id).filter(Boolean));
+      const list = ((masters || []) as any[]).filter((c) => idSet.has(c.id));
       list.sort((a, b) => String(a.company_name || "").localeCompare(String(b.company_name || "")));
       setContractors(list);
       setContractorsReady(true);
