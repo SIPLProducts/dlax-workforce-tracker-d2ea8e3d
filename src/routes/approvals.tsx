@@ -74,11 +74,7 @@ function Page() {
     ]);
     // Fetch totals
     const ids = (sh.data || []).map((s: any) => s.id);
-    let totals: Record<string, number> = {};
-    if (ids.length) {
-      const { data: dm } = await supabase.from("daily_manpower").select("sheet_id, headcount").in("sheet_id", ids);
-      (dm || []).forEach((r: any) => { totals[r.sheet_id] = (totals[r.sheet_id] || 0) + (r.headcount || 0); });
-    }
+    const totals = await fetchHeadcountTotals(ids);
     setSheets((sh.data || []).map((s: any) => ({ ...s, total_headcount: totals[s.id] || 0 })));
     setProjects((pr.data || []) as any);
     setLevels((lv.data || []) as Level[]);
