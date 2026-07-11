@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchHeadcountTotals } from "@/lib/headcount-totals";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -628,14 +629,7 @@ function OtEntryPage() {
       .order("entry_date", { ascending: false })
       .limit(500);
     const sheetIds = (sheets || []).map((s: any) => s.id);
-    let totals: Record<string, number> = {};
-    if (sheetIds.length > 0) {
-      const { data: dm } = await supabase
-        .from("daily_manpower")
-        .select("sheet_id, headcount")
-        .in("sheet_id", sheetIds);
-      (dm || []).forEach((r: any) => { totals[r.sheet_id] = (totals[r.sheet_id] || 0) + (r.headcount || 0); });
-    }
+    const totals = await fetchHeadcountTotals(sheetIds);
     setAllSheets((sheets || []).map((s: any) => ({
       id: s.id,
       sheet_code: s.sheet_code,

@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchHeadcountTotals } from "@/lib/headcount-totals";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,11 +75,7 @@ function Page() {
     ]);
     // Fetch totals
     const ids = (sh.data || []).map((s: any) => s.id);
-    let totals: Record<string, number> = {};
-    if (ids.length) {
-      const { data: dm } = await supabase.from("daily_manpower").select("sheet_id, headcount").in("sheet_id", ids);
-      (dm || []).forEach((r: any) => { totals[r.sheet_id] = (totals[r.sheet_id] || 0) + (r.headcount || 0); });
-    }
+    const totals = await fetchHeadcountTotals(ids);
     setSheets((sh.data || []).map((s: any) => ({ ...s, total_headcount: totals[s.id] || 0 })));
     setProjects((pr.data || []) as any);
     setLevels((lv.data || []) as Level[]);
