@@ -287,14 +287,18 @@ function OtEntryPage() {
     const fetchAssignments = async () => {
       if (!projectId) { setAssignedDepts([]); setAssignedCats([]); setDeptCatLinks([]); setAssignmentsReady(true); return; }
       setAssignmentsReady(false);
-      const [{ data: pd }, { data: pc }, { data: dc }] = await Promise.all([
-        supabase.from("project_departments").select("department:departments(id,name)").eq("project_id", projectId),
-        supabase.from("project_categories").select("category:worker_categories(id,name,display_order)").eq("project_id", projectId),
+      const [{ data: pd }, { data: pc }, { data: dc }, { data: allDepts }, { data: allCats }] = await Promise.all([
+        supabase.from("project_departments").select("department_id").eq("project_id", projectId),
+        supabase.from("project_categories").select("category_id").eq("project_id", projectId),
         supabase.from("department_categories").select("department_id, category_id"),
+        supabase.from("departments").select("id,name"),
+        supabase.from("worker_categories").select("id,name,display_order"),
       ]);
-      const depts = ((pd || []) as any[]).map((r) => r.department).filter((d): d is any => !!d && !!d.id);
+      const deptIds = new Set(((pd || []) as any[]).map((r) => r.department_id).filter(Boolean));
+      const catIds = new Set(((pc || []) as any[]).map((r) => r.category_id).filter(Boolean));
+      const depts = ((allDepts || []) as any[]).filter((d) => deptIds.has(d.id));
       depts.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-      const cats = ((pc || []) as any[]).map((r) => r.category).filter((c): c is any => !!c && !!c.id);
+      const cats = ((allCats || []) as any[]).filter((c) => catIds.has(c.id));
       cats.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || String(a.name || "").localeCompare(String(b.name || "")));
       setAssignedDepts(depts);
       setAssignedCats(cats);
