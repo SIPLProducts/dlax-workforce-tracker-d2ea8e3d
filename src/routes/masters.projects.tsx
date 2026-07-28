@@ -15,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { MobileCard, MobileCards } from "@/components/MobileCardList";
+
 import { ProjectAssignments } from "@/components/ProjectAssignments";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 
@@ -326,6 +328,7 @@ function ProjectsPage() {
 
       <Card>
         <CardContent className="p-0">
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -360,7 +363,35 @@ function ProjectsPage() {
               {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No projects found</TableCell></TableRow>}
             </TableBody>
           </Table>
+          </div>
+
+          <MobileCards isEmpty={filtered.length === 0} empty="No projects found">
+            {filtered.map((p) => (
+              <MobileCard
+                key={p.id}
+                data-row-id={p.id}
+                title={p.name}
+                subtitle={p.code || undefined}
+                badge={
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${p.status === "Active" ? "bg-accent/20 text-accent" : p.status === "Completed" ? "bg-muted text-muted-foreground" : "bg-chart-3/20 text-chart-3"}`}>{p.status}</span>
+                }
+                fields={[
+                  { label: "Group", value: p.project_group || "—" },
+                  { label: "Division", value: p.division || "—" },
+                  { label: "Location", value: p.location || "—" },
+                  { label: "Start Date", value: p.start_date || "—" },
+                ]}
+                actions={
+                  <>
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(p)}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(p.id)}><Trash2 className="mr-1 h-3.5 w-3.5 text-destructive" />Delete</Button>
+                  </>
+                }
+              />
+            ))}
+          </MobileCards>
         </CardContent>
+
       </Card>
     </div>
   );

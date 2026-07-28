@@ -207,8 +207,9 @@ function DepartmentsPage() {
       <Input placeholder="Search categories of labour..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
 
       <Card>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[720px]">
+
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[110px]">Code</TableHead>

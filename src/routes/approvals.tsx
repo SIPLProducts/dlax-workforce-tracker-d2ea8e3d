@@ -15,6 +15,7 @@ import { CheckCircle2, XCircle, Loader2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
+import { MobileCard, MobileCards } from "@/components/MobileCardList";
 
 export const Route = createFileRoute("/approvals")({
   component: () => <ScreenGuard screen="approvals"><Page /></ScreenGuard>,
@@ -125,7 +126,9 @@ function Page() {
   };
 
   const renderTable = (list: Sheet[], showActions: boolean) => (
-    <Table>
+    <>
+    <div className="hidden md:block overflow-x-auto">
+    <Table className="min-w-[900px]">
       <TableHeader>
         <TableRow>
           <TableHead>Sheet ID</TableHead>
@@ -174,6 +177,38 @@ function Page() {
         ))}
       </TableBody>
     </Table>
+    </div>
+    <MobileCards isEmpty={list.length === 0} empty="No sheets">
+      {list.map((s) => (
+        <MobileCard
+          key={s.id}
+          title={projectName(s.project_id)}
+          subtitle={`${s.sheet_code} · ${format(new Date(s.entry_date), "dd/MM/yyyy")}`}
+          badge={statusBadge(s.status, s.current_level, s.total_levels)}
+          fields={[
+            { label: "Type", value: s.sheet_type === "ot" ? "OT Entry" : "Daily Entry" },
+            { label: "Headcount", value: s.total_headcount },
+            { label: "Submitted By", value: s.submitted_by ? profiles[s.submitted_by] || "—" : "—", full: true },
+          ]}
+          actions={
+            <>
+              <Button size="sm" variant="outline" onClick={() => navigate(s.sheet_type === "ot" ? { to: "/ot-entry", search: { project: s.project_id, date: s.entry_date, from: "daily" } } : { to: "/daily-entry", search: { project: s.project_id, date: s.entry_date } })}><Eye className="w-3.5 h-3.5 mr-1" />View</Button>
+              {showActions && s.status === "pending" && (isCurrentApprover(s) || isAdmin) && (
+                <>
+                  <Button size="sm" variant="default" onClick={() => approve(s)} disabled={actioning}>
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Approve
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => { setRejectFor(s); setRejectRemarks(""); }} disabled={actioning}>
+                    <XCircle className="w-3.5 h-3.5 mr-1" />Reject
+                  </Button>
+                </>
+              )}
+            </>
+          }
+        />
+      ))}
+    </MobileCards>
+    </>
   );
 
   return (
@@ -185,7 +220,7 @@ function Page() {
 
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="pending">My Approvals ({myPending.length})</TabsTrigger>
           <TabsTrigger value="mine">My Submissions ({mySubmissions.length})</TabsTrigger>
           {isAdmin && <TabsTrigger value="all">All ({sheets.length})</TabsTrigger>}

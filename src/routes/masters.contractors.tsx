@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { MobileCard, MobileCards } from "@/components/MobileCardList";
 import { ProjectCombobox, type ProjectOption } from "@/components/ProjectCombobox";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 
@@ -593,12 +594,13 @@ function ContractorsPage() {
 
       {/* Contractors List — moved to bottom */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg">Contractors List ({items.length})</CardTitle>
-          <Input placeholder="Search contractors..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+          <Input placeholder="Search contractors..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:max-w-xs" />
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          <div className="hidden md:block overflow-x-auto">
+          <Table className="min-w-[1000px]">
             <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Company Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Phone</TableHead><TableHead>Contact #</TableHead><TableHead>Work Place</TableHead><TableHead>Nature of Work</TableHead><TableHead>License #</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {filtered.map((c) => (
@@ -617,6 +619,31 @@ function ContractorsPage() {
               {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No contractors found</TableCell></TableRow>}
             </TableBody>
           </Table>
+          </div>
+          <MobileCards isEmpty={filtered.length === 0} empty="No contractors found">
+            {filtered.map((c) => (
+              <MobileCard
+                key={c.id}
+                data-row-id={c.id}
+                title={c.company_name}
+                subtitle={c.contractor_code || undefined}
+                fields={[
+                  { label: "Contact Person", value: c.contact_person || "—" },
+                  { label: "Phone", value: c.phone || "—" },
+                  { label: "Contact #", value: c.contact_number || "—" },
+                  { label: "Work Place", value: c.work_place || "—" },
+                  { label: "Nature of Work", value: c.nature_of_work || "—", full: true },
+                  { label: "License #", value: c.license_number || "—", full: true },
+                ]}
+                actions={
+                  <>
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(c)}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(c.id)}><Trash2 className="mr-1 h-3.5 w-3.5 text-destructive" />Delete</Button>
+                  </>
+                }
+              />
+            ))}
+          </MobileCards>
         </CardContent>
       </Card>
       </>}

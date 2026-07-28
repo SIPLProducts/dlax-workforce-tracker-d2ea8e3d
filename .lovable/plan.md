@@ -1,35 +1,45 @@
 ## Goal
 
-On the login screen, always show a PWA action button (both desktop left panel and mobile view). Its label adapts:
+Make every screen usable on phones (≤640px) and tablets (641–1024px) without changing any data, queries, or business logic. Frontend/presentation only.
 
-- Not installed, native prompt available → **Install App** (fires `beforeinstallprompt.prompt()`).
-- Not installed, no native prompt yet (iOS, or Android before engagement heuristic) → **Install App** opens a help popover with per-platform instructions.
-- Already installed (running standalone) → **App Installed**.
-- Service worker has a waiting update → **Update Available** — clicking calls `skipWaiting` and reloads.
+## Approach
 
-## Changes
+**1. Shared responsive primitives**
+- Add a small `MobileCardList` presentation helper (label/value rows + actions slot) used by list screens, so each screen doesn't reinvent card markup.
+- Tighten `PageHeader`: title/actions stack on narrow widths; action buttons become icon-only or full-width row on phones.
+- Verify `AppLayout` bottom padding clears the mobile tab bar on every route, and `TopBar` controls (search, theme, user menu) collapse into a compact row on phones.
 
-### 1. `src/components/InstallAppButton.tsx`
-- Remove the `if (!deferred) return null;` early return so the button is **always rendered**.
-- Always render a button; branch behavior inside `onClick`:
-  - If `updateReady` → trigger waiting SW `skipWaiting` + `window.location.reload()`.
-  - Else if `deferred` → call `deferred.prompt()`.
-  - Else → open a popover with install instructions (iOS steps for Safari; Android/desktop fallback text: "Open this site in Chrome/Edge, then use browser menu → Install app / Add to Home Screen").
-- Track `updateReady` via a small event bus (see #2). Label priority: Installed > Update Available > Install App.
-- Detect platform (iOS vs Android vs desktop) to tailor popover content, but always show one unified button.
+**2. List screens — card lists on mobile, tables from `md:` up**
+Applies to: Users, Masters → Projects / Contractors / Departments / Categories / Approvals, Approvals queue, Project Assignments, and the Dashboard drill-down + department tables.
+- Wrap existing `<Table>` in `hidden md:block`.
+- Add a `md:hidden` card list rendering the same rows: primary field as card title, remaining columns as label/value pairs, row actions as buttons in the card footer.
+- Same data source and handlers — only markup differs.
 
-### 2. `src/pwa-register.ts`
-- Use the `registerSW({ onNeedRefresh, onOfflineReady })` callbacks from `virtual:pwa-register`.
-- On `onNeedRefresh`, dispatch a `window` custom event `dlax:pwa-update-ready` and stash the `updateSW` function on `window.__dlaxUpdateSW` so the button can call it.
-- Keep existing preview/iframe/dev guards unchanged.
+**3. Data Entry / OT Entry grids — keep the grid, scroll sideways**
+- Keep the current spreadsheet with its synced top/bottom scrollbars.
+- Freeze the first (contractor) column on mobile so context is never lost.
+- Reduce cell padding/font at `sm` and below; ensure inputs stay ≥40px tall for touch.
+- Add a subtle "swipe to see more →" hint above the grid on phones.
+- Stack the filter/date/project toolbar into a single column on phones, two columns on tablet.
 
-### 3. `src/routes/login.tsx`
-- Add a **mobile-visible** `<InstallAppButton />` inside the mobile brand block (`lg:hidden`) so it appears above the login card on phones. Keep the existing desktop instance in the left panel.
+**4. Reports**
+- Tab list becomes a horizontally scrollable strip on phones instead of a cramped 4-column grid.
+- Filter grids: 1 column phone → 2 tablet → 4 desktop.
+- Summary matrix and week-wise tables stay tabular inside a scroll container with the sticky left columns intact; export buttons become a full-width stacked group on phones.
 
-No other files change. No manifest, vite config, service worker, or business logic changes.
+**5. Dialogs & forms**
+- All master/user dialogs: `max-h-[90dvh]` with internal scroll, near-full-width on phones, form grids collapse to one column.
+- Popovers/comboboxes (ProjectCombobox, GlobalSearch) constrained to viewport width.
 
-## Notes / caveats (technical)
+**6. Login screen**
+- Card, QR panel, and install button stack vertically and stay within the viewport on small screens.
 
-- The native install prompt only fires in Chromium after the browser's engagement heuristic and only on HTTPS with an active SW — so in some Android sessions the button will open the instructions popover instead of a native sheet. That's expected browser behavior; the button itself stays visible always as requested.
-- Update detection only works on the deployed/published site (SW never registers in the Lovable editor iframe by design), so "Update Available" appears there, not in preview.
-- iOS never exposes `beforeinstallprompt`; the instructions popover remains the only path Apple allows.
+## Verification
+
+Screenshot each route at 390px, 768px, and 1280px via headless browser and check for horizontal page overflow, clipped text, and overlapped controls; fix what shows up.
+
+## Technical notes
+
+- Tailwind v4 utilities only; no new dependencies.
+- Follow the project's responsive rule for header rows: `grid-cols-[minmax(0,1fr)_auto]` on mobile → `flex` at `sm:`, `min-w-0` on text containers, `shrink-0` on icons.
+- No changes to Supabase queries, RLS, hooks, or export logic.
