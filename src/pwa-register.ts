@@ -2,6 +2,14 @@
 // Never registers in dev, iframe preview, or Lovable preview hosts.
 // Follows the Lovable PWA skill (offline path).
 
+declare global {
+  interface Window {
+    __dlaxUpdateSW?: (reloadPage?: boolean) => Promise<void>;
+  }
+}
+
+export const PWA_UPDATE_EVENT = "dlax:pwa-update-ready";
+
 export function registerAppPWA() {
   if (typeof window === "undefined") return;
 
@@ -39,7 +47,13 @@ export function registerAppPWA() {
   // Dynamic import so the virtual module is only pulled into the prod bundle.
   import("virtual:pwa-register")
     .then(({ registerSW }) => {
-      registerSW({ immediate: true });
+      const updateSW = registerSW({
+        immediate: true,
+        onNeedRefresh() {
+          window.__dlaxUpdateSW = updateSW;
+          window.dispatchEvent(new CustomEvent(PWA_UPDATE_EVENT));
+        },
+      });
     })
     .catch(() => {
       // no-op — plugin missing or blocked
