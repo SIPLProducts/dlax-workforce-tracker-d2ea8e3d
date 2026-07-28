@@ -22,6 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { MobileCard, MobileCards } from "@/components/MobileCardList";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/users")({
@@ -513,7 +514,9 @@ function UsersPage() {
               {loading ? (
                 <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               ) : (
-                <Table>
+                <>
+                <div className="hidden md:block overflow-x-auto">
+                <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>User ID</TableHead>
@@ -594,6 +597,63 @@ function UsersPage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
+                <MobileCards className="p-0" isEmpty={users.length === 0} empty="No users found">
+                  {users.map((u) => {
+                    const isUserAdmin = u.roles.includes("admin");
+                    const noProjects = !isUserAdmin && u.project_ids.length === 0;
+                    return (
+                      <MobileCard
+                        key={u.user_id}
+                        data-row-id={u.user_id}
+                        title={u.display_name || u.login_id || u.email?.split("@")[0] || "—"}
+                        subtitle={u.login_id || u.email || undefined}
+                        badge={isUserAdmin ? <Badge variant="default" className="text-[10px]">Admin</Badge> : null}
+                        fields={[
+                          { label: "Email", value: u.contact_email || "—" },
+                          { label: "Mobile", value: u.mobile_no || "—" },
+                          {
+                            label: "Custom Roles",
+                            full: true,
+                            value: u.custom_role_ids.length === 0 ? "—" : (
+                              <div className="flex flex-wrap gap-1">
+                                {u.custom_role_ids.map((rid) => {
+                                  const r = customRoles.find((c) => c.id === rid);
+                                  if (!r) return null;
+                                  return <Badge key={rid} variant="outline" className="text-[10px]">{r.name}</Badge>;
+                                })}
+                              </div>
+                            ),
+                          },
+                          {
+                            label: "Projects",
+                            full: true,
+                            value: isUserAdmin ? "All projects (admin)" : noProjects ? (
+                              <span className="text-amber-600">⚠ No projects assigned</span>
+                            ) : `${u.project_ids.length} project(s)`,
+                          },
+                        ]}
+                        actions={
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => openEdit(u)}><Pencil className="h-3 w-3 mr-1" />Edit</Button>
+                            <Button variant="outline" size="sm" onClick={() => { setSelectedUser(u); setCustomAssignOpen(true); }}><Key className="h-3 w-3 mr-1" />Custom</Button>
+                            <Button variant="outline" size="sm" onClick={() => openProjectsAssign(u)}><FolderKanban className="h-3 w-3 mr-1" />Projects</Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              disabled={currentUser?.id === u.user_id}
+                              onClick={() => setDeleteTarget(u)}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />Delete
+                            </Button>
+                          </>
+                        }
+                      />
+                    );
+                  })}
+                </MobileCards>
+                </>
               )}
             </CardContent>
           </Card>
