@@ -15,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScreenGuard } from "@/components/ScreenGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { MobileCard, MobileCards } from "@/components/MobileCardList";
+
 import { ProjectAssignments } from "@/components/ProjectAssignments";
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 
