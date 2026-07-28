@@ -1,8 +1,10 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { RootShell as AppRootShell } from "@/components/RootShell";
+import { registerAppPWA } from "@/pwa-register";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -71,6 +73,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  useEffect(() => {
+    registerAppPWA();
+  }, []);
   return (
     <ThemeProvider>
       <AuthProvider>
