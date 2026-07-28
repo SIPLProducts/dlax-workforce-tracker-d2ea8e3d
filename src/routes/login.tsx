@@ -303,7 +303,7 @@ function LoginPage() {
 
         <div className="relative z-10 flex w-full flex-col items-center">
         {/* Mobile brand */}
-        <div className="mb-8 flex flex-col items-center gap-2 lg:hidden">
+        <div className="mb-8 flex flex-col items-center gap-3 lg:hidden">
           <KpcLogo variant="on-dark" className="h-8 w-auto" />
           <h1 className="bg-gradient-to-br from-white to-indigo-200 bg-clip-text text-4xl font-bold tracking-tight text-transparent">
             DLAX
@@ -311,6 +311,9 @@ function LoginPage() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-300/90">
             Daily Labour Attendance &amp; Tracking
           </p>
+          <div className="mt-2">
+            <InstallAppButton />
+          </div>
         </div>
 
         {/* Glass login card */}
