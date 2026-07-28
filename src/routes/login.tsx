@@ -13,6 +13,7 @@ import { Eye, EyeOff, Loader2, Smartphone, User, Lock, ArrowRight } from "lucide
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { KpcLogo } from "@/components/KpcLogo";
+import { InstallAppButton } from "@/components/InstallAppButton";
 
 const INSTALL_URL = "https://dlax.siplproducts.com";
 
@@ -243,6 +244,10 @@ function LoginPage() {
               </p>
             </div>
           </div>
+          <div className="max-w-sm">
+            <InstallAppButton />
+          </div>
+
           <p className="text-[11px] text-slate-500">
             © 2026 Sharvi Infotech Pvt Ltd. All rights reserved.
           </p>
