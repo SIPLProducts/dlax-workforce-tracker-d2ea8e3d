@@ -13,6 +13,8 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PageHeader } from "@/components/PageHeader";
+import { MobileCard, MobileCards } from "@/components/MobileCardList";
+
 import { useHighlightRow } from "@/hooks/use-highlight-row";
 
 export const Route = createFileRoute("/masters/categories")({
