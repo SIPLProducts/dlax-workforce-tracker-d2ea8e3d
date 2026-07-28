@@ -1,22 +1,33 @@
-## Plan
+## Goal
 
-Reduce the Daily Entry / OT Entry / Approvals headcount request URL size so nginx/Kong stops returning 502, without dropping any sheets.
+Keep the existing QR install card exactly as-is, and **add** a native "Install" button next to it that triggers the browser's install prompt directly when clicked.
 
-### Change
+## Behavior
 
-In `src/lib/headcount-totals.ts`, lower the default chunk size from 100 → **25 sheet IDs per request**, and de-duplicate sheet IDs before batching. All sheets are still fetched — just across more small requests, merged into the same totals map. No caller changes needed since `daily-entry.tsx`, `ot-entry.tsx`, and `approvals.tsx` already call this helper.
+- **Chromium (Chrome/Edge/Android)**: capture `beforeinstallprompt`, store the event; button click calls `prompt()` → native install dialog.
+- **iOS Safari**: no install event exists; button opens a small popover with "Tap Share → Add to Home Screen" steps.
+- **Already installed** (`display-mode: standalone` or `appinstalled` fired): show a disabled "Installed" state.
+- **Unsupported desktop browsers**: button hidden.
 
-Why 25: a UUID is 36 chars + `%2C` separator ≈ 39 chars. 25 IDs ≈ 1 KB of query string, well under any reasonable nginx/Kong header buffer, with plenty of margin.
+## Changes
 
-### Not changing
+### 1. New file `src/components/InstallAppButton.tsx`
+- `useEffect` registers listeners for `beforeinstallprompt` (preventDefault + store event) and `appinstalled` (mark installed).
+- Detects iOS via UA and standalone via `matchMedia('(display-mode: standalone)')` / `navigator.standalone`.
+- Renders a compact button styled to match the existing glass card (indigo/amber accents, Download icon).
+- iOS branch renders the same button; click opens a lightweight popover with instructions.
 
-- No DB, RLS, schema, or data changes.
-- No limits on how many sheets are loaded — every sheet ID returned by the sheets query is still included; only the batch size per HTTP request is smaller.
-- Callers and UI totals unchanged.
+### 2. `src/routes/login.tsx`
+- Keep the existing QR "Install on Mobile" card unchanged.
+- Add `<InstallAppButton />` directly below (or beside) that card inside the same bottom stack (around line 229–245 area).
+- No other content or styles touched.
 
-### Verify after redeploy
+## Notes
 
-1. Rebuild frontend, `rsync` to `/root/DLAX/`, `pm2 restart all`.
-2. Open Daily Entry → saved entries table shows every sheet with its headcount.
-3. Network tab: multiple short `daily_manpower?select=sheet_id,headcount&sheet_id=in.(...)` requests, all `200`, no 502.
-4. Repeat check on OT Entry and Approvals.
+The `beforeinstallprompt` event only fires when the browser considers the site installable. Chromium typically requires a registered service worker for the prompt to be offered. This project intentionally has no app-shell service worker (per PWA rules), so on Chrome desktop the button may stay hidden until a service worker is added. iOS instructions and the QR card continue to work regardless. Say the word if you also want the guarded `vite-plugin-pwa` service worker enabled so Chromium reliably offers the prompt.
+
+## Technical section
+
+- Added: `src/components/InstallAppButton.tsx` (client-only, no server code).
+- Edited: `src/routes/login.tsx` — one import + one JSX line inside the existing bottom section.
+- No changes to manifest, routes, DB, or server functions.
