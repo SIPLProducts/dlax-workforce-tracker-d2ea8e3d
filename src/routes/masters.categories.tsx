@@ -116,6 +116,7 @@ function CategoriesPage() {
       />
       <Input placeholder="Search categories..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       <Card><CardContent className="p-0">
+        <div className="hidden md:block">
         <Table>
           <TableHeader><TableRow><TableHead className="w-[110px]">Code</TableHead><TableHead>Name</TableHead><TableHead className="w-32">Group</TableHead><TableHead className="w-24">Order</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -132,6 +133,28 @@ function CategoriesPage() {
           </TableBody>
 
         </Table>
+        </div>
+        <MobileCards isEmpty={filtered.length === 0} empty="No categories found">
+          {filtered.map((d) => (
+            <MobileCard
+              key={d.id}
+              data-row-id={d.id}
+              title={d.name}
+              subtitle={d.category_code || undefined}
+              fields={[
+                { label: "Group", value: d.category_group || "—" },
+                { label: "Order", value: d.display_order || 0 },
+              ]}
+              actions={
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => handleEdit(d)}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(d.id)}><Trash2 className="mr-1 h-3.5 w-3.5 text-destructive" />Delete</Button>
+                </>
+              }
+            />
+          ))}
+        </MobileCards>
+
       </CardContent></Card>
     </div>
   );
