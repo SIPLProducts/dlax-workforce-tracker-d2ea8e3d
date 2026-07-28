@@ -348,7 +348,7 @@ function DashboardContent() {
       </Card>
 
       {/* Today's snapshot */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Workers Today" value={stats.todayTotal} icon={Activity}
           delta={stats.dayChangePct} deltaLabel="vs yesterday" tint="stat-tint-blue"
@@ -446,7 +446,7 @@ function DashboardContent() {
 
       {/* Detailed Breakdowns */}
       <Tabs defaultValue="department">
-        <TabsList>
+        <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="department"><Layers className="h-4 w-4 mr-1.5" />Department</TabsTrigger>
           <TabsTrigger value="category"><ClipboardList className="h-4 w-4 mr-1.5" />Category</TabsTrigger>
           <TabsTrigger value="group"><Building2 className="h-4 w-4 mr-1.5" />Project Group</TabsTrigger>
