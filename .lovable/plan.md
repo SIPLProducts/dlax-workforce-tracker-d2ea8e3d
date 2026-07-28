@@ -1,33 +1,61 @@
-## Goal
+## Root cause
 
-Keep the existing QR install card exactly as-is, and **add** a native "Install" button next to it that triggers the browser's install prompt directly when clicked.
+Chromium browsers only fire `beforeinstallprompt` (and only offer the install UI) when the site satisfies PWA installability: valid manifest + icons + **a registered service worker with a fetch handler served over HTTPS**. This project intentionally has no service worker, so the button never receives the event and clicking does nothing.
 
-## Behavior
+The manifest and icons are already correct. What's missing is a service worker.
 
-- **Chromium (Chrome/Edge/Android)**: capture `beforeinstallprompt`, store the event; button click calls `prompt()` → native install dialog.
-- **iOS Safari**: no install event exists; button opens a small popover with "Tap Share → Add to Home Screen" steps.
-- **Already installed** (`display-mode: standalone` or `appinstalled` fired): show a disabled "Installed" state.
-- **Unsupported desktop browsers**: button hidden.
+## Fix — add a guarded PWA service worker via `vite-plugin-pwa`
 
-## Changes
+Follow the Lovable PWA skill (offline path) so the SW is registered only in production and never in the Lovable preview/iframe/dev.
 
-### 1. New file `src/components/InstallAppButton.tsx`
-- `useEffect` registers listeners for `beforeinstallprompt` (preventDefault + store event) and `appinstalled` (mark installed).
-- Detects iOS via UA and standalone via `matchMedia('(display-mode: standalone)')` / `navigator.standalone`.
-- Renders a compact button styled to match the existing glass card (indigo/amber accents, Download icon).
-- iOS branch renders the same button; click opens a lightweight popover with instructions.
+### 1. Install
+`bun add -d vite-plugin-pwa`
 
-### 2. `src/routes/login.tsx`
-- Keep the existing QR "Install on Mobile" card unchanged.
-- Add `<InstallAppButton />` directly below (or beside) that card inside the same bottom stack (around line 229–245 area).
-- No other content or styles touched.
+### 2. `vite.config.ts`
+Add `VitePWA` plugin via `defineConfig({ vite: { plugins: [...] } })` with:
+- `registerType: "autoUpdate"`
+- `injectRegister: null` (we register from our own wrapper)
+- `devOptions: { enabled: false }`
+- `filename: "sw.js"`
+- `manifest: false` (keep existing `public/manifest.webmanifest`)
+- `workbox`:
+  - `navigateFallback: "/index.html"`, `navigateFallbackDenylist: [/^\/api\//, /^\/~oauth/]`
+  - `runtimeCaching`:
+    - HTML navigations → `NetworkFirst`
+    - same-origin hashed `/assets/*` → `CacheFirst`
+  - `globPatterns`: `['**/*.{js,css,html,ico,png,svg,webmanifest}']`
 
-## Notes
+### 3. New file `src/pwa-register.ts`
+Guarded registration wrapper that refuses when:
+- `!import.meta.env.PROD`
+- inside iframe (`window.top !== window.self`)
+- hostname starts with `id-preview--` / `preview--`
+- hostname is/ends with `lovableproject.com`, `lovableproject-dev.com`, `beta.lovable.dev`
+- URL has `?sw=off`
+In any refused case, unregister any existing `/sw.js` registration and return.
+Otherwise call `registerSW({ immediate: true })` from `virtual:pwa-register`.
 
-The `beforeinstallprompt` event only fires when the browser considers the site installable. Chromium typically requires a registered service worker for the prompt to be offered. This project intentionally has no app-shell service worker (per PWA rules), so on Chrome desktop the button may stay hidden until a service worker is added. iOS instructions and the QR card continue to work regardless. Say the word if you also want the guarded `vite-plugin-pwa` service worker enabled so Chromium reliably offers the prompt.
+### 4. Call the wrapper once
+Import `./pwa-register` from `src/router.tsx` (or `src/start.ts` client entry) so it runs after hydration in the browser bundle only.
+
+### 5. Manifest link
+Ensure `<link rel="manifest" href="/manifest.webmanifest">` and `<meta name="theme-color" content="#0f1b3d">` are present in `src/routes/__root.tsx` head. If missing, add them (needed for install criteria).
+
+### 6. `InstallAppButton` — no logic change
+Once the SW is live in production, `beforeinstallprompt` fires and the existing button prompts the native install dialog on Chromium/Android. iOS branch (Add to Home Screen instructions) already works.
+
+## Deployment note
+
+The install prompt will NOT appear in the Lovable in-editor preview (iframe + preview hostname → guard refuses SW registration by design). It will work on:
+- The published site `https://dlax-workforce-tracker.lovable.app`
+- Your custom domain `https://dlax.siplproducts.com` and self-hosted `https://dlax.kpc.co` after you rebuild + redeploy the frontend
+
+On the self-hosted server the usual rebuild/rsync cycle applies. Nothing changes on the backend.
 
 ## Technical section
 
-- Added: `src/components/InstallAppButton.tsx` (client-only, no server code).
-- Edited: `src/routes/login.tsx` — one import + one JSX line inside the existing bottom section.
-- No changes to manifest, routes, DB, or server functions.
+- Deps: add `vite-plugin-pwa` (dev).
+- Files edited: `vite.config.ts`, `src/router.tsx` (or client entry), `src/routes/__root.tsx` (head tags if missing).
+- Files added: `src/pwa-register.ts`.
+- Files unchanged: `public/manifest.webmanifest`, icons, `InstallAppButton.tsx`, login layout.
+- No hand-written `public/sw.js` — Workbox generates it.
