@@ -80,6 +80,76 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
   );
 }
 
+function ProjectMultiSelect({
+  projects,
+  value,
+  onChange,
+}: {
+  projects: any[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedSet = new Set(value);
+  const label =
+    value.length === 0
+      ? "All Projects"
+      : value.length === 1
+      ? (() => {
+          const p = projects.find((x) => x.id === value[0]);
+          return p ? [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ") : "1 project selected";
+        })()
+      : `${value.length} projects selected`;
+
+  const toggle = (id: string) => {
+    if (selectedSet.has(id)) onChange(value.filter((v) => v !== id));
+    else onChange([...value, id]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-[220px] justify-between font-normal">
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[280px]" align="start">
+        <Command
+          filter={(itemValue, search) => (itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}
+        >
+          <CommandInput placeholder="Search projects..." />
+          <CommandList>
+            <CommandEmpty>No project found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="All Projects"
+                onSelect={() => onChange([])}
+              >
+                <Checkbox checked={value.length === 0} className="mr-2" />
+                <span className="font-medium">All Projects</span>
+              </CommandItem>
+              {projects.map((p) => {
+                const lbl = [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ");
+                return (
+                  <CommandItem
+                    key={p.id}
+                    value={`${p.code ?? ""} ${p.name}`}
+                    onSelect={() => toggle(p.id)}
+                  >
+                    <Checkbox checked={selectedSet.has(p.id)} className="mr-2" />
+                    <span className="truncate">{lbl}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const FILTER_KEY = "dlax.dashboard.filters.v2";
 
 type SavedFilters = {
