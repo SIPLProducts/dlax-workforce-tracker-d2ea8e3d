@@ -352,13 +352,11 @@ function DashboardContent() {
             <DatePicker value={dateTo} onChange={(d) => { setDateTo(d); setRangeDays(0); }} label="To" />
             <div className="space-y-1">
               <Label>Project</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ProjectMultiSelect
+                projects={projects}
+                value={projectIds}
+                onChange={setProjectIds}
+              />
             </div>
             <div className="space-y-1">
               <Label>Contractor</Label>
