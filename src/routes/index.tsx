@@ -167,7 +167,7 @@ function DashboardContent() {
   };
 
   const applyFilters = (q: any) => {
-    if (projectId !== "all") q = q.eq("project_id", projectId);
+    if (projectIds.length > 0) q = q.in("project_id", projectIds);
     if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
     if (departmentId !== "all") q = q.eq("department_id", departmentId);
     return q;
