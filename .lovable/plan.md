@@ -1,39 +1,42 @@
 ## Goal
-Enable multi-select in the Dashboard's Project filter while keeping the existing "All Projects" option. Dashboard KPIs, trend, breakdowns, leaderboards, "No entry today" card, and drilldowns should reflect the union of selected projects. Contractor/Department filters, date range, and all other behaviour stay unchanged.
+Replace the single "Week Starting" input in the Weekly Report tab with **From Date** and **To Date** filters. The report matrix and PDF expand to cover exactly the selected range (N days instead of a fixed 7). All other Reports tabs and functionality stay unchanged.
 
-## Changes — `src/routes/index.tsx`
+## Changes
 
-### State
-- Replace `projectId: string` with `projectIds: string[]` (empty array ≡ "All Projects").
-- Update `SavedFilters`, `loadFilters()`, and the persistence effect to store `projectIds`. Migrate old saved values: legacy `projectId === "all"` or missing → `[]`; any other string → `[projectId]`.
-- Update `resetFilters()` to set `projectIds` to `[]`.
-- Change effect dependency arrays that referenced `projectId` to depend on `projectIds.join(",")` to avoid identity-based refetch loops.
+### `src/lib/weekly-report.ts`
+- `buildWeeklyMatrix` accepts `{ project, fromDate, toDate, entries }` instead of `weekStart`.
+- Compute `days` as the inclusive day list between `fromDate` and `toDate` (length N, guard N ≥ 1).
+- Row/totals `days` arrays sized to N.
+- `perWeek` becomes `total / N` (kept as field name for compatibility) — displayed label updated in UI/PDF to "Per Day Avg (Total/N)".
+- `weeklyDateRangeLabel` uses `fromDate`→`toDate`.
 
-### Data fetching
-- `applyFilters(q)`: when `projectIds.length > 0`, apply `q.in("project_id", projectIds)`; else no project filter.
-- Contractor/department filters untouched.
+### `src/lib/weekly-report-pdf.ts`
+- Use `m.days.length` for column count; day header labels driven from `m.days`.
+- Column widths and page orientation stay landscape A4. When N is large the autotable will shrink font/scale; no manual pagination needed.
+- Last column header: "Per Day Avg (Total/N)".
 
-### Project filter UI
-Replace the single `<Select>` with a multi-select popover built from existing shadcn primitives (`Popover` + `Command` from `@/components/ui/command` + `Checkbox`), following the pattern used by `src/components/ProjectCombobox.tsx`:
-- Trigger button (`w-[220px]`) label:
-  - `projectIds.length === 0` → "All Projects"
-  - `=== 1` → `[code] name` of that project
-  - `>= 2` → "N projects selected"
-- Popover content:
-  - Top row: "All Projects" checkbox — checked when `projectIds.length === 0`; selecting it clears the array (equivalent to Select All).
-  - Search input (filters by code/name).
-  - One checkable row per project showing `[code] name`; clicking toggles membership in `projectIds`.
-- No new dependencies.
+### `src/routes/reports.tsx` — `WeeklyTab`
+- State: `fromDate: Date` (default today), `toDate: Date` (default today+6 to preserve current UX).
+- Replace the single Week Starting popover with two date pickers (`From Date`, `To Date`) using the same shadcn Popover+Calendar pattern already used in the Daily Labour Report tab.
+- Validation: if `toDate < fromDate`, show inline hint and disable PDF button; do not fetch.
+- Query `daily_manpower` with `entry_date` between `fromDate` and `toDate`.
+- Pass `fromDate`/`toDate` to `buildWeeklyMatrix`.
+- File name: `Weekly-Labour-Report-<code>-<ddMMyyyy>-to-<ddMMyyyy>.pdf`.
+- Preview table header row generates N `IR/NMR` column pairs from `matrix.days`; totals row unchanged in structure.
 
-### Downstream consumers
-No changes to memos — `stats`, `trendData`, `topProjects`, breakdown rollups, and drilldown queries all derive from `rows`/`todayRows`/etc., which are already filtered by `applyFilters`. Update the "No entry today" candidate list to restrict the full project master to `projectIds` when non-empty so the card reflects the selection.
+### Preserved
+- Project multi/single selection UI unchanged (still single-project `ProjectCombobox`).
+- Daily, Daily Labour Report, and Summary tabs untouched.
+- PDF layout (header band, KPC branding, grid styling) unchanged aside from dynamic column count and the renamed last column.
 
 ## Verification
-- Default state: "All Projects", totals match current dashboard.
-- Selecting 2–3 projects updates KPIs, trend, top lists, and "No entry today" to just those projects.
-- "All Projects" toggle clears the selection; Reset returns to All.
-- Selection persists across reload (localStorage) and migrates cleanly from the old single-project format.
-- Contractor/Department filters, range presets, Refresh, and drilldown remain functional.
+- Selecting From=To (single day) renders 1 IR/NMR pair, totals equal that day.
+- Selecting a 7-day range matches the previous Weekly output byte-for-byte in structure.
+- Selecting a 14-day range shows 14 day columns in both preview and PDF.
+- Invalid range (To < From) disables PDF and shows a hint.
+- Other Reports tabs unaffected.
 
 ## Files
-- `src/routes/index.tsx` (only file modified)
+- `src/lib/weekly-report.ts`
+- `src/lib/weekly-report-pdf.ts`
+- `src/routes/reports.tsx`
