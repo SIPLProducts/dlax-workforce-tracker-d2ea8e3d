@@ -127,17 +127,18 @@ function DashboardContent() {
   const [todayRows, setTodayRows] = useState<any[]>([]);
   const [yesterdayRows, setYesterdayRows] = useState<any[]>([]);
   const [drill, setDrill] = useState<{ type: "project" | "contractor"; id: string; label: string } | null>(null);
+  const projectIdsKey = projectIds.join(",");
 
   // persist filters
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectId, contractorId, departmentId }));
+      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectIds, contractorId, departmentId }));
     } catch {}
-  }, [rangeDays, projectId, contractorId, departmentId, user?.id]);
+  }, [rangeDays, projectIdsKey, contractorId, departmentId, user?.id]);
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadData(); }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
+  useEffect(() => { loadData(); }, [dateFrom, dateTo, projectIdsKey, contractorId, departmentId]);
 
   useEffect(() => {
     const refresh = () => { loadMasters(); loadData(); };
@@ -149,7 +150,7 @@ function DashboardContent() {
       document.removeEventListener("visibilitychange", onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
+  }, [dateFrom, dateTo, projectIdsKey, contractorId, departmentId]);
 
 
   const loadMasters = async () => {
