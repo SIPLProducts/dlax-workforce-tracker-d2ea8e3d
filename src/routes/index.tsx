@@ -114,7 +114,7 @@ function DashboardContent() {
   const [rangeDays, setRangeDays] = useState<number>(initial.rangeDays);
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), (initial.rangeDays > 0 ? initial.rangeDays : 30) - 1));
   const [dateTo, setDateTo] = useState<Date>(new Date());
-  const [projectId, setProjectId] = useState(initial.projectId);
+  const [projectIds, setProjectIds] = useState<string[]>(initial.projectIds);
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
 
