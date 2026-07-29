@@ -451,7 +451,7 @@ function ReportsPage() {
   );
 }
 
-function DlrTab({ projects }: { projects: any[] }) {
+function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any[]; approvalStatus: ApprovalStatusFilter; setApprovalStatus: (v: ApprovalStatusFilter) => void }) {
   const [projectId, setProjectId] = useState<string>("all");
   const [date, setDate] = useState<Date>(new Date());
   const [rows, setRows] = useState<any[]>([]);
