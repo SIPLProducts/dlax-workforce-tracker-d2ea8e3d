@@ -14,6 +14,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown } from "lucide-react";
 import {
   Users, ClipboardList, HardHat, CalendarIcon, TrendingUp, TrendingDown,
   AlertTriangle, Building2, Layers, Trophy, Activity, Briefcase, RefreshCw,
@@ -77,24 +80,104 @@ function DatePicker({ value, onChange, label }: { value: Date; onChange: (d: Dat
   );
 }
 
+function ProjectMultiSelect({
+  projects,
+  value,
+  onChange,
+}: {
+  projects: any[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedSet = new Set(value);
+  const label =
+    value.length === 0
+      ? "All Projects"
+      : value.length === 1
+      ? (() => {
+          const p = projects.find((x) => x.id === value[0]);
+          return p ? [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ") : "1 project selected";
+        })()
+      : `${value.length} projects selected`;
+
+  const toggle = (id: string) => {
+    if (selectedSet.has(id)) onChange(value.filter((v) => v !== id));
+    else onChange([...value, id]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-[220px] justify-between font-normal">
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[280px]" align="start">
+        <Command
+          filter={(itemValue, search) => (itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}
+        >
+          <CommandInput placeholder="Search projects..." />
+          <CommandList>
+            <CommandEmpty>No project found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="All Projects"
+                onSelect={() => onChange([])}
+              >
+                <Checkbox checked={value.length === 0} className="mr-2" />
+                <span className="font-medium">All Projects</span>
+              </CommandItem>
+              {projects.map((p) => {
+                const lbl = [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ");
+                return (
+                  <CommandItem
+                    key={p.id}
+                    value={`${p.code ?? ""} ${p.name}`}
+                    onSelect={() => toggle(p.id)}
+                  >
+                    <Checkbox checked={selectedSet.has(p.id)} className="mr-2" />
+                    <span className="truncate">{lbl}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const FILTER_KEY = "dlax.dashboard.filters.v2";
 
 type SavedFilters = {
   rangeDays: number;
-  projectId: string;
+  projectIds: string[];
   contractorId: string;
   departmentId: string;
 };
 
 function loadFilters(): SavedFilters {
-  if (typeof window === "undefined") {
-    return { rangeDays: 30, projectId: "all", contractorId: "all", departmentId: "all" };
-  }
+  const base: SavedFilters = { rangeDays: 30, projectIds: [], contractorId: "all", departmentId: "all" };
+  if (typeof window === "undefined") return base;
   try {
     const raw = localStorage.getItem(FILTER_KEY);
-    if (raw) return { rangeDays: 30, projectId: "all", contractorId: "all", departmentId: "all", ...JSON.parse(raw) };
+    if (!raw) return base;
+    const parsed = JSON.parse(raw) as any;
+    // Migrate legacy `projectId: string` -> `projectIds: string[]`
+    let projectIds: string[] = [];
+    if (Array.isArray(parsed.projectIds)) projectIds = parsed.projectIds.filter((x: any) => typeof x === "string" && x && x !== "all");
+    else if (typeof parsed.projectId === "string" && parsed.projectId && parsed.projectId !== "all") projectIds = [parsed.projectId];
+    return {
+      rangeDays: typeof parsed.rangeDays === "number" ? parsed.rangeDays : 30,
+      projectIds,
+      contractorId: parsed.contractorId || "all",
+      departmentId: parsed.departmentId || "all",
+    };
   } catch {}
-  return { rangeDays: 30, projectId: "all", contractorId: "all", departmentId: "all" };
+  return base;
 }
 
 function DashboardContent() {
@@ -104,7 +187,7 @@ function DashboardContent() {
   const [rangeDays, setRangeDays] = useState<number>(initial.rangeDays);
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), (initial.rangeDays > 0 ? initial.rangeDays : 30) - 1));
   const [dateTo, setDateTo] = useState<Date>(new Date());
-  const [projectId, setProjectId] = useState(initial.projectId);
+  const [projectIds, setProjectIds] = useState<string[]>(initial.projectIds);
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
 
@@ -117,17 +200,18 @@ function DashboardContent() {
   const [todayRows, setTodayRows] = useState<any[]>([]);
   const [yesterdayRows, setYesterdayRows] = useState<any[]>([]);
   const [drill, setDrill] = useState<{ type: "project" | "contractor"; id: string; label: string } | null>(null);
+  const projectIdsKey = projectIds.join(",");
 
   // persist filters
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectId, contractorId, departmentId }));
+      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectIds, contractorId, departmentId }));
     } catch {}
-  }, [rangeDays, projectId, contractorId, departmentId, user?.id]);
+  }, [rangeDays, projectIdsKey, contractorId, departmentId, user?.id]);
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadData(); }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
+  useEffect(() => { loadData(); }, [dateFrom, dateTo, projectIdsKey, contractorId, departmentId]);
 
   useEffect(() => {
     const refresh = () => { loadMasters(); loadData(); };
@@ -139,7 +223,7 @@ function DashboardContent() {
       document.removeEventListener("visibilitychange", onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
+  }, [dateFrom, dateTo, projectIdsKey, contractorId, departmentId]);
 
 
   const loadMasters = async () => {
@@ -156,7 +240,7 @@ function DashboardContent() {
   };
 
   const applyFilters = (q: any) => {
-    if (projectId !== "all") q = q.eq("project_id", projectId);
+    if (projectIds.length > 0) q = q.in("project_id", projectIds);
     if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
     if (departmentId !== "all") q = q.eq("department_id", departmentId);
     return q;
@@ -285,13 +369,14 @@ function DashboardContent() {
 
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
-    const candidates = projectId !== "all"
-      ? (projectMap.get(projectId) ? [projectMap.get(projectId)] : [])
+    const selected = new Set(projectIds);
+    const candidates = projectIds.length > 0
+      ? projects.filter((p) => selected.has(p.id))
       : projects;
     return candidates
       .filter((p: any) => p && !reportedToday.has(p.id))
       .filter((p: any) => !p.status || String(p.status).toLowerCase() === "active");
-  }, [todayRows, projects, projectMap, projectId]);
+  }, [todayRows, projects, projectIdsKey]);
 
 
   const setRange = (days: number) => {
@@ -302,7 +387,7 @@ function DashboardContent() {
 
   const resetFilters = () => {
     setRange(30);
-    setProjectId("all");
+    setProjectIds([]);
     setContractorId("all");
     setDepartmentId("all");
   };
@@ -340,13 +425,11 @@ function DashboardContent() {
             <DatePicker value={dateTo} onChange={(d) => { setDateTo(d); setRangeDays(0); }} label="To" />
             <div className="space-y-1">
               <Label>Project</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{[p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ProjectMultiSelect
+                projects={projects}
+                value={projectIds}
+                onChange={setProjectIds}
+              />
             </div>
             <div className="space-y-1">
               <Label>Contractor</Label>
