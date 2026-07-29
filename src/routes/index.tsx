@@ -311,14 +311,20 @@ function DashboardContent() {
         title="Dashboard"
         subtitle={`Workforce overview — ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`}
         actions={
-          <div className="flex gap-1 rounded-lg border bg-card p-1">
-            {[7, 14, 30, 90].map((d) => (
-              <Button key={d} size="sm" variant={rangeDays === d ? "default" : "ghost"} onClick={() => setRange(d)}>
-                {d}d
-              </Button>
-            ))}
+          <div className="flex gap-2 items-center">
+            <Button size="sm" variant="outline" onClick={() => { loadMasters(); loadData(); }}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            </Button>
+            <div className="flex gap-1 rounded-lg border bg-card p-1">
+              {[7, 14, 30, 90].map((d) => (
+                <Button key={d} size="sm" variant={rangeDays === d ? "default" : "ghost"} onClick={() => setRange(d)}>
+                  {d}d
+                </Button>
+              ))}
+            </div>
           </div>
         }
+
       />
 
       {/* Filters */}
