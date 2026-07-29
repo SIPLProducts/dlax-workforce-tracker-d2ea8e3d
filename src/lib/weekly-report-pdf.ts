@@ -40,6 +40,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
   doc.text("KPC", col3X + col3W / 2, bandY + 12, { align: "center" });
 
   // Table
+  const N = m.days.length;
   const dayLabels = m.days.map((d) => format(d, "EEE\ndd.MM"));
   const head = [
     [
@@ -49,8 +50,8 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
       ...dayLabels.map((lbl) => ({ content: lbl, colSpan: 2 })),
       { content: "Total IR", rowSpan: 2 },
       { content: "Total NMR", rowSpan: 2 },
-      { content: "Total Week Labour", rowSpan: 2 },
-      { content: "Per Week (Total/7)", rowSpan: 2 },
+      { content: "Total Labour", rowSpan: 2 },
+      { content: `Per Day Avg (Total/${N})`, rowSpan: 2 },
     ],
     [
       ...m.days.flatMap(() => [{ content: "IR" }, { content: "NMR" }]),

@@ -1036,23 +1036,21 @@ function SummaryTab({ projects }: { projects: any[] }) {
 
 function WeeklyTab({ projects }: { projects: any[] }) {
   const [projectId, setProjectId] = useState<string>("");
-  const [weekStart, setWeekStart] = useState<Date>(() => {
-    const d = new Date();
-    // Default to Wednesday-anchored week like the reference (fall back to today)
-    return d;
-  });
+  const [fromDate, setFromDate] = useState<Date>(() => new Date());
+  const [toDate, setToDate] = useState<Date>(() => addDays(new Date(), 6));
   const [loading, setLoading] = useState(false);
   const [matrix, setMatrix] = useState<WeeklyMatrix | null>(null);
 
   const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
+  const invalidRange = toDate < fromDate;
 
   useEffect(() => {
-    if (!projectId || !project) { setMatrix(null); return; }
+    if (!projectId || !project || invalidRange) { setMatrix(null); return; }
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const start = format(weekStart, "yyyy-MM-dd");
-      const end = format(addDays(weekStart, 6), "yyyy-MM-dd");
+      const start = format(fromDate, "yyyy-MM-dd");
+      const end = format(toDate, "yyyy-MM-dd");
       const { data, error } = await supabase
         .from("daily_manpower")
         .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code), departments(name)")
@@ -1063,20 +1061,22 @@ function WeeklyTab({ projects }: { projects: any[] }) {
       if (error) console.error(error);
       const m = buildWeeklyMatrix({
         project: { id: project.id, code: project.code, name: project.name },
-        weekStart,
+        fromDate,
+        toDate,
         entries: (data || []) as any,
       });
       setMatrix(m);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [projectId, project, weekStart]);
+  }, [projectId, project, fromDate, toDate, invalidRange]);
 
   const fileBase = project
-    ? `Weekly-Labour-Report-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(weekStart, "ddMMyyyy")}`
+    ? `Weekly-Labour-Report-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(fromDate, "ddMMyyyy")}-to-${format(toDate, "ddMMyyyy")}`
     : "Weekly-Labour-Report";
 
   const fmt = (n: number) => (n ? n.toLocaleString() : "");
+  const N = matrix?.days.length ?? 0;
 
   return (
     <div className="space-y-4">
@@ -1097,34 +1097,51 @@ function WeeklyTab({ projects }: { projects: any[] }) {
               />
             </div>
             <div className="space-y-1 min-w-0">
-              <Label>Week Starting</Label>
+              <Label>From Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(weekStart, "dd MMM yyyy")}
+                    {format(fromDate, "dd MMM yyyy")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={weekStart} onSelect={(d) => d && setWeekStart(d)} className="p-3 pointer-events-auto" />
+                  <Calendar mode="single" selected={fromDate} onSelect={(d) => d && setFromDate(d)} className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-2">
+            <div className="space-y-1 min-w-0">
+              <Label>To Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(toDate, "dd MMM yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={toDate} onSelect={(d) => d && setToDate(d)} className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => matrix && downloadWeeklyReportPdf(matrix, `${fileBase}.pdf`)}
-                disabled={!matrix || matrix.rows.length === 0}
+                disabled={!matrix || matrix.rows.length === 0 || invalidRange}
               >
                 <FileDown className="mr-2 h-4 w-4" /> PDF
               </Button>
             </div>
           </div>
 
-          {!projectId && (
-            <p className="text-sm text-muted-foreground">Select a project and week to preview the weekly labour report.</p>
+          {invalidRange && (
+            <p className="text-sm text-destructive">To Date must be on or after From Date.</p>
+          )}
+          {!projectId && !invalidRange && (
+            <p className="text-sm text-muted-foreground">Select a project and date range to preview the labour report.</p>
           )}
           {projectId && loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-          {projectId && !loading && matrix && (
+          {projectId && !loading && matrix && !invalidRange && (
             <div className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 border rounded-md p-3 text-sm">
                 <div>
@@ -1154,9 +1171,10 @@ function WeeklyTab({ projects }: { projects: any[] }) {
                       ))}
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total IR</th>
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total NMR</th>
-                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total Week Labour</th>
-                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Per Week (Total/7)</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total Labour</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Per Day Avg (Total/{N})</th>
                     </tr>
+
                     <tr>
                       {matrix.days.flatMap((_, i) => [
                         <th key={`ir-${i}`} className="border px-2 py-1 text-center">IR</th>,
@@ -1167,8 +1185,8 @@ function WeeklyTab({ projects }: { projects: any[] }) {
                   <tbody>
                     {matrix.rows.length === 0 && (
                       <tr>
-                        <td colSpan={3 + 14 + 4} className="border text-center py-6 text-muted-foreground">
-                          No entries for this project in the selected week.
+                        <td colSpan={3 + N * 2 + 4} className="border text-center py-6 text-muted-foreground">
+                          No entries for this project in the selected range.
                         </td>
                       </tr>
                     )}
