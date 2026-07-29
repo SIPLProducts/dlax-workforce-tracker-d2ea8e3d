@@ -1185,8 +1185,8 @@ function WeeklyTab({ projects }: { projects: any[] }) {
                   <tbody>
                     {matrix.rows.length === 0 && (
                       <tr>
-                        <td colSpan={3 + 14 + 4} className="border text-center py-6 text-muted-foreground">
-                          No entries for this project in the selected week.
+                        <td colSpan={3 + N * 2 + 4} className="border text-center py-6 text-muted-foreground">
+                          No entries for this project in the selected range.
                         </td>
                       </tr>
                     )}
