@@ -512,7 +512,7 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [projectId, date, selectedProjects.length]);
+  }, [projectId, date, selectedProjects.length, approvalStatus]);
 
   const rowsByProject = useMemo(() => {
     const map = new Map<string, any[]>();
