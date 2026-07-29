@@ -1156,6 +1156,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                 </PopoverContent>
               </Popover>
             </div>
+            <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => matrix && downloadWeeklyReportPdf(matrix, `${fileBase}.pdf`)}
