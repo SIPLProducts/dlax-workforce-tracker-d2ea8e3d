@@ -1064,7 +1064,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
   );
 }
 
-function WeeklyTab({ projects }: { projects: any[] }) {
+function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: any[]; approvalStatus: ApprovalStatusFilter; setApprovalStatus: (v: ApprovalStatusFilter) => void }) {
   const [projectId, setProjectId] = useState<string>("");
   const [fromDate, setFromDate] = useState<Date>(() => new Date());
   const [toDate, setToDate] = useState<Date>(() => addDays(new Date(), 6));
@@ -1081,12 +1081,14 @@ function WeeklyTab({ projects }: { projects: any[] }) {
       setLoading(true);
       const start = format(fromDate, "yyyy-MM-dd");
       const end = format(toDate, "yyyy-MM-dd");
-      const { data, error } = await supabase
+      let q = supabase
         .from("daily_manpower")
         .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code), departments(name)")
         .eq("project_id", projectId)
         .gte("entry_date", start)
         .lte("entry_date", end);
+      q = applyApprovalStatus(q as any, approvalStatus) as typeof q;
+      const { data, error } = await q;
       if (cancelled) return;
       if (error) console.error(error);
       const m = buildWeeklyMatrix({
@@ -1099,7 +1101,7 @@ function WeeklyTab({ projects }: { projects: any[] }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [projectId, project, fromDate, toDate, invalidRange]);
+  }, [projectId, project, fromDate, toDate, invalidRange, approvalStatus]);
 
   const fileBase = project
     ? `Weekly-Labour-Report-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(fromDate, "ddMMyyyy")}-to-${format(toDate, "ddMMyyyy")}`
