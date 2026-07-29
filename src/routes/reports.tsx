@@ -863,6 +863,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
                 formatLabel={(p) => p.id === "" ? "All Projects" : [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
               />
             </div>
+            <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
