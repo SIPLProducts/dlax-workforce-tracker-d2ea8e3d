@@ -86,6 +86,30 @@ function BreakdownCard({ title, icon: Icon, rows, total, accent }: { title: stri
   );
 }
 
+type ApprovalStatusFilter = "all" | "pending" | "approved";
+
+function applyApprovalStatus<T extends { eq: any; in: any }>(q: T, s: ApprovalStatusFilter): T {
+  if (s === "approved") return q.eq("status", "approved");
+  if (s === "pending") return q.in("status", ["pending_l1", "pending_l2"]);
+  return q;
+}
+
+function ApprovalStatusSelect({ value, onChange, className }: { value: ApprovalStatusFilter; onChange: (v: ApprovalStatusFilter) => void; className?: string }) {
+  return (
+    <div className="space-y-1 min-w-0">
+      <Label>Status</Label>
+      <Select value={value} onValueChange={(v) => onChange(v as ApprovalStatusFilter)}>
+        <SelectTrigger className={cn("w-full sm:w-[160px]", className)}><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="approved">Approved</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
   
@@ -96,6 +120,7 @@ function ReportsPage() {
   const [departmentId, setDepartmentId] = useState("all");
   const [categoryId, setCategoryId] = useState("all");
   const [projectGroup, setProjectGroup] = useState("all");
+  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatusFilter>("all");
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -106,7 +131,7 @@ function ReportsPage() {
   
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup]);
+  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup, approvalStatus]);
 
   const loadMasters = async () => {
     const [p, c, d, cat] = await Promise.all([
@@ -134,6 +159,7 @@ function ReportsPage() {
       if (contractorId !== "all") query = query.eq("contractor_id", contractorId);
       if (departmentId !== "all") query = query.eq("department_id", departmentId);
       if (categoryId !== "all") query = query.eq("category_id", categoryId);
+      query = applyApprovalStatus(query as any, approvalStatus) as typeof query;
 
       const { data: result, error } = await query.order("entry_date", { ascending: false });
       if (error) {
@@ -208,7 +234,7 @@ function ReportsPage() {
   };
 
   const resetFilters = () => {
-    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setProjectGroup("all"); setSearch("");
+    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setProjectGroup("all"); setApprovalStatus("all"); setSearch("");
   };
 
   const exportCsv = () => {
@@ -256,9 +282,9 @@ function ReportsPage() {
         </TabsList>
 
 
-        {tab === "dlr" && <DlrTab projects={projects} />}
-        {tab === "weekly" && <WeeklyTab projects={projects} />}
-        {tab === "summary" && <SummaryTab projects={projects} />}
+        {tab === "dlr" && <DlrTab projects={projects} approvalStatus={approvalStatus} setApprovalStatus={setApprovalStatus} />}
+        {tab === "weekly" && <WeeklyTab projects={projects} approvalStatus={approvalStatus} setApprovalStatus={setApprovalStatus} />}
+        {tab === "summary" && <SummaryTab projects={projects} approvalStatus={approvalStatus} setApprovalStatus={setApprovalStatus} />}
         {tab !== "dlr" && tab !== "summary" && tab !== "weekly" && (
         <>
 
@@ -329,6 +355,7 @@ function ReportsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
               <div className="space-y-1 min-w-0">
                 <Label>Search</Label>
                 <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:w-[200px]" />

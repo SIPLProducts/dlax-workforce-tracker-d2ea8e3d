@@ -157,10 +157,11 @@ type SavedFilters = {
   projectIds: string[];
   contractorId: string;
   departmentId: string;
+  approvalStatus: "all" | "pending" | "approved";
 };
 
 function loadFilters(): SavedFilters {
-  const base: SavedFilters = { rangeDays: 30, projectIds: [], contractorId: "all", departmentId: "all" };
+  const base: SavedFilters = { rangeDays: 30, projectIds: [], contractorId: "all", departmentId: "all", approvalStatus: "all" };
   if (typeof window === "undefined") return base;
   try {
     const raw = localStorage.getItem(FILTER_KEY);
@@ -170,11 +171,13 @@ function loadFilters(): SavedFilters {
     let projectIds: string[] = [];
     if (Array.isArray(parsed.projectIds)) projectIds = parsed.projectIds.filter((x: any) => typeof x === "string" && x && x !== "all");
     else if (typeof parsed.projectId === "string" && parsed.projectId && parsed.projectId !== "all") projectIds = [parsed.projectId];
+    const as = parsed.approvalStatus;
     return {
       rangeDays: typeof parsed.rangeDays === "number" ? parsed.rangeDays : 30,
       projectIds,
       contractorId: parsed.contractorId || "all",
       departmentId: parsed.departmentId || "all",
+      approvalStatus: as === "pending" || as === "approved" ? as : "all",
     };
   } catch {}
   return base;
@@ -190,6 +193,7 @@ function DashboardContent() {
   const [projectIds, setProjectIds] = useState<string[]>(initial.projectIds);
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
+  const [approvalStatus, setApprovalStatus] = useState<"all" | "pending" | "approved">(initial.approvalStatus);
 
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -206,12 +210,12 @@ function DashboardContent() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectIds, contractorId, departmentId }));
+      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectIds, contractorId, departmentId, approvalStatus }));
     } catch {}
-  }, [rangeDays, projectIdsKey, contractorId, departmentId, user?.id]);
+  }, [rangeDays, projectIdsKey, contractorId, departmentId, approvalStatus, user?.id]);
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadData(); }, [dateFrom, dateTo, projectIdsKey, contractorId, departmentId]);
+  useEffect(() => { loadData(); }, [dateFrom, dateTo, projectIdsKey, contractorId, departmentId, approvalStatus]);
 
   useEffect(() => {
     const refresh = () => { loadMasters(); loadData(); };
@@ -243,8 +247,11 @@ function DashboardContent() {
     if (projectIds.length > 0) q = q.in("project_id", projectIds);
     if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
     if (departmentId !== "all") q = q.eq("department_id", departmentId);
+    if (approvalStatus === "approved") q = q.eq("status", "approved");
+    else if (approvalStatus === "pending") q = q.in("status", ["pending_l1", "pending_l2"]);
     return q;
   };
+
 
   const loadData = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -390,6 +397,7 @@ function DashboardContent() {
     setProjectIds([]);
     setContractorId("all");
     setDepartmentId("all");
+    setApprovalStatus("all");
   };
 
   return (
@@ -448,6 +456,17 @@ function DashboardContent() {
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
                   {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <Select value={approvalStatus} onValueChange={(v) => setApprovalStatus(v as any)}>
+                <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
                 </SelectContent>
               </Select>
             </div>
