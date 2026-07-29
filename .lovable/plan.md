@@ -1,45 +1,43 @@
-## Goal
+## Problem
 
-Make every screen usable on phones (≤640px) and tablets (641–1024px) without changing any data, queries, or business logic. Frontend/presentation only.
+The dashboard's "No entry today" card only shows 4 projects even though other projects also have no entries today. Root cause (verified in `src/routes/index.tsx` lines 270-278):
 
-## Approach
+```ts
+const projectsWithoutToday = useMemo(() => {
+  const reportedToday = new Set(todayRows.map((r) => r.project_id));
+  const activeIds = new Set(rows.map((r) => r.project_id));   // <-- only projects with activity in the selected period
+  return Array.from(activeIds)
+    .filter((id) => !reportedToday.has(id))
+    .map((id) => projectMap.get(id))
+    .filter(Boolean)
+    .slice(0, 6);                                              // <-- hard cap of 6
+}, [todayRows, rows, projectMap]);
+```
 
-**1. Shared responsive primitives**
-- Add a small `MobileCardList` presentation helper (label/value rows + actions slot) used by list screens, so each screen doesn't reinvent card markup.
-- Tighten `PageHeader`: title/actions stack on narrow widths; action buttons become icon-only or full-width row on phones.
-- Verify `AppLayout` bottom padding clears the mobile tab bar on every route, and `TopBar` controls (search, theme, user menu) collapse into a compact row on phones.
+Two bugs:
+1. The candidate set is projects that had headcount in the current filter window (`rows`), so any project that hasn't been used in the last N days is silently excluded from the "no entry today" list.
+2. `.slice(0, 6)` caps the display at 6 even when more projects are missing entries.
 
-**2. List screens — card lists on mobile, tables from `md:` up**
-Applies to: Users, Masters → Projects / Contractors / Departments / Categories / Approvals, Approvals queue, Project Assignments, and the Dashboard drill-down + department tables.
-- Wrap existing `<Table>` in `hidden md:block`.
-- Add a `md:hidden` card list rendering the same rows: primary field as card title, remaining columns as label/value pairs, row actions as buttons in the card footer.
-- Same data source and handlers — only markup differs.
+## Fix (UI/data only, no backend or logic changes elsewhere)
 
-**3. Data Entry / OT Entry grids — keep the grid, scroll sideways**
-- Keep the current spreadsheet with its synced top/bottom scrollbars.
-- Freeze the first (contractor) column on mobile so context is never lost.
-- Reduce cell padding/font at `sm` and below; ensure inputs stay ≥40px tall for touch.
-- Add a subtle "swipe to see more →" hint above the grid on phones.
-- Stack the filter/date/project toolbar into a single column on phones, two columns on tablet.
+In `src/routes/index.tsx`:
 
-**4. Reports**
-- Tab list becomes a horizontally scrollable strip on phones instead of a cramped 4-column grid.
-- Filter grids: 1 column phone → 2 tablet → 4 desktop.
-- Summary matrix and week-wise tables stay tabular inside a scroll container with the sticky left columns intact; export buttons become a full-width stacked group on phones.
+1. Compute `projectsWithoutToday` from the full `projects` master list already loaded (respecting the current Project filter when set), instead of from `rows`:
+   - If `projectId !== "all"`: candidate set = `[projectMap.get(projectId)]`.
+   - Else: candidate set = all `projects` visible to the user (already RLS-scoped by `loadMasters`).
+   - Optionally exclude projects whose `status` is inactive/closed if such a value exists — keep current behavior of "all visible projects" otherwise to match the user's expectation.
+2. Remove the `.slice(0, 6)` cap so every project without a today entry is listed. Keep the flex-wrap badge layout so it stays readable.
+3. Update the card title count to reflect the true number (already uses `projectsWithoutToday.length`, will now be accurate).
 
-**5. Dialogs & forms**
-- All master/user dialogs: `max-h-[90dvh]` with internal scroll, near-full-width on phones, form grids collapse to one column.
-- Popovers/comboboxes (ProjectCombobox, GlobalSearch) constrained to viewport width.
+## Ensuring live/fresh data
 
-**6. Login screen**
-- Card, QR panel, and install button stack vertically and stay within the viewport on small screens.
+The dashboard already refetches whenever filters change (`useEffect` on `dateFrom/dateTo/projectId/contractorId/departmentId`) and reads directly from Supabase with no client caching layer. To make "today" reliably fresh:
 
-## Verification
+- Add a lightweight refresh on window focus and on tab-visibility change that re-runs `loadData()` (and `loadMasters()` if projects list can change), so returning to the tab shows current entries without a manual reload.
+- Add a small "Refresh" button next to the range selector that calls `loadData()` + `loadMasters()` for on-demand refresh.
 
-Screenshot each route at 390px, 768px, and 1280px via headless browser and check for horizontal page overflow, clipped text, and overlapped controls; fix what shows up.
+No changes to queries, RLS, schema, other cards, or business logic — only the candidate-set fix, slice removal, and refresh triggers.
 
-## Technical notes
+## Files touched
 
-- Tailwind v4 utilities only; no new dependencies.
-- Follow the project's responsive rule for header rows: `grid-cols-[minmax(0,1fr)_auto]` on mobile → `flex` at `sm:`, `min-w-0` on text containers, `shrink-0` on icons.
-- No changes to Supabase queries, RLS, hooks, or export logic.
+- `src/routes/index.tsx` — only the `projectsWithoutToday` memo, plus focus/visibility refresh effect and a Refresh button in the header.
