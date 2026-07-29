@@ -144,6 +144,7 @@ export function getDlrDailyMatrix({ projects, date, rows, departments }: DlrInpu
   const sortedGroups = Array.from(groupMap.keys()).sort();
 
   let sno = 1;
+  let firstDataRow: number | null = null;
   for (const g of sortedGroups) {
     const groupProjects = groupMap.get(g)!.sort((a, b) => projectSortKey(a).localeCompare(projectSortKey(b)));
 
@@ -155,13 +156,14 @@ export function getDlrDailyMatrix({ projects, date, rows, departments }: DlrInpu
     }
 
     for (const p of groupProjects) {
+      if (firstDataRow === null) firstDataRow = cells.length;
       const pRows = rowsByProject.get(p.id) || [];
       cells.push(buildProjectDataRow(p, sno++, pRows, bands, blank));
     }
   }
 
   // dataRow points to the first data row (kept for single-project consumers)
-  return { title, dateLabel, bands, cells, headerRows: HEADER_ROWS, sectionRows, dataRow: HEADER_ROWS };
+  return { title, dateLabel, bands, cells, headerRows: HEADER_ROWS, sectionRows, dataRow: firstDataRow ?? HEADER_ROWS };
 }
 
 export function buildDlrDailyWorkbook(matrix: DlrMatrix): XLSX.WorkBook {
