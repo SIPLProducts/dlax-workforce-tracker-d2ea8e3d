@@ -81,20 +81,30 @@ const FILTER_KEY = "dlax.dashboard.filters.v2";
 
 type SavedFilters = {
   rangeDays: number;
-  projectId: string;
+  projectIds: string[];
   contractorId: string;
   departmentId: string;
 };
 
 function loadFilters(): SavedFilters {
-  if (typeof window === "undefined") {
-    return { rangeDays: 30, projectId: "all", contractorId: "all", departmentId: "all" };
-  }
+  const base: SavedFilters = { rangeDays: 30, projectIds: [], contractorId: "all", departmentId: "all" };
+  if (typeof window === "undefined") return base;
   try {
     const raw = localStorage.getItem(FILTER_KEY);
-    if (raw) return { rangeDays: 30, projectId: "all", contractorId: "all", departmentId: "all", ...JSON.parse(raw) };
+    if (!raw) return base;
+    const parsed = JSON.parse(raw) as any;
+    // Migrate legacy `projectId: string` -> `projectIds: string[]`
+    let projectIds: string[] = [];
+    if (Array.isArray(parsed.projectIds)) projectIds = parsed.projectIds.filter((x: any) => typeof x === "string" && x && x !== "all");
+    else if (typeof parsed.projectId === "string" && parsed.projectId && parsed.projectId !== "all") projectIds = [parsed.projectId];
+    return {
+      rangeDays: typeof parsed.rangeDays === "number" ? parsed.rangeDays : 30,
+      projectIds,
+      contractorId: parsed.contractorId || "all",
+      departmentId: parsed.departmentId || "all",
+    };
   } catch {}
-  return { rangeDays: 30, projectId: "all", contractorId: "all", departmentId: "all" };
+  return base;
 }
 
 function DashboardContent() {
