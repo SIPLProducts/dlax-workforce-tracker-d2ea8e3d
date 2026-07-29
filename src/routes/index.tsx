@@ -269,13 +269,14 @@ function DashboardContent() {
 
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
-    const activeIds = new Set(rows.map((r) => r.project_id));
-    return Array.from(activeIds)
-      .filter((id) => !reportedToday.has(id))
-      .map((id) => projectMap.get(id))
-      .filter(Boolean)
-      .slice(0, 6);
-  }, [todayRows, rows, projectMap]);
+    const candidates = projectId !== "all"
+      ? (projectMap.get(projectId) ? [projectMap.get(projectId)] : [])
+      : projects;
+    return candidates
+      .filter((p: any) => p && !reportedToday.has(p.id))
+      .filter((p: any) => !p.status || String(p.status).toLowerCase() === "active");
+  }, [todayRows, projects, projectMap, projectId]);
+
 
   const setRange = (days: number) => {
     setRangeDays(days);
