@@ -296,13 +296,14 @@ function DashboardContent() {
 
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
-    const candidates = projectId !== "all"
-      ? (projectMap.get(projectId) ? [projectMap.get(projectId)] : [])
+    const selected = new Set(projectIds);
+    const candidates = projectIds.length > 0
+      ? projects.filter((p) => selected.has(p.id))
       : projects;
     return candidates
       .filter((p: any) => p && !reportedToday.has(p.id))
       .filter((p: any) => !p.status || String(p.status).toLowerCase() === "active");
-  }, [todayRows, projects, projectMap, projectId]);
+  }, [todayRows, projects, projectIdsKey]);
 
 
   const setRange = (days: number) => {
