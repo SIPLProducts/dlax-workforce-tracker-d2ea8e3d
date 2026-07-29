@@ -634,7 +634,7 @@ type SummaryColumn =
   | { kind: "avg"; week: number; key: string }
   | { kind: "month"; key: string };
 
-function SummaryTab({ projects }: { projects: any[] }) {
+function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects: any[]; approvalStatus: ApprovalStatusFilter; setApprovalStatus: (v: ApprovalStatusFilter) => void }) {
   const [dateFrom, setDateFrom] = useState<Date>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [projectId, setProjectId] = useState<string>("all");
@@ -649,9 +649,9 @@ function SummaryTab({ projects }: { projects: any[] }) {
         .from("daily_manpower")
         .select("entry_date, headcount, project_id, projects(name, code, project_group)")
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))
-        .eq("status", "approved");
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
       if (projectId !== "all") q = q.eq("project_id", projectId);
+      q = applyApprovalStatus(q as any, approvalStatus) as typeof q;
       const { data, error } = await q;
       if (cancelled) return;
       if (error) { console.error(error); setRows([]); }
@@ -659,7 +659,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [dateFrom, dateTo, projectId]);
+  }, [dateFrom, dateTo, projectId, approvalStatus]);
 
   const matrix = useMemo(() => {
     // Build day list
