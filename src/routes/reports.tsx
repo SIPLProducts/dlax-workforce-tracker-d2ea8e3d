@@ -478,15 +478,6 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
       if (projectId !== "all") q = q.eq("project_id", projectId);
       q = applyApprovalStatus(q as any, approvalStatus) as typeof q;
       const dmRes = await q;
-    (async () => {
-      setLoading(true);
-      const dateStr = format(date, "yyyy-MM-dd");
-      let q = supabase
-        .from("daily_manpower")
-        .select("*, project_id, projects(id, code, name, project_group), departments(id, name), worker_categories(id, name, display_order)")
-        .eq("entry_date", dateStr);
-      if (projectId !== "all") q = q.eq("project_id", projectId);
-      const dmRes = await q;
       if (cancelled) return;
 
       if (dmRes.error) console.error(dmRes.error);
