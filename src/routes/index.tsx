@@ -16,8 +16,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Users, ClipboardList, HardHat, CalendarIcon, TrendingUp, TrendingDown,
-  AlertTriangle, Building2, Layers, Trophy, Activity, Briefcase,
+  AlertTriangle, Building2, Layers, Trophy, Activity, Briefcase, RefreshCw,
 } from "lucide-react";
+
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
   Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
@@ -127,6 +128,19 @@ function DashboardContent() {
 
   useEffect(() => { loadMasters(); }, []);
   useEffect(() => { loadData(); }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
+
+  useEffect(() => {
+    const refresh = () => { loadMasters(); loadData(); };
+    const onVis = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
+
 
   const loadMasters = async () => {
     const [p, c, d, cat] = await Promise.all([
@@ -269,13 +283,14 @@ function DashboardContent() {
 
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
-    const activeIds = new Set(rows.map((r) => r.project_id));
-    return Array.from(activeIds)
-      .filter((id) => !reportedToday.has(id))
-      .map((id) => projectMap.get(id))
-      .filter(Boolean)
-      .slice(0, 6);
-  }, [todayRows, rows, projectMap]);
+    const candidates = projectId !== "all"
+      ? (projectMap.get(projectId) ? [projectMap.get(projectId)] : [])
+      : projects;
+    return candidates
+      .filter((p: any) => p && !reportedToday.has(p.id))
+      .filter((p: any) => !p.status || String(p.status).toLowerCase() === "active");
+  }, [todayRows, projects, projectMap, projectId]);
+
 
   const setRange = (days: number) => {
     setRangeDays(days);
@@ -296,14 +311,20 @@ function DashboardContent() {
         title="Dashboard"
         subtitle={`Workforce overview — ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`}
         actions={
-          <div className="flex gap-1 rounded-lg border bg-card p-1">
-            {[7, 14, 30, 90].map((d) => (
-              <Button key={d} size="sm" variant={rangeDays === d ? "default" : "ghost"} onClick={() => setRange(d)}>
-                {d}d
-              </Button>
-            ))}
+          <div className="flex gap-2 items-center">
+            <Button size="sm" variant="outline" onClick={() => { loadMasters(); loadData(); }}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            </Button>
+            <div className="flex gap-1 rounded-lg border bg-card p-1">
+              {[7, 14, 30, 90].map((d) => (
+                <Button key={d} size="sm" variant={rangeDays === d ? "default" : "ghost"} onClick={() => setRange(d)}>
+                  {d}d
+                </Button>
+              ))}
+            </div>
           </div>
         }
+
       />
 
       {/* Filters */}
