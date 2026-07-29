@@ -281,6 +281,8 @@ function DashboardContent() {
       .sort((a, b) => b.value - a.value);
   }, [rows, projectMap]);
 
+  const todayLabel = format(new Date(), "dd-MMM-yyyy");
+
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
     const candidates = projectId !== "all"
