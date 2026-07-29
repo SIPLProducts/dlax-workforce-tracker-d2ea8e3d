@@ -86,6 +86,30 @@ function BreakdownCard({ title, icon: Icon, rows, total, accent }: { title: stri
   );
 }
 
+type ApprovalStatusFilter = "all" | "pending" | "approved";
+
+function applyApprovalStatus<T extends { eq: any; in: any }>(q: T, s: ApprovalStatusFilter): T {
+  if (s === "approved") return q.eq("status", "approved");
+  if (s === "pending") return q.in("status", ["pending_l1", "pending_l2"]);
+  return q;
+}
+
+function ApprovalStatusSelect({ value, onChange, className }: { value: ApprovalStatusFilter; onChange: (v: ApprovalStatusFilter) => void; className?: string }) {
+  return (
+    <div className="space-y-1 min-w-0">
+      <Label>Status</Label>
+      <Select value={value} onValueChange={(v) => onChange(v as ApprovalStatusFilter)}>
+        <SelectTrigger className={cn("w-full sm:w-[160px]", className)}><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="approved">Approved</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
   
@@ -96,6 +120,7 @@ function ReportsPage() {
   const [departmentId, setDepartmentId] = useState("all");
   const [categoryId, setCategoryId] = useState("all");
   const [projectGroup, setProjectGroup] = useState("all");
+  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatusFilter>("all");
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -106,7 +131,7 @@ function ReportsPage() {
   
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup]);
+  useEffect(() => { loadReport(); }, [tab, dateFrom, dateTo, projectId, contractorId, departmentId, categoryId, projectGroup, approvalStatus]);
 
   const loadMasters = async () => {
     const [p, c, d, cat] = await Promise.all([
@@ -134,6 +159,7 @@ function ReportsPage() {
       if (contractorId !== "all") query = query.eq("contractor_id", contractorId);
       if (departmentId !== "all") query = query.eq("department_id", departmentId);
       if (categoryId !== "all") query = query.eq("category_id", categoryId);
+      query = applyApprovalStatus(query as any, approvalStatus) as typeof query;
 
       const { data: result, error } = await query.order("entry_date", { ascending: false });
       if (error) {
@@ -208,7 +234,7 @@ function ReportsPage() {
   };
 
   const resetFilters = () => {
-    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setProjectGroup("all"); setSearch("");
+    setProjectId("all"); setContractorId("all"); setDepartmentId("all"); setCategoryId("all"); setProjectGroup("all"); setApprovalStatus("all"); setSearch("");
   };
 
   const exportCsv = () => {
@@ -256,9 +282,9 @@ function ReportsPage() {
         </TabsList>
 
 
-        {tab === "dlr" && <DlrTab projects={projects} />}
-        {tab === "weekly" && <WeeklyTab projects={projects} />}
-        {tab === "summary" && <SummaryTab projects={projects} />}
+        {tab === "dlr" && <DlrTab projects={projects} approvalStatus={approvalStatus} setApprovalStatus={setApprovalStatus} />}
+        {tab === "weekly" && <WeeklyTab projects={projects} approvalStatus={approvalStatus} setApprovalStatus={setApprovalStatus} />}
+        {tab === "summary" && <SummaryTab projects={projects} approvalStatus={approvalStatus} setApprovalStatus={setApprovalStatus} />}
         {tab !== "dlr" && tab !== "summary" && tab !== "weekly" && (
         <>
 
@@ -329,6 +355,7 @@ function ReportsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
               <div className="space-y-1 min-w-0">
                 <Label>Search</Label>
                 <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:w-[200px]" />
@@ -424,7 +451,7 @@ function ReportsPage() {
   );
 }
 
-function DlrTab({ projects }: { projects: any[] }) {
+function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any[]; approvalStatus: ApprovalStatusFilter; setApprovalStatus: (v: ApprovalStatusFilter) => void }) {
   const [projectId, setProjectId] = useState<string>("all");
   const [date, setDate] = useState<Date>(new Date());
   const [rows, setRows] = useState<any[]>([]);
@@ -449,6 +476,7 @@ function DlrTab({ projects }: { projects: any[] }) {
         .select("*, project_id, projects(id, code, name, project_group), departments(id, name), worker_categories(id, name, display_order)")
         .eq("entry_date", dateStr);
       if (projectId !== "all") q = q.eq("project_id", projectId);
+      q = applyApprovalStatus(q as any, approvalStatus) as typeof q;
       const dmRes = await q;
       if (cancelled) return;
 
@@ -484,7 +512,7 @@ function DlrTab({ projects }: { projects: any[] }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [projectId, date, selectedProjects.length]);
+  }, [projectId, date, selectedProjects.length, approvalStatus]);
 
   const rowsByProject = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -555,6 +583,7 @@ function DlrTab({ projects }: { projects: any[] }) {
                 </PopoverContent>
               </Popover>
             </div>
+            <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
             <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-2">
               <Button
                 onClick={() => matrix && downloadDlrXlsx(matrix, `${fileBase}.xlsx`)}
@@ -605,7 +634,7 @@ type SummaryColumn =
   | { kind: "avg"; week: number; key: string }
   | { kind: "month"; key: string };
 
-function SummaryTab({ projects }: { projects: any[] }) {
+function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects: any[]; approvalStatus: ApprovalStatusFilter; setApprovalStatus: (v: ApprovalStatusFilter) => void }) {
   const [dateFrom, setDateFrom] = useState<Date>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [projectId, setProjectId] = useState<string>("all");
@@ -620,9 +649,9 @@ function SummaryTab({ projects }: { projects: any[] }) {
         .from("daily_manpower")
         .select("entry_date, headcount, project_id, projects(name, code, project_group)")
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))
-        .eq("status", "approved");
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
       if (projectId !== "all") q = q.eq("project_id", projectId);
+      q = applyApprovalStatus(q as any, approvalStatus) as typeof q;
       const { data, error } = await q;
       if (cancelled) return;
       if (error) { console.error(error); setRows([]); }
@@ -630,7 +659,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [dateFrom, dateTo, projectId]);
+  }, [dateFrom, dateTo, projectId, approvalStatus]);
 
   const matrix = useMemo(() => {
     // Build day list
@@ -834,6 +863,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
                 formatLabel={(p) => p.id === "" ? "All Projects" : [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
               />
             </div>
+            <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1034,7 +1064,7 @@ function SummaryTab({ projects }: { projects: any[] }) {
   );
 }
 
-function WeeklyTab({ projects }: { projects: any[] }) {
+function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: any[]; approvalStatus: ApprovalStatusFilter; setApprovalStatus: (v: ApprovalStatusFilter) => void }) {
   const [projectId, setProjectId] = useState<string>("");
   const [fromDate, setFromDate] = useState<Date>(() => new Date());
   const [toDate, setToDate] = useState<Date>(() => addDays(new Date(), 6));
@@ -1051,12 +1081,14 @@ function WeeklyTab({ projects }: { projects: any[] }) {
       setLoading(true);
       const start = format(fromDate, "yyyy-MM-dd");
       const end = format(toDate, "yyyy-MM-dd");
-      const { data, error } = await supabase
+      let q = supabase
         .from("daily_manpower")
         .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code), departments(name)")
         .eq("project_id", projectId)
         .gte("entry_date", start)
         .lte("entry_date", end);
+      q = applyApprovalStatus(q as any, approvalStatus) as typeof q;
+      const { data, error } = await q;
       if (cancelled) return;
       if (error) console.error(error);
       const m = buildWeeklyMatrix({
@@ -1069,7 +1101,7 @@ function WeeklyTab({ projects }: { projects: any[] }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [projectId, project, fromDate, toDate, invalidRange]);
+  }, [projectId, project, fromDate, toDate, invalidRange, approvalStatus]);
 
   const fileBase = project
     ? `Weekly-Labour-Report-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(fromDate, "ddMMyyyy")}-to-${format(toDate, "ddMMyyyy")}`
@@ -1124,6 +1156,7 @@ function WeeklyTab({ projects }: { projects: any[] }) {
                 </PopoverContent>
               </Popover>
             </div>
+            <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => matrix && downloadWeeklyReportPdf(matrix, `${fileBase}.pdf`)}

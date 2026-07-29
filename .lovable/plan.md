@@ -1,42 +1,39 @@
 ## Goal
-Replace the single "Week Starting" input in the Weekly Report tab with **From Date** and **To Date** filters. The report matrix and PDF expand to cover exactly the selected range (N days instead of a fixed 7). All other Reports tabs and functionality stay unchanged.
+Add an **Approval Status** filter to the Dashboard and Reports screens with three options: **All** (default), **Pending**, and **Approved**. When set, all `daily_manpower` queries on that screen filter by the selected status; every other behavior stays as-is.
 
-## Changes
+Status mapping (uses existing `approval_status` enum on `daily_manpower.status`):
+- **Approved** → `status = 'approved'`
+- **Pending** → `status IN ('pending_l1','pending_l2')` (data not yet approved and not draft/rejected)
+- **All** → no status filter
 
-### `src/lib/weekly-report.ts`
-- `buildWeeklyMatrix` accepts `{ project, fromDate, toDate, entries }` instead of `weekStart`.
-- Compute `days` as the inclusive day list between `fromDate` and `toDate` (length N, guard N ≥ 1).
-- Row/totals `days` arrays sized to N.
-- `perWeek` becomes `total / N` (kept as field name for compatibility) — displayed label updated in UI/PDF to "Per Day Avg (Total/N)".
-- `weeklyDateRangeLabel` uses `fromDate`→`toDate`.
+## Dashboard — `src/routes/index.tsx`
+- Add `approvalStatus: "all" | "pending" | "approved"` state, persisted to the same localStorage filter blob used by the other filters (with migration for older payloads defaulting to `"all"`).
+- Add a `Select` control in the filter row (next to Department) labeled **Status** with options All / Pending / Approved. Include it in the Reset action.
+- Extend the shared `applyFilters` helper (used for the 4 `daily_manpower` reads around line 259-266) so that when `approvalStatus !== "all"` it appends:
+  - `.eq("status","approved")` for Approved
+  - `.in("status",["pending_l1","pending_l2"])` for Pending
+- The "No entry today" card queries projects, not manpower, so it stays unchanged.
 
-### `src/lib/weekly-report-pdf.ts`
-- Use `m.days.length` for column count; day header labels driven from `m.days`.
-- Column widths and page orientation stay landscape A4. When N is large the autotable will shrink font/scale; no manual pagination needed.
-- Last column header: "Per Day Avg (Total/N)".
+## Reports — `src/routes/reports.tsx`
+Add a single `approvalStatus` state at the page level, rendered as a **Select** in each tab's filter bar (Daily, Daily Labour Report, Weekly, Summary), placed alongside the existing project/contractor/department filters. Apply the same enum mapping to every `daily_manpower` query:
+- Line ~127 (Daily preview list)
+- Line ~448 (DLR fetch)
+- Line ~620 (Weekly fetch)
+- Line ~1055 (Summary fetch)
 
-### `src/routes/reports.tsx` — `WeeklyTab`
-- State: `fromDate: Date` (default today), `toDate: Date` (default today+6 to preserve current UX).
-- Replace the single Week Starting popover with two date pickers (`From Date`, `To Date`) using the same shadcn Popover+Calendar pattern already used in the Daily Labour Report tab.
-- Validation: if `toDate < fromDate`, show inline hint and disable PDF button; do not fetch.
-- Query `daily_manpower` with `entry_date` between `fromDate` and `toDate`.
-- Pass `fromDate`/`toDate` to `buildWeeklyMatrix`.
-- File name: `Weekly-Labour-Report-<code>-<ddMMyyyy>-to-<ddMMyyyy>.pdf`.
-- Preview table header row generates N `IR/NMR` column pairs from `matrix.days`; totals row unchanged in structure.
+Each call gets a small helper (local to the file) `applyStatus(q)` returning the builder with `.eq` / `.in` applied when needed, typed via the `sel` string-widening pattern to keep TS fast.
 
-### Preserved
-- Project multi/single selection UI unchanged (still single-project `ProjectCombobox`).
-- Daily, Daily Labour Report, and Summary tabs untouched.
-- PDF layout (header band, KPC branding, grid styling) unchanged aside from dynamic column count and the renamed last column.
+## Preserved
+- No schema changes; uses existing `status` column.
+- Other filters, previews, PDF/Excel exports, approval workflow, and the "No entry today" card behavior unchanged.
+- Default is **All**, so current outputs match today.
 
 ## Verification
-- Selecting From=To (single day) renders 1 IR/NMR pair, totals equal that day.
-- Selecting a 7-day range matches the previous Weekly output byte-for-byte in structure.
-- Selecting a 14-day range shows 14 day columns in both preview and PDF.
-- Invalid range (To < From) disables PDF and shows a hint.
-- Other Reports tabs unaffected.
+- Dashboard: switching Status to Approved reduces KPIs to approved rows only; Pending shows only pending_l1/pending_l2; All matches previous totals.
+- Reports Daily/DLR/Weekly/Summary previews and their downloaded files reflect the selected status.
+- Reset restores Status to All along with other filters.
+- Selection persists across reload on Dashboard (localStorage).
 
 ## Files
-- `src/lib/weekly-report.ts`
-- `src/lib/weekly-report-pdf.ts`
+- `src/routes/index.tsx`
 - `src/routes/reports.tsx`
