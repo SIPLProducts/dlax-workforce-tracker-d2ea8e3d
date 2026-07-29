@@ -22,7 +22,9 @@ const fml = (f: string, s: any = {}): Cell => ({ f, t: "n", s: { font: FONT, ali
 
 const H = { font: FONT_B, alignment: { horizontal: "center", vertical: "center", wrapText: true }, fill: FILL_HEADER, border: ALL_BORDERS };
 
-export function buildDlrMatrixWorkbook(matrix: DlrMatrix, projectGroup?: string | null): XLSX.WorkBook {
+export type DlrMatrixWorkbookItem = { matrix: DlrMatrix; projectGroup?: string | null };
+
+function buildSingleDlrMatrixSheet(matrix: DlrMatrix, projectGroup?: string | null): any {
   const b = matrix.bands;
   // Columns layout (0-based):
   // 0: Sl.No | 1: Project | 2..(2+catWidth-1): category leaves | catWidth cols
@@ -84,7 +86,7 @@ export function buildDlrMatrixWorkbook(matrix: DlrMatrix, projectGroup?: string 
 
   // Row 4 kept blank (reference has a sub-descriptor line the app has no data for)
 
-  // Data row (row 5, index 5). Group header first if applicable.
+  // Data row(s) starting at row 5 (index 5). Group header first if applicable.
   let r = 5;
   if (projectGroup) {
     set(r, 0, txt("", { fill: FILL_GROUP, font: FONT_B }));
@@ -137,12 +139,27 @@ export function buildDlrMatrixWorkbook(matrix: DlrMatrix, projectGroup?: string 
   (ws as any)["!pageSetup"] = { orientation: "landscape", fitToWidth: 1, fitToHeight: 0 };
   (ws as any)["!margins"] = { left: 0.3, right: 0.3, top: 0.3, bottom: 0.3, header: 0.2, footer: 0.2 };
 
+  return ws;
+}
+
+export function buildDlrMatrixWorkbook(items: DlrMatrixWorkbookItem[]): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, matrix.dateLabel.replace(/-/g, "."));
+  const seenNames = new Set<string>();
+  for (const item of items) {
+    const ws = buildSingleDlrMatrixSheet(item.matrix, item.projectGroup);
+    let sheetName = item.matrix.dateLabel.replace(/-/g, ".");
+    let uniqueName = sheetName;
+    let n = 1;
+    while (seenNames.has(uniqueName)) {
+      uniqueName = `${sheetName}-${n++}`;
+    }
+    seenNames.add(uniqueName);
+    XLSX.utils.book_append_sheet(wb, ws, uniqueName);
+  }
   return wb;
 }
 
-export function downloadDlrMatrixXlsx(matrix: DlrMatrix, projectGroup: string | null | undefined, filename: string) {
-  const wb = buildDlrMatrixWorkbook(matrix, projectGroup);
+export function downloadDlrMatrixXlsx(items: DlrMatrixWorkbookItem[], filename: string) {
+  const wb = buildDlrMatrixWorkbook(items);
   XLSX.writeFile(wb, filename);
 }

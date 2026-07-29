@@ -3,9 +3,10 @@ import { format } from "date-fns";
 
 export type DlrCategory = { id: string; name: string };
 export type DlrDept = { name: string; isNmr: boolean; categories: DlrCategory[] };
+export type DlrProject = { id: string; code?: string | null; name: string; project_group?: string | null };
 
 export type DlrInput = {
-  project: { id: string; code?: string | null; name: string; project_group?: string | null };
+  projects: DlrProject[];
   date: Date;
   rows: any[];
   departments: DlrDept[];
@@ -56,19 +57,56 @@ function buildBands(departments: DlrDept[]): HeaderBands {
   return { depts, catCols, catStart, catWidth, subTotalCol, nmrTotalCol, totalCol, securityCol, remarksCol, numCols };
 }
 
-export function getDlrDailyMatrix({ project, date, rows, departments }: DlrInput): DlrMatrix {
-  const dateLabel = format(date, "dd-MM-yyyy");
-  const title = `DAILY LABOUR REPORT\n${dateLabel}`;
-  const bands = buildBands(departments);
-  const NUM = bands.numCols;
-  const blank = (): (string | number | null)[] => Array(NUM).fill(null);
+function projectSortKey(p: DlrProject) {
+  return p.code ? `[${p.code}] ${p.name}` : p.name;
+}
 
+function buildProjectDataRow(
+  p: DlrProject,
+  sno: number,
+  rows: any[],
+  bands: HeaderBands,
+  blank: () => (string | number | null)[]
+): (string | number | null)[] {
   const catTotals: Record<string, number> = {};
   const remarksSet = new Set<string>();
   for (const r of rows) {
     const hc = Number(r.headcount || 0);
     if (r.category_id) catTotals[r.category_id] = (catTotals[r.category_id] || 0) + hc;
     if (r.remarks && String(r.remarks).trim()) remarksSet.add(String(r.remarks).trim());
+  }
+
+  const d = blank();
+  d[0] = sno;
+  d[1] = projectSortKey(p);
+  let subTotal = 0;
+  let nmrTotal = 0;
+  bands.catCols.forEach((c, i) => {
+    const v = catTotals[c.id] || 0;
+    d[bands.catStart + i] = v;
+    if (c.isNmr) nmrTotal += v; else subTotal += v;
+  });
+  d[bands.subTotalCol] = subTotal;
+  d[bands.nmrTotalCol] = nmrTotal;
+  d[bands.totalCol] = subTotal + nmrTotal;
+  d[bands.securityCol] = 0; // no data source in app
+  d[bands.remarksCol] = remarksSet.size ? Array.from(remarksSet).join("; ") : "";
+  return d;
+}
+
+export function getDlrDailyMatrix({ projects, date, rows, departments }: DlrInput): DlrMatrix {
+  const dateLabel = format(date, "dd-MM-yyyy");
+  const title = `DAILY LABOUR REPORT\n${dateLabel}`;
+  const bands = buildBands(departments);
+  const NUM = bands.numCols;
+  const blank = (): (string | number | null)[] => Array(NUM).fill(null);
+
+  // Group rows by project_id
+  const rowsByProject = new Map<string, any[]>();
+  for (const r of rows) {
+    const pid = r.project_id as string;
+    if (!rowsByProject.has(pid)) rowsByProject.set(pid, []);
+    rowsByProject.get(pid)!.push(r);
   }
 
   // r0 title
@@ -96,32 +134,36 @@ export function getDlrDailyMatrix({ project, date, rows, departments }: DlrInput
   const cells: (string | number | null)[][] = [r0, r1, r2, r3];
   const sectionRows: number[] = [];
 
-  if (project.project_group) {
-    const sec = blank();
-    sec[1] = project.project_group;
-    sectionRows.push(cells.length);
-    cells.push(sec);
+  // Group projects by project_group, then sort by name/code within each group
+  const groupMap = new Map<string, DlrProject[]>();
+  for (const p of projects) {
+    const g = p.project_group || "";
+    if (!groupMap.has(g)) groupMap.set(g, []);
+    groupMap.get(g)!.push(p);
+  }
+  const sortedGroups = Array.from(groupMap.keys()).sort();
+
+  let sno = 1;
+  let firstDataRow: number | null = null;
+  for (const g of sortedGroups) {
+    const groupProjects = groupMap.get(g)!.sort((a, b) => projectSortKey(a).localeCompare(projectSortKey(b)));
+
+    if (g) {
+      const sec = blank();
+      sec[1] = g;
+      sectionRows.push(cells.length);
+      cells.push(sec);
+    }
+
+    for (const p of groupProjects) {
+      if (firstDataRow === null) firstDataRow = cells.length;
+      const pRows = rowsByProject.get(p.id) || [];
+      cells.push(buildProjectDataRow(p, sno++, pRows, bands, blank));
+    }
   }
 
-  const dataRow = cells.length;
-  const d = blank();
-  d[0] = 1;
-  d[1] = project.code ? `[${project.code}] ${project.name}` : project.name;
-  let subTotal = 0;
-  let nmrTotal = 0;
-  bands.catCols.forEach((c, i) => {
-    const v = catTotals[c.id] || 0;
-    d[bands.catStart + i] = v;
-    if (c.isNmr) nmrTotal += v; else subTotal += v;
-  });
-  d[bands.subTotalCol] = subTotal;
-  d[bands.nmrTotalCol] = nmrTotal;
-  d[bands.totalCol] = subTotal + nmrTotal;
-  d[bands.securityCol] = 0; // no data source in app
-  d[bands.remarksCol] = remarksSet.size ? Array.from(remarksSet).join("; ") : "";
-  cells.push(d);
-
-  return { title, dateLabel, bands, cells, headerRows: HEADER_ROWS, sectionRows, dataRow };
+  // dataRow points to the first data row (kept for single-project consumers)
+  return { title, dateLabel, bands, cells, headerRows: HEADER_ROWS, sectionRows, dataRow: firstDataRow ?? HEADER_ROWS };
 }
 
 export function buildDlrDailyWorkbook(matrix: DlrMatrix): XLSX.WorkBook {

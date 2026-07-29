@@ -425,26 +425,31 @@ function ReportsPage() {
 }
 
 function DlrTab({ projects }: { projects: any[] }) {
-  const [projectId, setProjectId] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>("all");
   const [date, setDate] = useState<Date>(new Date());
   const [rows, setRows] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const project = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
+  const selectedProjects = useMemo(() => {
+    if (projectId === "all") return projects;
+    const p = projects.find((p) => p.id === projectId);
+    return p ? [p] : [];
+  }, [projects, projectId]);
 
   useEffect(() => {
-    if (!projectId) { setRows([]); setDepartments([]); setDepartmentIds([]); return; }
+    if (selectedProjects.length === 0) { setRows([]); setDepartments([]); setDepartmentIds([]); return; }
     let cancelled = false;
     (async () => {
       setLoading(true);
       const dateStr = format(date, "yyyy-MM-dd");
-      const dmRes = await supabase
+      let q = supabase
         .from("daily_manpower")
-        .select("*, departments(id, name), worker_categories(id, name, display_order)")
-        .eq("project_id", projectId)
+        .select("*, project_id, projects(id, code, name, project_group), departments(id, name), worker_categories(id, name, display_order)")
         .eq("entry_date", dateStr);
+      if (projectId !== "all") q = q.eq("project_id", projectId);
+      const dmRes = await q;
       if (cancelled) return;
 
       if (dmRes.error) console.error(dmRes.error);
@@ -479,16 +484,41 @@ function DlrTab({ projects }: { projects: any[] }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [projectId, date]);
+  }, [projectId, date, selectedProjects.length]);
+
+  const rowsByProject = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const r of rows) {
+      const pid = r.project_id as string;
+      if (!map.has(pid)) map.set(pid, []);
+      map.get(pid)!.push(r);
+    }
+    return map;
+  }, [rows]);
 
   const matrix = useMemo(() => {
-    if (!project) return null;
-    return getDlrDailyMatrix({ project, date, rows, departments, departmentIds });
-  }, [project, date, rows, departments, departmentIds]);
+    if (selectedProjects.length === 0) return null;
+    return getDlrDailyMatrix({ projects: selectedProjects, date, rows, departments, departmentIds });
+  }, [selectedProjects, date, rows, departments, departmentIds]);
 
+  const matrixItems = useMemo(() => {
+    if (!matrix || selectedProjects.length === 0) return [];
+    return selectedProjects.map((p) => ({
+      matrix: getDlrDailyMatrix({
+        projects: [p],
+        date,
+        rows: rowsByProject.get(p.id) || [],
+        departments,
+        departmentIds,
+      }),
+      projectGroup: p.project_group,
+    }));
+  }, [matrix, selectedProjects, date, rowsByProject, departments, departmentIds]);
 
-  const fileBase = project
-    ? `DLR-${(project.code || project.name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(date, "dd-MM-yyyy")}`
+  const fileBase = projectId === "all"
+    ? `DLR-AllProjects-${format(date, "dd-MM-yyyy")}`
+    : selectedProjects[0]
+    ? `DLR-${(selectedProjects[0].code || selectedProjects[0].name).toString().replace(/[^A-Za-z0-9_-]+/g, "_")}-${format(date, "dd-MM-yyyy")}`
     : "DLR";
 
   return (
@@ -505,6 +535,8 @@ function DlrTab({ projects }: { projects: any[] }) {
                 value={projectId}
                 onChange={setProjectId}
                 projects={projects}
+                includeAllOption
+                allLabel="All Projects"
                 className="w-full"
                 formatLabel={(p) => [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
               />
@@ -532,8 +564,8 @@ function DlrTab({ projects }: { projects: any[] }) {
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => matrix && downloadDlrMatrixXlsx(matrix, project?.project_group, `${fileBase}-Matrix.xlsx`)}
-                disabled={!matrix}
+                onClick={() => matrixItems.length > 0 && downloadDlrMatrixXlsx(matrixItems, `${fileBase}-Matrix.xlsx`)}
+                disabled={matrixItems.length === 0}
               >
                 <LayoutGrid className="mr-2 h-4 w-4" /> Matrix Format
               </Button>
@@ -546,13 +578,13 @@ function DlrTab({ projects }: { projects: any[] }) {
               </Button>
             </div>
           </div>
-          {!projectId && (
+          {selectedProjects.length === 0 && (
             <p className="text-sm text-muted-foreground">Select a project and date to preview and download the report.</p>
           )}
-          {projectId && loading && (
+          {selectedProjects.length > 0 && loading && (
             <p className="text-sm text-muted-foreground">Loading…</p>
           )}
-          {projectId && !loading && matrix && <DlrDailyPreview matrix={matrix} />}
+          {selectedProjects.length > 0 && !loading && matrix && <DlrDailyPreview matrix={matrix} />}
         </CardContent>
       </Card>
     </div>
