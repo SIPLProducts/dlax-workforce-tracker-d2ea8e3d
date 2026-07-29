@@ -128,6 +128,19 @@ function DashboardContent() {
   useEffect(() => { loadMasters(); }, []);
   useEffect(() => { loadData(); }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
 
+  useEffect(() => {
+    const refresh = () => { loadMasters(); loadData(); };
+    const onVis = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, projectId, contractorId, departmentId]);
+
+
   const loadMasters = async () => {
     const [p, c, d, cat] = await Promise.all([
       supabase.from("projects").select("*").order("name"),
