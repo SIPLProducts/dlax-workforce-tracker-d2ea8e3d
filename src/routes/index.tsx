@@ -318,6 +318,9 @@ function DashboardContent() {
               <RefreshCw className="h-4 w-4 mr-1" /> Refresh
             </Button>
             <div className="flex gap-1 rounded-lg border bg-card p-1">
+              <Button size="sm" variant={rangeDays === 1 ? "default" : "ghost"} onClick={() => setRange(1)}>
+                Today
+              </Button>
               {[7, 14, 30, 90].map((d) => (
                 <Button key={d} size="sm" variant={rangeDays === d ? "default" : "ghost"} onClick={() => setRange(d)}>
                   {d}d
