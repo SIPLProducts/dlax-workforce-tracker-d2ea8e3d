@@ -1,55 +1,39 @@
 ## Goal
-Add a "Select All" option to the project filter in the **Daily Labour Report** tab so users can preview and download data for all projects at once. Existing single-project behaviour and all other report tabs remain unchanged.
+Enable multi-select in the Dashboard's Project filter while keeping the existing "All Projects" option. Dashboard KPIs, trend, breakdowns, leaderboards, "No entry today" card, and drilldowns should reflect the union of selected projects. Contractor/Department filters, date range, and all other behaviour stay unchanged.
 
-## Current state
-- `src/routes/reports.tsx` has a `DlrTab` component that only supports one selected project via `ProjectCombobox` (no `includeAllOption` prop).
-- `src/lib/dlr-daily.ts::getDlrDailyMatrix()` builds a matrix for exactly one project row.
-- `src/components/DlrDailyPreview.tsx` already renders multiple rows and group headers, so it can display a combined matrix once one is produced.
-- Matrix Format export (`src/lib/dlr-daily-matrix.ts`) currently emits one sheet for a single project.
+## Changes — `src/routes/index.tsx`
 
-## Changes
+### State
+- Replace `projectId: string` with `projectIds: string[]` (empty array ≡ "All Projects").
+- Update `SavedFilters`, `loadFilters()`, and the persistence effect to store `projectIds`. Migrate old saved values: legacy `projectId === "all"` or missing → `[]`; any other string → `[projectId]`.
+- Update `resetFilters()` to set `projectIds` to `[]`.
+- Change effect dependency arrays that referenced `projectId` to depend on `projectIds.join(",")` to avoid identity-based refetch loops.
 
-### 1. `src/routes/reports.tsx` — DlrTab
-- Change `projectId` state default from `""` to `"all"`.
-- Pass `includeAllOption` and `allLabel="All Projects"` to `ProjectCombobox`.
-- Update the data fetch:
-  - Keep date filter.
-  - Add `projects(id, code, name, project_group)` to the select so rows carry project identity.
-  - When `projectId === "all"`, do **not** apply a project filter.
-  - When a specific project is selected, keep the existing `.eq("project_id", projectId)` filter.
-- Build a list of projects to render (all projects for "all", or the single selected project).
+### Data fetching
+- `applyFilters(q)`: when `projectIds.length > 0`, apply `q.in("project_id", projectIds)`; else no project filter.
+- Contractor/department filters untouched.
 
-### 2. `src/lib/dlr-daily.ts` — multi-project matrix
-- Update `DlrInput` to accept `projects: Project[]` instead of a single `project`.
-- Update `getDlrDailyMatrix()` to:
-  - Accept the new input shape.
-  - Group rows by project, then by project_group.
-  - Emit one group header row per distinct `project_group` (only when the group value exists).
-  - Emit one data row per project, sorted by project name/code.
-  - Keep the same header band structure and column layout.
-- Update `DlrMatrix` type to support multiple data rows (it already does structurally; only the generator changes).
-- Keep `downloadDlrXlsx()` and `downloadDlrCsv()` unchanged — they already operate on the matrix cells.
+### Project filter UI
+Replace the single `<Select>` with a multi-select popover built from existing shadcn primitives (`Popover` + `Command` from `@/components/ui/command` + `Checkbox`), following the pattern used by `src/components/ProjectCombobox.tsx`:
+- Trigger button (`w-[220px]`) label:
+  - `projectIds.length === 0` → "All Projects"
+  - `=== 1` → `[code] name` of that project
+  - `>= 2` → "N projects selected"
+- Popover content:
+  - Top row: "All Projects" checkbox — checked when `projectIds.length === 0`; selecting it clears the array (equivalent to Select All).
+  - Search input (filters by code/name).
+  - One checkable row per project showing `[code] name`; clicking toggles membership in `projectIds`.
+- No new dependencies.
 
-### 3. `src/lib/dlr-daily-matrix.ts` — Matrix Format export for all projects
-- Update `downloadDlrMatrixXlsx()` to accept an array of per-project matrices (or a single combined matrix plus project list).
-- For a single project: behaviour identical to today (one sheet).
-- For "Select All": generate one sheet per project in the same workbook, each sheet named by project code/name and preserving the reference template formatting.
-
-### 4. `src/routes/reports.tsx` — wiring and UI text
-- Update the `matrix` memo to call the new `getDlrDailyMatrix()` with the project list.
-- Update the empty-state message and file base name for the "all projects" case.
-- Ensure the Excel, Matrix Format, and CSV buttons remain disabled until data is ready.
+### Downstream consumers
+No changes to memos — `stats`, `trendData`, `topProjects`, breakdown rollups, and drilldown queries all derive from `rows`/`todayRows`/etc., which are already filtered by `applyFilters`. Update the "No entry today" candidate list to restrict the full project master to `projectIds` when non-empty so the card reflects the selection.
 
 ## Verification
-- Open `/reports` → Daily Labour Report tab.
-- Confirm "All Projects" appears in the project combobox and is selectable.
-- With "All Projects" selected, the preview table lists every project that has approved data for the chosen date.
-- Selecting a single project still shows only that project, identical to today.
-- Excel and CSV downloads contain the combined data; Matrix Format download contains one correctly formatted sheet per project.
+- Default state: "All Projects", totals match current dashboard.
+- Selecting 2–3 projects updates KPIs, trend, top lists, and "No entry today" to just those projects.
+- "All Projects" toggle clears the selection; Reset returns to All.
+- Selection persists across reload (localStorage) and migrates cleanly from the old single-project format.
+- Contractor/Department filters, range presets, Refresh, and drilldown remain functional.
 
-## Files to modify
-- `src/routes/reports.tsx`
-- `src/lib/dlr-daily.ts`
-- `src/lib/dlr-daily-matrix.ts`
-
-No database, auth, or other report-tab changes are required.
+## Files
+- `src/routes/index.tsx` (only file modified)
