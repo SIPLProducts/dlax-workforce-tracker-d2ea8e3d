@@ -583,6 +583,7 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
                 </PopoverContent>
               </Popover>
             </div>
+            <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
             <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-2">
               <Button
                 onClick={() => matrix && downloadDlrXlsx(matrix, `${fileBase}.xlsx`)}
