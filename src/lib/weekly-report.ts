@@ -1,21 +1,21 @@
-import { format, addDays } from "date-fns";
+import { format, addDays, differenceInCalendarDays } from "date-fns";
 
 export type WeeklyContractorRow = {
   contractorId: string;
   code: string;
   name: string;
-  days: { ir: number; nmr: number }[]; // length = 7
+  days: { ir: number; nmr: number }[]; // length = N
   totalIR: number;
   totalNMR: number;
   totalWeek: number;
-  perWeek: number;
+  perWeek: number; // per-day average = total / N
 };
 
 export type WeeklyMatrix = {
   project: { id: string; code?: string | null; name: string };
-  weekStart: Date;
-  weekEnd: Date;
-  days: Date[]; // 7 dates
+  weekStart: Date; // fromDate
+  weekEnd: Date;   // toDate
+  days: Date[];    // N dates
   rows: WeeklyContractorRow[];
   totals: {
     days: { ir: number; nmr: number }[];
@@ -28,7 +28,8 @@ export type WeeklyMatrix = {
 
 export function buildWeeklyMatrix(input: {
   project: { id: string; code?: string | null; name: string };
-  weekStart: Date;
+  fromDate: Date;
+  toDate: Date;
   entries: Array<{
     entry_date: string;
     headcount: number | null;
@@ -37,10 +38,12 @@ export function buildWeeklyMatrix(input: {
     departments?: { name: string } | null;
   }>;
 }): WeeklyMatrix {
-  const { project, weekStart, entries } = input;
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const { project, fromDate, toDate, entries } = input;
+  const rawN = differenceInCalendarDays(toDate, fromDate) + 1;
+  const N = Math.max(1, rawN);
+  const days = Array.from({ length: N }, (_, i) => addDays(fromDate, i));
   const dayKeys = days.map((d) => format(d, "yyyy-MM-dd"));
-  const weekEnd = days[6];
+  const weekEnd = days[N - 1];
 
   const byContractor = new Map<string, WeeklyContractorRow>();
   for (const r of entries) {
@@ -55,7 +58,7 @@ export function buildWeeklyMatrix(input: {
         contractorId: r.contractor_id,
         code: r.contractors.contractor_code || "",
         name: r.contractors.company_name,
-        days: Array.from({ length: 7 }, () => ({ ir: 0, nmr: 0 })),
+        days: Array.from({ length: N }, () => ({ ir: 0, nmr: 0 })),
         totalIR: 0,
         totalNMR: 0,
         totalWeek: 0,
@@ -72,12 +75,12 @@ export function buildWeeklyMatrix(input: {
     row.totalIR = row.days.reduce((s, d) => s + d.ir, 0);
     row.totalNMR = row.days.reduce((s, d) => s + d.nmr, 0);
     row.totalWeek = row.totalIR + row.totalNMR;
-    row.perWeek = Math.round((row.totalWeek / 7) * 100) / 100;
+    row.perWeek = Math.round((row.totalWeek / N) * 100) / 100;
   }
   rows.sort((a, b) => (a.code || "").localeCompare(b.code || "") || a.name.localeCompare(b.name));
 
   const totals = {
-    days: Array.from({ length: 7 }, (_, i) => ({
+    days: Array.from({ length: N }, (_, i) => ({
       ir: rows.reduce((s, r) => s + r.days[i].ir, 0),
       nmr: rows.reduce((s, r) => s + r.days[i].nmr, 0),
     })),
@@ -86,9 +89,9 @@ export function buildWeeklyMatrix(input: {
     totalWeek: rows.reduce((s, r) => s + r.totalWeek, 0),
     perWeek: 0,
   };
-  totals.perWeek = Math.round((totals.totalWeek / 7) * 100) / 100;
+  totals.perWeek = Math.round((totals.totalWeek / N) * 100) / 100;
 
-  return { project, weekStart, weekEnd, days, rows, totals };
+  return { project, weekStart: fromDate, weekEnd, days, rows, totals };
 }
 
 export function weeklyDateRangeLabel(m: WeeklyMatrix): string {
