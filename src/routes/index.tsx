@@ -281,6 +281,8 @@ function DashboardContent() {
       .sort((a, b) => b.value - a.value);
   }, [rows, projectMap]);
 
+  const todayLabel = format(new Date(), "dd-MMM-yyyy");
+
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
     const candidates = projectId !== "all"
@@ -406,7 +408,7 @@ function DashboardContent() {
         <Card className="border-l-4 border-l-amber-500">
           <CardHeader className="flex-row items-center gap-2 pb-3">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <CardTitle className="text-base">No entry today — {projectsWithoutToday.length} project(s)</CardTitle>
+            <CardTitle className="text-base">No entry on {todayLabel} — {projectsWithoutToday.length} project(s)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
