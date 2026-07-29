@@ -314,7 +314,7 @@ function DashboardContent() {
 
   const resetFilters = () => {
     setRange(30);
-    setProjectId("all");
+    setProjectIds([]);
     setContractorId("all");
     setDepartmentId("all");
   };
