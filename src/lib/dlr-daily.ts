@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { format } from "date-fns";
 
 export type DlrCategory = { id: string; name: string };
-export type DlrDept = { name: string; isNmr: boolean; categories: DlrCategory[] };
+export type DlrDept = { id?: string; name: string; isNmr: boolean; categories: DlrCategory[] };
 export type DlrProject = { id: string; code?: string | null; name: string; project_group?: string | null };
 
 export type DlrInput = {
@@ -19,7 +19,7 @@ export type DlrInput = {
 // totalCol "Total" | securityCol "Security" | remarksCol "Remarks"
 export type HeaderBands = {
   depts: DlrDept[];
-  catCols: { id: string; name: string; deptName: string; isNmr: boolean }[];
+  catCols: { id: string; name: string; deptId?: string; deptName: string; isNmr: boolean }[];
   catStart: number;
   catWidth: number;
   subTotalCol: number;
@@ -45,7 +45,7 @@ const HEADER_ROWS = 4;
 function buildBands(departments: DlrDept[]): HeaderBands {
   const depts = departments.filter((d) => d.categories.length > 0);
   const catCols: HeaderBands["catCols"] = [];
-  for (const d of depts) for (const c of d.categories) catCols.push({ id: c.id, name: c.name, deptName: d.name, isNmr: d.isNmr });
+  for (const d of depts) for (const c of d.categories) catCols.push({ id: c.id, name: c.name, deptId: d.id, deptName: d.name, isNmr: d.isNmr });
   const catStart = 2;
   const catWidth = catCols.length;
   const subTotalCol = catStart + catWidth;
@@ -68,11 +68,17 @@ function buildProjectDataRow(
   bands: HeaderBands,
   blank: () => (string | number | null)[]
 ): (string | number | null)[] {
+  // Key totals by department + category: the same category can belong to several
+  // departments (e.g. Electrician under both Electrical and Maintenance), and keying
+  // by category alone would repeat the same headcount in every matching column.
   const catTotals: Record<string, number> = {};
   const remarksSet = new Set<string>();
   for (const r of rows) {
     const hc = Number(r.headcount || 0);
-    if (r.category_id) catTotals[r.category_id] = (catTotals[r.category_id] || 0) + hc;
+    if (r.category_id) {
+      const key = `${r.department_id ?? ""}|${r.category_id}`;
+      catTotals[key] = (catTotals[key] || 0) + hc;
+    }
     if (r.remarks && String(r.remarks).trim()) remarksSet.add(String(r.remarks).trim());
   }
 
@@ -82,7 +88,7 @@ function buildProjectDataRow(
   let subTotal = 0;
   let nmrTotal = 0;
   bands.catCols.forEach((c, i) => {
-    const v = catTotals[c.id] || 0;
+    const v = catTotals[`${c.deptId ?? ""}|${c.id}`] || 0;
     d[bands.catStart + i] = v;
     if (c.isNmr) nmrTotal += v; else subTotal += v;
   });
