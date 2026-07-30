@@ -30,6 +30,7 @@ import {
   format, subDays, eachDayOfInterval, differenceInCalendarDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/")({
@@ -231,6 +232,8 @@ function DashboardContent() {
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
   const [approvalStatus, setApprovalStatus] = useState<"all" | "draft" | "pending" | "approved">(initial.approvalStatus);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [statusProjectsOpen, setStatusProjectsOpen] = useState(false);
   const [statusProjectSearch, setStatusProjectSearch] = useState("");
 
@@ -308,6 +311,7 @@ function DashboardContent() {
 
   const loadData = async () => {
     const seq = ++loadSeq.current;
+    setIsLoading(true);
     const today = format(new Date(), "yyyy-MM-dd");
     const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
     const days = differenceInCalendarDays(dateTo, dateFrom) + 1;
@@ -316,27 +320,33 @@ function DashboardContent() {
 
     const sel = "entry_date, headcount, project_id, contractor_id, department_id, category_id";
 
-    const [cur, prev, td, yd, st] = await Promise.all([
-      applyFilters(supabase.from("daily_manpower").select(sel)
-        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
-      applyFilters(supabase.from("daily_manpower").select(sel)
-        .gte("entry_date", format(prevFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(prevTo, "yyyy-MM-dd"))),
-      applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", today)),
-      applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", yesterday)),
-      applyBaseFilters(supabase.from("daily_manpower").select("headcount, project_id, status")
-        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
-    ]);
-    // Ignore results from a superseded load (e.g. focus refresh raced a click).
-    if (seq !== loadSeq.current) return;
-    setRows(cur.data || []);
-    setPrevRows(prev.data || []);
-    setTodayRows(td.data || []);
-    setYesterdayRows(yd.data || []);
-    setStatusRows(st.data || []);
+    try {
+      const [cur, prev, td, yd, st] = await Promise.all([
+        applyFilters(supabase.from("daily_manpower").select(sel)
+          .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+          .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
+        applyFilters(supabase.from("daily_manpower").select(sel)
+          .gte("entry_date", format(prevFrom, "yyyy-MM-dd"))
+          .lte("entry_date", format(prevTo, "yyyy-MM-dd"))),
+        applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", today)),
+        applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", yesterday)),
+        applyBaseFilters(supabase.from("daily_manpower").select("headcount, project_id, status")
+          .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+          .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
+      ]);
+      // Ignore results from a superseded load (e.g. focus refresh raced a click).
+      if (seq !== loadSeq.current) return;
+      setRows(cur.data || []);
+      setPrevRows(prev.data || []);
+      setTodayRows(td.data || []);
+      setYesterdayRows(yd.data || []);
+      setStatusRows(st.data || []);
+      setLastUpdated(new Date());
+    } finally {
+      if (seq === loadSeq.current) setIsLoading(false);
+    }
   };
+
 
 
 
@@ -488,6 +498,7 @@ function DashboardContent() {
     setDepartmentId("all");
     setApprovalStatus("all");
     triggerRefresh();
+    toast.success("Filters reset — data reloaded");
   };
 
   return (
@@ -497,9 +508,15 @@ function DashboardContent() {
         subtitle={`Workforce overview — ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`}
         actions={
           <div className="flex gap-2 items-center">
-            <Button size="sm" variant="outline" onClick={() => { loadMasters(); triggerRefresh(); }}>
-              <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            {lastUpdated && (
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                Updated {format(lastUpdated, "HH:mm:ss")}
+              </span>
+            )}
+            <Button size="sm" variant="outline" disabled={isLoading} onClick={() => { loadMasters(); triggerRefresh(); }}>
+              <RefreshCw className={cn("h-4 w-4 mr-1", isLoading && "animate-spin")} /> Refresh
             </Button>
+
 
             <div className="flex gap-1 rounded-lg border bg-card p-1">
               <Button size="sm" variant={rangeDays === 1 ? "default" : "ghost"} onClick={() => setRange(1)}>
@@ -562,13 +579,16 @@ function DashboardContent() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={resetFilters}>Reset</Button>
+            <Button variant="outline" disabled={isLoading} onClick={resetFilters}>Reset</Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Today's snapshot */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className={cn(
+        "grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4 transition-opacity duration-200",
+        isLoading && "opacity-60 animate-pulse",
+      )}>
         <KpiCard
           title="Workers Today" value={stats.todayTotal} icon={Activity}
           delta={stats.dayChangePct} deltaLabel="vs yesterday" tint="stat-tint-blue"
