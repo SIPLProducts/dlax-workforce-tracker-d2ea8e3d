@@ -498,6 +498,7 @@ function DashboardContent() {
     setDepartmentId("all");
     setApprovalStatus("all");
     triggerRefresh();
+    toast.success("Filters reset — data reloaded");
   };
 
   return (
@@ -507,9 +508,15 @@ function DashboardContent() {
         subtitle={`Workforce overview — ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`}
         actions={
           <div className="flex gap-2 items-center">
-            <Button size="sm" variant="outline" onClick={() => { loadMasters(); triggerRefresh(); }}>
-              <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            {lastUpdated && (
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                Updated {format(lastUpdated, "HH:mm:ss")}
+              </span>
+            )}
+            <Button size="sm" variant="outline" disabled={isLoading} onClick={() => { loadMasters(); triggerRefresh(); }}>
+              <RefreshCw className={cn("h-4 w-4 mr-1", isLoading && "animate-spin")} /> Refresh
             </Button>
+
 
             <div className="flex gap-1 rounded-lg border bg-card p-1">
               <Button size="sm" variant={rangeDays === 1 ? "default" : "ghost"} onClick={() => setRange(1)}>
