@@ -472,10 +472,14 @@ function DashboardContent() {
 
 
   const setRange = (days: number) => {
+    const { from, to } = windowForRange(days);
     setRangeDays(days);
-    setDateFrom(subDays(new Date(), days - 1));
-    setDateTo(new Date());
+    setDateFrom(from);
+    setDateTo(to);
   };
+
+  /** Force a reload even when no filter value changed. */
+  const triggerRefresh = () => setRefreshKey((k) => k + 1);
 
   const resetFilters = () => {
     setRange(30);
@@ -483,6 +487,7 @@ function DashboardContent() {
     setContractorId("all");
     setDepartmentId("all");
     setApprovalStatus("all");
+    triggerRefresh();
   };
 
   return (
@@ -492,9 +497,10 @@ function DashboardContent() {
         subtitle={`Workforce overview — ${format(dateFrom, "dd MMM yyyy")} to ${format(dateTo, "dd MMM yyyy")}`}
         actions={
           <div className="flex gap-2 items-center">
-            <Button size="sm" variant="outline" onClick={() => { loadMasters(); loadData(); }}>
+            <Button size="sm" variant="outline" onClick={() => { loadMasters(); triggerRefresh(); }}>
               <RefreshCw className="h-4 w-4 mr-1" /> Refresh
             </Button>
+
             <div className="flex gap-1 rounded-lg border bg-card p-1">
               <Button size="sm" variant={rangeDays === 1 ? "default" : "ghost"} onClick={() => setRange(1)}>
                 Today
