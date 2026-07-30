@@ -579,13 +579,16 @@ function DashboardContent() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={resetFilters}>Reset</Button>
+            <Button variant="outline" disabled={isLoading} onClick={resetFilters}>Reset</Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Today's snapshot */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className={cn(
+        "grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4 transition-opacity duration-200",
+        isLoading && "opacity-60 animate-pulse",
+      )}>
         <KpiCard
           title="Workers Today" value={stats.todayTotal} icon={Activity}
           delta={stats.dayChangePct} deltaLabel="vs yesterday" tint="stat-tint-blue"
