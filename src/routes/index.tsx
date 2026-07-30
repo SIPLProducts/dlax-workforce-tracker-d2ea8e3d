@@ -194,6 +194,8 @@ function DashboardContent() {
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
   const [approvalStatus, setApprovalStatus] = useState<"all" | "draft" | "pending" | "approved">(initial.approvalStatus);
+  const [statusProjectsOpen, setStatusProjectsOpen] = useState(false);
+  const [statusProjectSearch, setStatusProjectSearch] = useState("");
 
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -535,16 +537,14 @@ function DashboardContent() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Approval Status</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          {statusBreakdown.map((b) => (
-            <div
-              key={b.key}
-              className={`rounded-lg border p-3 space-y-2 ${b.tint} ${approvalStatus === b.key ? "ring-2 ring-ring" : ""}`}
-            >
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            {statusBreakdown.map((b) => (
               <button
+                key={b.key}
                 type="button"
                 onClick={() => setApprovalStatus(approvalStatus === b.key ? "all" : b.key)}
-                className="w-full text-left focus:outline-none"
+                className={`rounded-lg border p-3 text-left focus:outline-none transition-shadow ${b.tint} ${approvalStatus === b.key ? "ring-2 ring-ring" : "hover:shadow-sm"}`}
               >
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm font-medium">{b.label}</span>
@@ -554,25 +554,87 @@ function DashboardContent() {
                   {b.entries} entr{b.entries === 1 ? "y" : "ies"} • {b.projects.length} project(s)
                 </div>
               </button>
-              <div className="flex flex-wrap gap-1.5">
-                {b.projects.length === 0 && <span className="text-xs text-muted-foreground">No data</span>}
-                {b.projects.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setDrill({ type: "project", id: p.id, label: p.label })}
-                    className="focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
-                  >
-                    <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted transition-colors">
-                      {p.label}
-                    </Badge>
-                  </button>
-                ))}
+            ))}
+          </div>
+
+          {(() => {
+            const sel = statusBreakdown.find((b) => b.key === approvalStatus);
+            if (!sel) {
+              return (
+                <p className="text-xs text-muted-foreground">
+                  Select Draft, Pending or Approved to see the projects in that status.
+                </p>
+              );
+            }
+            const MAX_INLINE = 12;
+            const shown = sel.projects.slice(0, MAX_INLINE);
+            return (
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">
+                    {sel.label} projects ({sel.projects.length})
+                  </span>
+                  {sel.projects.length > MAX_INLINE && (
+                    <Button variant="outline" size="sm" onClick={() => { setStatusProjectSearch(""); setStatusProjectsOpen(true); }}>
+                      View all {sel.projects.length}
+                    </Button>
+                  )}
+                </div>
+                <div className="max-h-[140px] overflow-y-auto pr-1">
+                  <div className="flex flex-wrap gap-1.5">
+                    {sel.projects.length === 0 && <span className="text-xs text-muted-foreground">No data</span>}
+                    {shown.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setDrill({ type: "project", id: p.id, label: p.label })}
+                        className="focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
+                      >
+                        <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted transition-colors">
+                          {p.label}
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })()}
         </CardContent>
       </Card>
+
+      <Dialog open={statusProjectsOpen} onOpenChange={setStatusProjectsOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {statusBreakdown.find((b) => b.key === approvalStatus)?.label ?? "Status"} projects
+            </DialogTitle>
+            <DialogDescription>Click a project to drill down.</DialogDescription>
+          </DialogHeader>
+          <input
+            value={statusProjectSearch}
+            onChange={(e) => setStatusProjectSearch(e.target.value)}
+            placeholder="Search projects..."
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <div className="max-h-[50vh] overflow-y-auto space-y-1">
+            {(statusBreakdown.find((b) => b.key === approvalStatus)?.projects ?? [])
+              .filter((p) => p.label.toLowerCase().includes(statusProjectSearch.trim().toLowerCase()))
+              .map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { setStatusProjectsOpen(false); setDrill({ type: "project", id: p.id, label: p.label }); }}
+                  className="w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {p.label}
+                </button>
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
 
       {/* Top summaries — directly after KPI boxes */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
