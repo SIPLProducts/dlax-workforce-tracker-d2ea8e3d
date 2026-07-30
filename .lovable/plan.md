@@ -1,29 +1,34 @@
-## What's wrong (verified in the database)
+## Goal
 
-Entry rows carry their own `status` column, and it has drifted out of sync with the sheet's real approval state. Checked live data:
+On the Dashboard, support Draft / Pending / Approved approval statuses and show a dedicated card with the live count and project list per status.
 
-- Sheet DE-000076 (Testing, 29-07-2026) is **Draft**, but its single entry row is stored as **approved** — that's why it appears under the Approved filter in both Reports and Dashboard.
-- Same drift on DE-000070 and DE-000071 (draft sheets, approved rows).
+## What exists today (verified)
 
-Cause: the insert trigger `set_daily_manpower_initial_status` stamps a row as `approved` whenever the project has no enabled approval configuration, regardless of what the sheet it belongs to says. The sheet (`daily_manpower_sheets.status`, driven by submit/approve/reject) is the real source of truth; the row copy is only refreshed on submit/approve/reject, so rows created outside those paths stay wrong.
+`src/routes/index.tsx` already has a Status filter with All / Pending / Approved. It filters `daily_manpower` rows by `status` (`approved`, or `pending_l1`/`pending_l2`) inside `applyFilters`, and the choice is persisted in saved filters. There is no Draft option and no per-status summary card.
 
-## Fix
+## Changes
 
-1. **Migration — make the row status derive from the sheet**
-   - Rewrite `set_daily_manpower_initial_status` so a new row inherits the status of the sheet it is attached to (draft / pending / approved / rejected), instead of reading `approval_enabled`. It must run after `assign_daily_sheet` so the sheet exists.
-   - Add a trigger on `daily_manpower_sheets` that propagates any sheet status change to all its rows, so the two can never drift again.
-   - One-time backfill: set every `daily_manpower.status` from its sheet's current status (`draft`→draft, `pending`→pending_l1, `approved`→approved, `rejected`→rejected). This alone corrects DE-000076/70/71 immediately.
+1. **Add Draft to the existing Status filter**
+   - Extend the filter value set to `all | draft | pending | approved`, including the saved-filter type, the localStorage read/validate step, and reset.
+   - In `applyFilters`, Draft filters rows with status `draft`. Pending stays `pending_l1`/`pending_l2`; Approved stays `approved`.
 
-2. **Frontend — no hardcoded status assumptions**
-   - No query logic changes are required in `src/routes/index.tsx` or `src/routes/reports.tsx`; they already filter on the live `status` column (Approved = `approved`, Pending = `pending_l1`/`pending_l2`), which becomes correct once the data is sheet-driven.
-   - Only cleanup: keep the Pending filter matching the generic pending markers used by the backend so partially-approved multi-level sheets still count as Pending.
+2. **New "Approval Status" card (separate card, placed under the KPI row)**
+   - Loads live from the backend for the currently selected date range, projects, contractor and department — but ignoring the status filter itself, so all three buckets are always visible.
+   - Shows three rows: Draft, Pending, Approved, each with:
+     - entry/headcount count for that status,
+     - the list of distinct projects that have data in that status (shown as badges, same style as the "No entry" card).
+   - Clicking a status row applies that status to the Status filter; clicking a project badge opens the existing project drill-down.
+   - Counts and project names come purely from the query result and the loaded project master — no hardcoded numbers or project names.
 
-## Technical notes
+3. **Refresh behaviour**
+   - The new query is loaded in the same `loadData` pass, so it updates with date/project/contractor/department changes, window focus, and the Refresh button, exactly like the other dashboard data.
 
-- No changes to approval workflow functions (`submit_sheet`, `approve_sheet`, `reject_sheet`) — they keep writing sheet status, and the new propagation trigger keeps rows aligned.
-- Nothing else on the Dashboard, Reports, Daily Entry, or OT Entry screens changes.
+## Not changing
+
+Existing KPIs, top lists, trend chart, no-entry alert, drill-downs, Reports screen, and all backend/database logic remain untouched.
 
 ## Verification
 
-- Re-run the row-vs-sheet status comparison query; every row must match its sheet.
-- With Status = Approved on 29-07-2026, the draft "Testing" sheet must disappear from both the Daily Labour Report and the Dashboard totals.
+- With Status = Draft, the dashboard totals show only draft rows.
+- The Approval Status card totals across the three buckets equal the unfiltered period total.
+- Draft sheets (e.g. DE-000076 "Testing") appear only under Draft, not Approved.
