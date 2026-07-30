@@ -507,7 +507,7 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
         .sort((a, b) => a.name.localeCompare(b.name));
 
       setRows(dmRows);
-      setDepartments(deptEntries.map(({ name, isNmr, categories }) => ({ name, isNmr, categories })));
+      setDepartments(deptEntries.map(({ id, name, isNmr, categories }) => ({ id, name, isNmr, categories })));
       setDepartmentIds(deptEntries.map((d) => d.id));
       setLoading(false);
     })();

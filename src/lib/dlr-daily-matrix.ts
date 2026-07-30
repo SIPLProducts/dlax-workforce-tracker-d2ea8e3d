@@ -110,7 +110,7 @@ function buildSingleDlrMatrixSheet(matrix: DlrMatrix, projectGroup?: string | nu
   b.catCols.forEach((cc, i) => {
     const v = Number(dataRow[b.catStart + i] || 0);
     set(r, catStart + i, num(v));
-    const dept = b.depts.find((d) => d.name === cc.deptName);
+    const dept = b.depts.find((d) => (cc.deptId && d.id ? d.id === cc.deptId : d.name === cc.deptName));
     if (dept?.isNmr) nmrTotal += v; else subTotal += v;
   });
 
