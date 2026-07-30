@@ -203,6 +203,7 @@ function DashboardContent() {
   const [prevRows, setPrevRows] = useState<any[]>([]);
   const [todayRows, setTodayRows] = useState<any[]>([]);
   const [yesterdayRows, setYesterdayRows] = useState<any[]>([]);
+  const [statusRows, setStatusRows] = useState<any[]>([]);
   const [drill, setDrill] = useState<{ type: "project" | "contractor"; id: string; label: string } | null>(null);
   const projectIdsKey = projectIds.join(",");
 
@@ -268,7 +269,7 @@ function DashboardContent() {
 
     const sel = "entry_date, headcount, project_id, contractor_id, department_id, category_id";
 
-    const [cur, prev, td, yd] = await Promise.all([
+    const [cur, prev, td, yd, st] = await Promise.all([
       applyFilters(supabase.from("daily_manpower").select(sel)
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
         .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
@@ -277,12 +278,17 @@ function DashboardContent() {
         .lte("entry_date", format(prevTo, "yyyy-MM-dd"))),
       applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", today)),
       applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", yesterday)),
+      applyBaseFilters(supabase.from("daily_manpower").select("headcount, project_id, status")
+        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
     ]);
     setRows(cur.data || []);
     setPrevRows(prev.data || []);
     setTodayRows(td.data || []);
     setYesterdayRows(yd.data || []);
+    setStatusRows(st.data || []);
   };
+
 
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const contractorMap = useMemo(() => new Map(contractors.map((c) => [c.id, c])), [contractors]);
