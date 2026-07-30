@@ -530,6 +530,50 @@ function DashboardContent() {
         />
       </div>
 
+      {/* Approval status breakdown */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Approval Status</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {statusBreakdown.map((b) => (
+            <div
+              key={b.key}
+              className={`rounded-lg border p-3 space-y-2 ${b.tint} ${approvalStatus === b.key ? "ring-2 ring-ring" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => setApprovalStatus(approvalStatus === b.key ? "all" : b.key)}
+                className="w-full text-left focus:outline-none"
+              >
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-medium">{b.label}</span>
+                  <span className="text-2xl font-semibold tabular-nums">{b.total.toLocaleString()}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {b.entries} entr{b.entries === 1 ? "y" : "ies"} • {b.projects.length} project(s)
+                </div>
+              </button>
+              <div className="flex flex-wrap gap-1.5">
+                {b.projects.length === 0 && <span className="text-xs text-muted-foreground">No data</span>}
+                {b.projects.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setDrill({ type: "project", id: p.id, label: p.label })}
+                    className="focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
+                  >
+                    <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted transition-colors">
+                      {p.label}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       {/* Top summaries — directly after KPI boxes */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Leaderboard title="Top Contractors" icon={HardHat} rows={topContractors} total={stats.total}
