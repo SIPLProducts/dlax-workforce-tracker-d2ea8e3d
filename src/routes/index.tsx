@@ -154,14 +154,38 @@ const FILTER_KEY = "dlax.dashboard.filters.v2";
 
 type SavedFilters = {
   rangeDays: number;
+  dateFrom: string | null;
+  dateTo: string | null;
   projectIds: string[];
   contractorId: string;
   departmentId: string;
   approvalStatus: "all" | "draft" | "pending" | "approved";
 };
 
+const ISO = "yyyy-MM-dd";
+
+/** Derive the [from, to] window for a preset range (days > 0), anchored on today. */
+function windowForRange(days: number): { from: Date; to: Date } {
+  const to = new Date();
+  return { from: subDays(to, Math.max(1, days) - 1), to };
+}
+
+function parseISODate(v: unknown): Date | null {
+  if (typeof v !== "string" || !v) return null;
+  const d = new Date(`${v}T00:00:00`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function loadFilters(): SavedFilters {
-  const base: SavedFilters = { rangeDays: 30, projectIds: [], contractorId: "all", departmentId: "all", approvalStatus: "all" };
+  const base: SavedFilters = {
+    rangeDays: 30,
+    dateFrom: null,
+    dateTo: null,
+    projectIds: [],
+    contractorId: "all",
+    departmentId: "all",
+    approvalStatus: "all",
+  };
   if (typeof window === "undefined") return base;
   try {
     const raw = localStorage.getItem(FILTER_KEY);
@@ -174,6 +198,8 @@ function loadFilters(): SavedFilters {
     const as = parsed.approvalStatus;
     return {
       rangeDays: typeof parsed.rangeDays === "number" ? parsed.rangeDays : 30,
+      dateFrom: typeof parsed.dateFrom === "string" ? parsed.dateFrom : null,
+      dateTo: typeof parsed.dateTo === "string" ? parsed.dateTo : null,
       projectIds,
       contractorId: parsed.contractorId || "all",
       departmentId: parsed.departmentId || "all",
@@ -183,17 +209,28 @@ function loadFilters(): SavedFilters {
   return base;
 }
 
+/** Resolve the initial window: preset ranges re-anchor to today, custom ranges restore as saved. */
+function initialWindow(initial: SavedFilters): { from: Date; to: Date } {
+  if (initial.rangeDays > 0) return windowForRange(initial.rangeDays);
+  const from = parseISODate(initial.dateFrom);
+  const to = parseISODate(initial.dateTo);
+  if (from && to) return { from, to };
+  return windowForRange(30);
+}
+
 function DashboardContent() {
   const { user } = useAuth();
-  const initial = loadFilters();
+  const [initial] = useState<SavedFilters>(() => loadFilters());
+  const [initialRange] = useState(() => initialWindow(initial));
 
   const [rangeDays, setRangeDays] = useState<number>(initial.rangeDays);
-  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), (initial.rangeDays > 0 ? initial.rangeDays : 30) - 1));
-  const [dateTo, setDateTo] = useState<Date>(new Date());
+  const [dateFrom, setDateFrom] = useState<Date>(initialRange.from);
+  const [dateTo, setDateTo] = useState<Date>(initialRange.to);
   const [projectIds, setProjectIds] = useState<string[]>(initial.projectIds);
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
   const [approvalStatus, setApprovalStatus] = useState<"all" | "draft" | "pending" | "approved">(initial.approvalStatus);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [statusProjectsOpen, setStatusProjectsOpen] = useState(false);
   const [statusProjectSearch, setStatusProjectSearch] = useState("");
 
@@ -208,17 +245,24 @@ function DashboardContent() {
   const [statusRows, setStatusRows] = useState<any[]>([]);
   const [drill, setDrill] = useState<{ type: "project" | "contractor"; id: string; label: string } | null>(null);
   const projectIdsKey = projectIds.join(",");
+  const fromKey = format(dateFrom, ISO);
+  const toKey = format(dateTo, ISO);
+  const loadSeq = useRef(0);
 
   // persist filters
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify({ rangeDays: rangeDays > 0 ? rangeDays : 30, projectIds, contractorId, departmentId, approvalStatus }));
+      localStorage.setItem(
+        FILTER_KEY,
+        JSON.stringify({ rangeDays, dateFrom: fromKey, dateTo: toKey, projectIds, contractorId, departmentId, approvalStatus }),
+      );
     } catch {}
-  }, [rangeDays, projectIdsKey, contractorId, departmentId, approvalStatus, user?.id]);
+  }, [rangeDays, fromKey, toKey, projectIdsKey, contractorId, departmentId, approvalStatus, user?.id]);
 
   useEffect(() => { loadMasters(); }, []);
-  useEffect(() => { loadData(); }, [dateFrom, dateTo, projectIdsKey, contractorId, departmentId, approvalStatus]);
+  useEffect(() => { loadData(); }, [fromKey, toKey, projectIdsKey, contractorId, departmentId, approvalStatus, refreshKey]);
+
 
   useEffect(() => {
     const refresh = () => { loadMasters(); loadData(); };
