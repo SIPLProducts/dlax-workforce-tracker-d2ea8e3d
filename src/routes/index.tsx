@@ -307,6 +307,7 @@ function DashboardContent() {
 
 
   const loadData = async () => {
+    const seq = ++loadSeq.current;
     const today = format(new Date(), "yyyy-MM-dd");
     const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
     const days = differenceInCalendarDays(dateTo, dateFrom) + 1;
@@ -328,12 +329,15 @@ function DashboardContent() {
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
         .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
     ]);
+    // Ignore results from a superseded load (e.g. focus refresh raced a click).
+    if (seq !== loadSeq.current) return;
     setRows(cur.data || []);
     setPrevRows(prev.data || []);
     setTodayRows(td.data || []);
     setYesterdayRows(yd.data || []);
     setStatusRows(st.data || []);
   };
+
 
 
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
