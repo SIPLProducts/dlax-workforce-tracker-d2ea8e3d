@@ -1,34 +1,26 @@
 ## Goal
 
-On the Dashboard, support Draft / Pending / Approved approval statuses and show a dedicated card with the live count and project list per status.
+On the Dashboard's Approval Status card, when Draft / Pending / Approved is selected, show only that status's project list, and keep the card compact regardless of how many projects there are.
 
-## What exists today (verified)
+## Current behaviour (verified in `src/routes/index.tsx`)
 
-`src/routes/index.tsx` already has a Status filter with All / Pending / Approved. It filters `daily_manpower` rows by `status` (`approved`, or `pending_l1`/`pending_l2`) inside `applyFilters`, and the choice is persisted in saved filters. There is no Draft option and no per-status summary card.
+The card renders all three buckets (`statusBreakdown`, built from the live backend query) side by side, each with its full project badge list inline. With many projects the badges wrap endlessly and the card grows tall. Selecting a status only adds a ring highlight; every bucket still shows its projects.
 
-## Changes
+## Changes (all in `src/routes/index.tsx`, presentation only)
 
-1. **Add Draft to the existing Status filter**
-   - Extend the filter value set to `all | draft | pending | approved`, including the saved-filter type, the localStorage read/validate step, and reset.
-   - In `applyFilters`, Draft filters rows with status `draft`. Pending stays `pending_l1`/`pending_l2`; Approved stays `approved`.
+1. **Selected-status-only project list**
+   - Keep the three status tiles (label, headcount, entry count) always visible so counts stay comparable.
+   - Render the project badge list only for the currently selected status (`approvalStatus` = draft / pending / approved). When the filter is `all`, no badge list is shown, just the three counts and a hint to pick a status.
+   - Clicking a tile selects that status (and toggles back to `all`), unchanged from today.
 
-2. **New "Approval Status" card (separate card, placed under the KPI row)**
-   - Loads live from the backend for the currently selected date range, projects, contractor and department — but ignoring the status filter itself, so all three buckets are always visible.
-   - Shows three rows: Draft, Pending, Approved, each with:
-     - entry/headcount count for that status,
-     - the list of distinct projects that have data in that status (shown as badges, same style as the "No entry" card).
-   - Clicking a status row applies that status to the Status filter; clicking a project badge opens the existing project drill-down.
-   - Counts and project names come purely from the query result and the loaded project master — no hardcoded numbers or project names.
+2. **Compact, scrollable project list**
+   - Move the selected status's projects into a bounded region below the tiles: a scrollable area with a fixed max height (~140px) so the card never grows.
+   - When the list exceeds a small threshold (e.g. 12 projects), show the first ones plus a "View all N projects" button that opens a dialog with a search box and a scrollable full list.
+   - Project badges keep their existing click-to-drill-down behaviour in both the inline list and the dialog.
 
-3. **Refresh behaviour**
-   - The new query is loaded in the same `loadData` pass, so it updates with date/project/contractor/department changes, window focus, and the Refresh button, exactly like the other dashboard data.
+3. **Data**
+   - No query changes: counts and project names continue to come from the existing live `statusBreakdown` query and loaded project master. No hardcoded values.
 
 ## Not changing
 
-Existing KPIs, top lists, trend chart, no-entry alert, drill-downs, Reports screen, and all backend/database logic remain untouched.
-
-## Verification
-
-- With Status = Draft, the dashboard totals show only draft rows.
-- The Approval Status card totals across the three buckets equal the unfiltered period total.
-- Draft sheets (e.g. DE-000076 "Testing") appear only under Draft, not Approved.
+Status filter semantics, dashboard queries, KPIs, top lists, no-entry card, drill-downs, Reports.
