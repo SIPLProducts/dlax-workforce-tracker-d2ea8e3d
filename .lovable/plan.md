@@ -1,39 +1,46 @@
-## Goal
-Add an **Approval Status** filter to the Dashboard and Reports screens with three options: **All** (default), **Pending**, and **Approved**. When set, all `daily_manpower` queries on that screen filter by the selected status; every other behavior stays as-is.
+## Problem (confirmed from backend data)
 
-Status mapping (uses existing `approval_status` enum on `daily_manpower.status`):
-- **Approved** → `status = 'approved'`
-- **Pending** → `status IN ('pending_l1','pending_l2')` (data not yet approved and not draft/rejected)
-- **All** → no status filter
+For 29-07-2026 the actual entries are:
 
-## Dashboard — `src/routes/index.tsx`
-- Add `approvalStatus: "all" | "pending" | "approved"` state, persisted to the same localStorage filter blob used by the other filters (with migration for older payloads defaulting to `"all"`).
-- Add a `Select` control in the filter row (next to Department) labeled **Status** with options All / Pending / Approved. Include it in the Reset action.
-- Extend the shared `applyFilters` helper (used for the 4 `daily_manpower` reads around line 259-266) so that when `approvalStatus !== "all"` it appends:
-  - `.eq("status","approved")` for Approved
-  - `.in("status",["pending_l1","pending_l2"])` for Pending
-- The "No entry today" card queries projects, not manpower, so it stays unchanged.
+```text
+Civil        Painting 1, Structural Steel Work 1
+Electrical   Electrician 3, Street Lighting 3, Technician 6
+Housekeeping Cleaner 3, Sweeper 3
+Maintenance  Electrician 3
+NMR          Cleaner 3, Sweeper 6
+```
 
-## Reports — `src/routes/reports.tsx`
-Add a single `approvalStatus` state at the page level, rendered as a **Select** in each tab's filter bar (Daily, Daily Labour Report, Weekly, Summary), placed alongside the existing project/contractor/department filters. Apply the same enum mapping to every `daily_manpower` query:
-- Line ~127 (Daily preview list)
-- Line ~448 (DLR fetch)
-- Line ~620 (Weekly fetch)
-- Line ~1055 (Summary fetch)
+Total = 32 (31 draft + 1 approved), which matches the Daily Entry sheet, Dashboard and Weekly Report.
 
-Each call gets a small helper (local to the file) `applyStatus(q)` returning the builder with `.eq` / `.in` applied when needed, typed via the `sel` string-widening pattern to keep TS fast.
+The Daily Labour Report shows 52 because it aggregates headcounts **by category only, ignoring the department**. The same category name/id is used under several departments (Electrician under Electrical *and* Maintenance; Cleaner/Sweeper under Housekeeping *and* NMR). In `src/lib/dlr-daily.ts` `buildProjectDataRow` builds `catTotals[category_id]`, then every column that uses that category id reads the same total — so Electrician shows 6 in both Electrical and Maintenance, Cleaner 6 in both Housekeeping and NMR, etc. That is exactly the repeated `6 / 6 / 9` pattern in the attached screenshot, and it also inflates the Sub-Contractor / NMR / Total figures.
+
+## Fix
+
+Scope the aggregation key to department + category.
+
+1. `src/lib/dlr-daily.ts`
+   - Add `deptId` to `DlrDept` / the `catCols` entries in `HeaderBands` (departments are already passed with their ids available in the caller).
+   - In `buildProjectDataRow`, key totals as `` `${r.department_id}|${r.category_id}` `` and read each column with its own `deptId|catId` key.
+   - Sub-contractor vs NMR splits and the Total column then follow automatically from the corrected per-column values.
+
+2. `src/routes/reports.tsx` (DLR tab)
+   - Pass the department id along with each department's categories into `getDlrDailyMatrix` (the `deptEntries` structure already carries `id`; currently it's stripped before being set into state).
+
+3. `src/lib/dlr-daily-matrix.ts`
+   - It reads values straight from the matrix data row and only uses `deptName` for the NMR/sub split, so it needs no logic change; verify the NMR split still resolves after the type change (match on `deptId` instead of name for safety).
 
 ## Preserved
-- No schema changes; uses existing `status` column.
-- Other filters, previews, PDF/Excel exports, approval workflow, and the "No entry today" card behavior unchanged.
-- Default is **All**, so current outputs match today.
+
+- No schema or query changes; same approval-status filter, same date/project filters.
+- Excel / Matrix Format / CSV exports keep their current layouts — only the numbers correct themselves.
+- Dashboard, Weekly, Summary, Daily Entry untouched.
 
 ## Verification
-- Dashboard: switching Status to Approved reduces KPIs to approved rows only; Pending shows only pending_l1/pending_l2; All matches previous totals.
-- Reports Daily/DLR/Weekly/Summary previews and their downloaded files reflect the selected status.
-- Reset restores Status to All along with other filters.
-- Selection persists across reload on Dashboard (localStorage).
+
+For 29-07-2026 with Status = All, the DLR row should read: Civil Painting 1, Structural Steel Work 1, Electrical Electrician 3 / Street Lighting 3 / Technician 6, Housekeeping Cleaner 3 / Sweeper 3, Maintenance Electrician 3, NMR Cleaner 3 / Sweeper 6 → Sub-Contractors 23, NMR 9, **Total 32**, consistent with the Weekly Report and Dashboard.
 
 ## Files
-- `src/routes/index.tsx`
+
+- `src/lib/dlr-daily.ts`
+- `src/lib/dlr-daily-matrix.ts`
 - `src/routes/reports.tsx`
