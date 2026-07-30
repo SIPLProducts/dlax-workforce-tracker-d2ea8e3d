@@ -194,6 +194,8 @@ function DashboardContent() {
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
   const [approvalStatus, setApprovalStatus] = useState<"all" | "draft" | "pending" | "approved">(initial.approvalStatus);
+  const [statusProjectsOpen, setStatusProjectsOpen] = useState(false);
+  const [statusProjectSearch, setStatusProjectSearch] = useState("");
 
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
