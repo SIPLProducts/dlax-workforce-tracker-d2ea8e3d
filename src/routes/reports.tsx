@@ -86,10 +86,11 @@ function BreakdownCard({ title, icon: Icon, rows, total, accent }: { title: stri
   );
 }
 
-type ApprovalStatusFilter = "all" | "pending" | "approved";
+type ApprovalStatusFilter = "all" | "draft" | "pending" | "approved";
 
 function applyApprovalStatus<T extends { eq: any; in: any }>(q: T, s: ApprovalStatusFilter): T {
   if (s === "approved") return q.eq("status", "approved");
+  if (s === "draft") return q.eq("status", "draft");
   if (s === "pending") return q.in("status", ["pending_l1", "pending_l2"]);
   return q;
 }
