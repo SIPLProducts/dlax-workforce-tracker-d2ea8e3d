@@ -1,46 +1,29 @@
-## Problem (confirmed from backend data)
+## What's wrong (verified in the database)
 
-For 29-07-2026 the actual entries are:
+Entry rows carry their own `status` column, and it has drifted out of sync with the sheet's real approval state. Checked live data:
 
-```text
-Civil        Painting 1, Structural Steel Work 1
-Electrical   Electrician 3, Street Lighting 3, Technician 6
-Housekeeping Cleaner 3, Sweeper 3
-Maintenance  Electrician 3
-NMR          Cleaner 3, Sweeper 6
-```
+- Sheet DE-000076 (Testing, 29-07-2026) is **Draft**, but its single entry row is stored as **approved** — that's why it appears under the Approved filter in both Reports and Dashboard.
+- Same drift on DE-000070 and DE-000071 (draft sheets, approved rows).
 
-Total = 32 (31 draft + 1 approved), which matches the Daily Entry sheet, Dashboard and Weekly Report.
-
-The Daily Labour Report shows 52 because it aggregates headcounts **by category only, ignoring the department**. The same category name/id is used under several departments (Electrician under Electrical *and* Maintenance; Cleaner/Sweeper under Housekeeping *and* NMR). In `src/lib/dlr-daily.ts` `buildProjectDataRow` builds `catTotals[category_id]`, then every column that uses that category id reads the same total — so Electrician shows 6 in both Electrical and Maintenance, Cleaner 6 in both Housekeeping and NMR, etc. That is exactly the repeated `6 / 6 / 9` pattern in the attached screenshot, and it also inflates the Sub-Contractor / NMR / Total figures.
+Cause: the insert trigger `set_daily_manpower_initial_status` stamps a row as `approved` whenever the project has no enabled approval configuration, regardless of what the sheet it belongs to says. The sheet (`daily_manpower_sheets.status`, driven by submit/approve/reject) is the real source of truth; the row copy is only refreshed on submit/approve/reject, so rows created outside those paths stay wrong.
 
 ## Fix
 
-Scope the aggregation key to department + category.
+1. **Migration — make the row status derive from the sheet**
+   - Rewrite `set_daily_manpower_initial_status` so a new row inherits the status of the sheet it is attached to (draft / pending / approved / rejected), instead of reading `approval_enabled`. It must run after `assign_daily_sheet` so the sheet exists.
+   - Add a trigger on `daily_manpower_sheets` that propagates any sheet status change to all its rows, so the two can never drift again.
+   - One-time backfill: set every `daily_manpower.status` from its sheet's current status (`draft`→draft, `pending`→pending_l1, `approved`→approved, `rejected`→rejected). This alone corrects DE-000076/70/71 immediately.
 
-1. `src/lib/dlr-daily.ts`
-   - Add `deptId` to `DlrDept` / the `catCols` entries in `HeaderBands` (departments are already passed with their ids available in the caller).
-   - In `buildProjectDataRow`, key totals as `` `${r.department_id}|${r.category_id}` `` and read each column with its own `deptId|catId` key.
-   - Sub-contractor vs NMR splits and the Total column then follow automatically from the corrected per-column values.
+2. **Frontend — no hardcoded status assumptions**
+   - No query logic changes are required in `src/routes/index.tsx` or `src/routes/reports.tsx`; they already filter on the live `status` column (Approved = `approved`, Pending = `pending_l1`/`pending_l2`), which becomes correct once the data is sheet-driven.
+   - Only cleanup: keep the Pending filter matching the generic pending markers used by the backend so partially-approved multi-level sheets still count as Pending.
 
-2. `src/routes/reports.tsx` (DLR tab)
-   - Pass the department id along with each department's categories into `getDlrDailyMatrix` (the `deptEntries` structure already carries `id`; currently it's stripped before being set into state).
+## Technical notes
 
-3. `src/lib/dlr-daily-matrix.ts`
-   - It reads values straight from the matrix data row and only uses `deptName` for the NMR/sub split, so it needs no logic change; verify the NMR split still resolves after the type change (match on `deptId` instead of name for safety).
-
-## Preserved
-
-- No schema or query changes; same approval-status filter, same date/project filters.
-- Excel / Matrix Format / CSV exports keep their current layouts — only the numbers correct themselves.
-- Dashboard, Weekly, Summary, Daily Entry untouched.
+- No changes to approval workflow functions (`submit_sheet`, `approve_sheet`, `reject_sheet`) — they keep writing sheet status, and the new propagation trigger keeps rows aligned.
+- Nothing else on the Dashboard, Reports, Daily Entry, or OT Entry screens changes.
 
 ## Verification
 
-For 29-07-2026 with Status = All, the DLR row should read: Civil Painting 1, Structural Steel Work 1, Electrical Electrician 3 / Street Lighting 3 / Technician 6, Housekeeping Cleaner 3 / Sweeper 3, Maintenance Electrician 3, NMR Cleaner 3 / Sweeper 6 → Sub-Contractors 23, NMR 9, **Total 32**, consistent with the Weekly Report and Dashboard.
-
-## Files
-
-- `src/lib/dlr-daily.ts`
-- `src/lib/dlr-daily-matrix.ts`
-- `src/routes/reports.tsx`
+- Re-run the row-vs-sheet status comparison query; every row must match its sheet.
+- With Status = Approved on 29-07-2026, the draft "Testing" sheet must disappear from both the Daily Labour Report and the Dashboard totals.
