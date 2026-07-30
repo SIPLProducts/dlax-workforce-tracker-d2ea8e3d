@@ -386,6 +386,29 @@ function DashboardContent() {
 
   const todayLabel = format(new Date(), "dd-MMM-yyyy");
 
+  const statusBreakdown = useMemo(() => {
+    const buckets: { key: "draft" | "pending" | "approved"; label: string; tint: string }[] = [
+      { key: "draft", label: "Draft", tint: "stat-tint-amber" },
+      { key: "pending", label: "Pending", tint: "stat-tint-blue" },
+      { key: "approved", label: "Approved", tint: "stat-tint-green" },
+    ];
+    const bucketOf = (s: string) =>
+      s === "approved" ? "approved" : s === "pending_l1" || s === "pending_l2" ? "pending" : s === "draft" ? "draft" : null;
+
+    return buckets.map((b) => {
+      const rowsOf = statusRows.filter((r) => bucketOf(String(r.status)) === b.key);
+      const total = rowsOf.reduce((s, r) => s + (r.headcount || 0), 0);
+      const ids = Array.from(new Set(rowsOf.map((r) => r.project_id)));
+      const projectsOf = ids
+        .map((id) => {
+          const p = projectMap.get(id);
+          return { id, label: p ? `${p.code ? `[${p.code}] ` : ""}${p.name}` : "—" };
+        })
+        .sort((a, b2) => a.label.localeCompare(b2.label));
+      return { ...b, total, entries: rowsOf.length, projects: projectsOf };
+    });
+  }, [statusRows, projectMap]);
+
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
     const selected = new Set(projectIds);
