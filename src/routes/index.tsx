@@ -157,7 +157,7 @@ type SavedFilters = {
   projectIds: string[];
   contractorId: string;
   departmentId: string;
-  approvalStatus: "all" | "pending" | "approved";
+  approvalStatus: "all" | "draft" | "pending" | "approved";
 };
 
 function loadFilters(): SavedFilters {
@@ -177,7 +177,7 @@ function loadFilters(): SavedFilters {
       projectIds,
       contractorId: parsed.contractorId || "all",
       departmentId: parsed.departmentId || "all",
-      approvalStatus: as === "pending" || as === "approved" ? as : "all",
+      approvalStatus: as === "pending" || as === "approved" || as === "draft" ? as : "all",
     };
   } catch {}
   return base;
@@ -193,7 +193,7 @@ function DashboardContent() {
   const [projectIds, setProjectIds] = useState<string[]>(initial.projectIds);
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
-  const [approvalStatus, setApprovalStatus] = useState<"all" | "pending" | "approved">(initial.approvalStatus);
+  const [approvalStatus, setApprovalStatus] = useState<"all" | "draft" | "pending" | "approved">(initial.approvalStatus);
 
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -244,11 +244,17 @@ function DashboardContent() {
   };
 
   const applyFilters = (q: any) => {
+    q = applyBaseFilters(q);
+    if (approvalStatus === "approved") q = q.eq("status", "approved");
+    else if (approvalStatus === "pending") q = q.in("status", ["pending_l1", "pending_l2"]);
+    else if (approvalStatus === "draft") q = q.eq("status", "draft");
+    return q;
+  };
+
+  const applyBaseFilters = (q: any) => {
     if (projectIds.length > 0) q = q.in("project_id", projectIds);
     if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
     if (departmentId !== "all") q = q.eq("department_id", departmentId);
-    if (approvalStatus === "approved") q = q.eq("status", "approved");
-    else if (approvalStatus === "pending") q = q.in("status", ["pending_l1", "pending_l2"]);
     return q;
   };
 
