@@ -311,6 +311,7 @@ function DashboardContent() {
 
   const loadData = async () => {
     const seq = ++loadSeq.current;
+    setIsLoading(true);
     const today = format(new Date(), "yyyy-MM-dd");
     const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
     const days = differenceInCalendarDays(dateTo, dateFrom) + 1;
@@ -319,27 +320,33 @@ function DashboardContent() {
 
     const sel = "entry_date, headcount, project_id, contractor_id, department_id, category_id";
 
-    const [cur, prev, td, yd, st] = await Promise.all([
-      applyFilters(supabase.from("daily_manpower").select(sel)
-        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
-      applyFilters(supabase.from("daily_manpower").select(sel)
-        .gte("entry_date", format(prevFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(prevTo, "yyyy-MM-dd"))),
-      applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", today)),
-      applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", yesterday)),
-      applyBaseFilters(supabase.from("daily_manpower").select("headcount, project_id, status")
-        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
-        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
-    ]);
-    // Ignore results from a superseded load (e.g. focus refresh raced a click).
-    if (seq !== loadSeq.current) return;
-    setRows(cur.data || []);
-    setPrevRows(prev.data || []);
-    setTodayRows(td.data || []);
-    setYesterdayRows(yd.data || []);
-    setStatusRows(st.data || []);
+    try {
+      const [cur, prev, td, yd, st] = await Promise.all([
+        applyFilters(supabase.from("daily_manpower").select(sel)
+          .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+          .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
+        applyFilters(supabase.from("daily_manpower").select(sel)
+          .gte("entry_date", format(prevFrom, "yyyy-MM-dd"))
+          .lte("entry_date", format(prevTo, "yyyy-MM-dd"))),
+        applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", today)),
+        applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", yesterday)),
+        applyBaseFilters(supabase.from("daily_manpower").select("headcount, project_id, status")
+          .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+          .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
+      ]);
+      // Ignore results from a superseded load (e.g. focus refresh raced a click).
+      if (seq !== loadSeq.current) return;
+      setRows(cur.data || []);
+      setPrevRows(prev.data || []);
+      setTodayRows(td.data || []);
+      setYesterdayRows(yd.data || []);
+      setStatusRows(st.data || []);
+      setLastUpdated(new Date());
+    } finally {
+      if (seq === loadSeq.current) setIsLoading(false);
+    }
   };
+
 
 
 
