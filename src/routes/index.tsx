@@ -232,6 +232,8 @@ function DashboardContent() {
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
   const [approvalStatus, setApprovalStatus] = useState<"all" | "draft" | "pending" | "approved">(initial.approvalStatus);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [statusProjectsOpen, setStatusProjectsOpen] = useState(false);
   const [statusProjectSearch, setStatusProjectSearch] = useState("");
 
