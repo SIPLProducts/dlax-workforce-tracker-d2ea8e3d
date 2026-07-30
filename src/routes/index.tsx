@@ -157,7 +157,7 @@ type SavedFilters = {
   projectIds: string[];
   contractorId: string;
   departmentId: string;
-  approvalStatus: "all" | "pending" | "approved";
+  approvalStatus: "all" | "draft" | "pending" | "approved";
 };
 
 function loadFilters(): SavedFilters {
@@ -177,7 +177,7 @@ function loadFilters(): SavedFilters {
       projectIds,
       contractorId: parsed.contractorId || "all",
       departmentId: parsed.departmentId || "all",
-      approvalStatus: as === "pending" || as === "approved" ? as : "all",
+      approvalStatus: as === "pending" || as === "approved" || as === "draft" ? as : "all",
     };
   } catch {}
   return base;
@@ -193,7 +193,7 @@ function DashboardContent() {
   const [projectIds, setProjectIds] = useState<string[]>(initial.projectIds);
   const [contractorId, setContractorId] = useState(initial.contractorId);
   const [departmentId, setDepartmentId] = useState(initial.departmentId);
-  const [approvalStatus, setApprovalStatus] = useState<"all" | "pending" | "approved">(initial.approvalStatus);
+  const [approvalStatus, setApprovalStatus] = useState<"all" | "draft" | "pending" | "approved">(initial.approvalStatus);
 
   const [projects, setProjects] = useState<any[]>([]);
   const [contractors, setContractors] = useState<any[]>([]);
@@ -203,6 +203,7 @@ function DashboardContent() {
   const [prevRows, setPrevRows] = useState<any[]>([]);
   const [todayRows, setTodayRows] = useState<any[]>([]);
   const [yesterdayRows, setYesterdayRows] = useState<any[]>([]);
+  const [statusRows, setStatusRows] = useState<any[]>([]);
   const [drill, setDrill] = useState<{ type: "project" | "contractor"; id: string; label: string } | null>(null);
   const projectIdsKey = projectIds.join(",");
 
@@ -244,11 +245,17 @@ function DashboardContent() {
   };
 
   const applyFilters = (q: any) => {
+    q = applyBaseFilters(q);
+    if (approvalStatus === "approved") q = q.eq("status", "approved");
+    else if (approvalStatus === "pending") q = q.in("status", ["pending_l1", "pending_l2"]);
+    else if (approvalStatus === "draft") q = q.eq("status", "draft");
+    return q;
+  };
+
+  const applyBaseFilters = (q: any) => {
     if (projectIds.length > 0) q = q.in("project_id", projectIds);
     if (contractorId !== "all") q = q.eq("contractor_id", contractorId);
     if (departmentId !== "all") q = q.eq("department_id", departmentId);
-    if (approvalStatus === "approved") q = q.eq("status", "approved");
-    else if (approvalStatus === "pending") q = q.in("status", ["pending_l1", "pending_l2"]);
     return q;
   };
 
@@ -262,7 +269,7 @@ function DashboardContent() {
 
     const sel = "entry_date, headcount, project_id, contractor_id, department_id, category_id";
 
-    const [cur, prev, td, yd] = await Promise.all([
+    const [cur, prev, td, yd, st] = await Promise.all([
       applyFilters(supabase.from("daily_manpower").select(sel)
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
         .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
@@ -271,12 +278,17 @@ function DashboardContent() {
         .lte("entry_date", format(prevTo, "yyyy-MM-dd"))),
       applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", today)),
       applyFilters(supabase.from("daily_manpower").select(sel).eq("entry_date", yesterday)),
+      applyBaseFilters(supabase.from("daily_manpower").select("headcount, project_id, status")
+        .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
+        .lte("entry_date", format(dateTo, "yyyy-MM-dd"))),
     ]);
     setRows(cur.data || []);
     setPrevRows(prev.data || []);
     setTodayRows(td.data || []);
     setYesterdayRows(yd.data || []);
+    setStatusRows(st.data || []);
   };
+
 
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const contractorMap = useMemo(() => new Map(contractors.map((c) => [c.id, c])), [contractors]);
@@ -374,6 +386,29 @@ function DashboardContent() {
 
   const todayLabel = format(new Date(), "dd-MMM-yyyy");
 
+  const statusBreakdown = useMemo(() => {
+    const buckets: { key: "draft" | "pending" | "approved"; label: string; tint: string }[] = [
+      { key: "draft", label: "Draft", tint: "stat-tint-amber" },
+      { key: "pending", label: "Pending", tint: "stat-tint-blue" },
+      { key: "approved", label: "Approved", tint: "stat-tint-green" },
+    ];
+    const bucketOf = (s: string) =>
+      s === "approved" ? "approved" : s === "pending_l1" || s === "pending_l2" ? "pending" : s === "draft" ? "draft" : null;
+
+    return buckets.map((b) => {
+      const rowsOf = statusRows.filter((r) => bucketOf(String(r.status)) === b.key);
+      const total = rowsOf.reduce((s, r) => s + (r.headcount || 0), 0);
+      const ids = Array.from(new Set(rowsOf.map((r) => r.project_id)));
+      const projectsOf = ids
+        .map((id) => {
+          const p = projectMap.get(id);
+          return { id, label: p ? `${p.code ? `[${p.code}] ` : ""}${p.name}` : "—" };
+        })
+        .sort((a, b2) => a.label.localeCompare(b2.label));
+      return { ...b, total, entries: rowsOf.length, projects: projectsOf };
+    });
+  }, [statusRows, projectMap]);
+
   const projectsWithoutToday = useMemo(() => {
     const reportedToday = new Set(todayRows.map((r) => r.project_id));
     const selected = new Set(projectIds);
@@ -465,6 +500,7 @@ function DashboardContent() {
                 <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                 </SelectContent>
@@ -493,6 +529,50 @@ function DashboardContent() {
           subtitle={`${stats.activeContractors} contractors • ${stats.entries} entries`} tint="stat-tint-purple"
         />
       </div>
+
+      {/* Approval status breakdown */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Approval Status</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {statusBreakdown.map((b) => (
+            <div
+              key={b.key}
+              className={`rounded-lg border p-3 space-y-2 ${b.tint} ${approvalStatus === b.key ? "ring-2 ring-ring" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => setApprovalStatus(approvalStatus === b.key ? "all" : b.key)}
+                className="w-full text-left focus:outline-none"
+              >
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-medium">{b.label}</span>
+                  <span className="text-2xl font-semibold tabular-nums">{b.total.toLocaleString()}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {b.entries} entr{b.entries === 1 ? "y" : "ies"} • {b.projects.length} project(s)
+                </div>
+              </button>
+              <div className="flex flex-wrap gap-1.5">
+                {b.projects.length === 0 && <span className="text-xs text-muted-foreground">No data</span>}
+                {b.projects.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setDrill({ type: "project", id: p.id, label: p.label })}
+                    className="focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
+                  >
+                    <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted transition-colors">
+                      {p.label}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Top summaries — directly after KPI boxes */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
