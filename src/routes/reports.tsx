@@ -479,7 +479,7 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
   const [loading, setLoading] = useState(false);
 
   const selectedProjects = useMemo(() => {
-    if (projectId === "all") return projects;
+    if (projectId === "all") return [...projects].sort(compareProjects);
     const p = projects.find((p) => p.id === projectId);
     return p ? [p] : [];
   }, [projects, projectId]);
