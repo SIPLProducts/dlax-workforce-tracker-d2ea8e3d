@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -39,11 +39,16 @@ export function ProjectCombobox({
 }: Props) {
   const [open, setOpen] = useState(false);
 
+  const sortedProjects = useMemo(
+    () => [...projects].sort((a, b) => a.name.localeCompare(b.name)),
+    [projects]
+  );
+
   const selected =
     includeAllOption && value === "all"
       ? allLabel
-      : projects.find((p) => p.id === value)
-      ? formatLabel(projects.find((p) => p.id === value)!)
+      : sortedProjects.find((p) => p.id === value)
+      ? formatLabel(sortedProjects.find((p) => p.id === value)!)
       : "";
 
   return (
@@ -85,7 +90,7 @@ export function ProjectCombobox({
                   {allLabel}
                 </CommandItem>
               )}
-              {projects.map((p) => {
+              {sortedProjects.map((p) => {
                 const label = formatLabel(p);
                 return (
                   <CommandItem
