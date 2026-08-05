@@ -639,7 +639,7 @@ type SummaryColumn =
 function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects: any[]; approvalStatus: ApprovalStatusFilter; setApprovalStatus: (v: ApprovalStatusFilter) => void }) {
   const [dateFrom, setDateFrom] = useState<Date>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date>(new Date());
-  const [projectId, setProjectId] = useState<string>("all");
+  const [projectIds, setProjectIds] = useState<string[]>([]);
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -652,7 +652,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
         .select("entry_date, headcount, project_id, projects(name, code, project_group)")
         .gte("entry_date", format(dateFrom, "yyyy-MM-dd"))
         .lte("entry_date", format(dateTo, "yyyy-MM-dd"));
-      if (projectId !== "all") q = q.eq("project_id", projectId);
+      if (projectIds.length > 0) q = q.in("project_id", projectIds);
       q = applyApprovalStatus(q as any, approvalStatus) as typeof q;
       const { data, error } = await q;
       if (cancelled) return;
@@ -661,7 +661,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [dateFrom, dateTo, projectId, approvalStatus]);
+  }, [dateFrom, dateTo, projectIds, approvalStatus]);
 
   const matrix = useMemo(() => {
     // Build day list
@@ -699,9 +699,9 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
     // Aggregate: project -> dateKey -> total headcount
     const byProject = new Map<string, { id: string; name: string; code: string; group: string | null; daily: Map<string, number> }>();
     // Seed from selected projects so rows appear even with no data
-    const seedProjects = projectId === "all"
+    const seedProjects = projectIds.length === 0
       ? projects
-      : projects.filter((p: any) => p.id === projectId);
+      : projects.filter((p: any) => projectIds.includes(p.id));
     for (const p of seedProjects) {
       byProject.set(p.id, { id: p.id, name: p.name || "—", code: p.code || "", group: p.project_group || null, daily: new Map() });
     }
@@ -766,7 +766,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
     const avgPerWeek = totalDays > 0 ? Math.round((totalLabour / (totalDays / 7)) * 10) / 10 : 0;
 
     return { columns, projectRows, colTotals, totalLabour, avgPerWeek, grandMonth, weeks: Math.round((totalDays / 7) * 10) / 10 };
-  }, [rows, dateFrom, dateTo, projects, projectId]);
+  }, [rows, dateFrom, dateTo, projects, projectIds]);
 
   const exportXlsx = async () => {
     const XLSX = await import("xlsx");
@@ -857,12 +857,11 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
             <DatePicker value={dateTo} onChange={setDateTo} label="To Date" />
             <div className="space-y-1 min-w-0">
               <Label>Project</Label>
-              <ProjectCombobox
-                value={projectId === "all" ? "" : projectId}
-                onChange={(v) => setProjectId(v || "all")}
-                projects={[{ id: "", name: "All Projects", code: "" }, ...projects]}
+              <ProjectMultiCombobox
+                value={projectIds}
+                onChange={setProjectIds}
+                projects={projects}
                 className="w-full"
-                formatLabel={(p) => p.id === "" ? "All Projects" : [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
               />
             </div>
             <ApprovalStatusSelect value={approvalStatus} onChange={setApprovalStatus} />
