@@ -152,7 +152,7 @@ function ReportsPage() {
       supabase.from("departments").select("*").order("name"),
       supabase.from("worker_categories").select("*").order("name"),
     ]);
-    setProjects(p.data || []);
+    setProjects([...(p.data || [])].sort(compareProjects));
     setContractors(c.data || []);
     setDepartments(d.data || []);
     setCategories(cat.data || []);
