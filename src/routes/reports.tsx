@@ -113,6 +113,15 @@ function ApprovalStatusSelect({ value, onChange, className }: { value: ApprovalS
   );
 }
 
+// Alphabetical project ordering: by code when present, else by name (case-insensitive, natural).
+const projectSortKey = (p: any) => (p?.code || p?.name || "").toString();
+const cmpAlpha = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+export const compareProjects = (a: any, b: any) =>
+  cmpAlpha(projectSortKey(a), projectSortKey(b)) ||
+  cmpAlpha((a?.name || "").toString(), (b?.name || "").toString());
+
+
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
   
@@ -143,7 +152,7 @@ function ReportsPage() {
       supabase.from("departments").select("*").order("name"),
       supabase.from("worker_categories").select("*").order("name"),
     ]);
-    setProjects(p.data || []);
+    setProjects([...(p.data || [])].sort(compareProjects));
     setContractors(c.data || []);
     setDepartments(d.data || []);
     setCategories(cat.data || []);
@@ -195,11 +204,18 @@ function ReportsPage() {
   const filtered = useMemo(() => {
     let arr = data;
     if (projectGroup !== "all") arr = arr.filter((r) => r.projects?.project_group === projectGroup);
-    if (!search.trim()) return arr;
-    const q = search.toLowerCase();
-    return arr.filter((r) =>
-      [getName(r.projects), r.projects?.code, r.projects?.project_group, getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
-        .some((v) => (v || "").toString().toLowerCase().includes(q))
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      arr = arr.filter((r) =>
+        [getName(r.projects), r.projects?.code, r.projects?.project_group, getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
+          .some((v) => (v || "").toString().toLowerCase().includes(q))
+      );
+    }
+    return [...arr].sort(
+      (a, b) =>
+        compareProjects(a.projects, b.projects) ||
+        (b.entry_date || "").localeCompare(a.entry_date || "") ||
+        cmpAlpha(getName(a.contractors), getName(b.contractors))
     );
   }, [data, search, projectGroup]);
 
@@ -463,7 +479,7 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
   const [loading, setLoading] = useState(false);
 
   const selectedProjects = useMemo(() => {
-    if (projectId === "all") return projects;
+    if (projectId === "all") return [...projects].sort(compareProjects);
     const p = projects.find((p) => p.id === projectId);
     return p ? [p] : [];
   }, [projects, projectId]);
@@ -736,7 +752,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
         }
         return { ...p, dayVals, weekAvgs, monthTotal };
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort(compareProjects);
 
     // Grand totals per column (avg across all approved entries that week, ignoring empty days)
     const colTotals: Record<string, number | null> = {};
