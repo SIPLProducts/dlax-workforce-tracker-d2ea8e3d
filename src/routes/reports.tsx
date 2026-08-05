@@ -204,11 +204,18 @@ function ReportsPage() {
   const filtered = useMemo(() => {
     let arr = data;
     if (projectGroup !== "all") arr = arr.filter((r) => r.projects?.project_group === projectGroup);
-    if (!search.trim()) return arr;
-    const q = search.toLowerCase();
-    return arr.filter((r) =>
-      [getName(r.projects), r.projects?.code, r.projects?.project_group, getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
-        .some((v) => (v || "").toString().toLowerCase().includes(q))
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      arr = arr.filter((r) =>
+        [getName(r.projects), r.projects?.code, r.projects?.project_group, getName(r.contractors), getName(r.departments), getName(r.worker_categories), r.remarks]
+          .some((v) => (v || "").toString().toLowerCase().includes(q))
+      );
+    }
+    return [...arr].sort(
+      (a, b) =>
+        compareProjects(a.projects, b.projects) ||
+        (b.entry_date || "").localeCompare(a.entry_date || "") ||
+        cmpAlpha(getName(a.contractors), getName(b.contractors))
     );
   }, [data, search, projectGroup]);
 
