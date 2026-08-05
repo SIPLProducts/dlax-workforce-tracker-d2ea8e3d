@@ -36,7 +36,7 @@ export function ProjectMultiCombobox({ projects, value, onChange, className, all
       ? allLabel
       : value.length === 1
       ? (() => {
-          const p = projects.find((x) => x.id === value[0]);
+          const p = sortedProjects.find((x) => x.id === value[0]);
           return p ? fmt(p) : "1 project selected";
         })()
       : `${value.length} projects selected`;
@@ -70,7 +70,7 @@ export function ProjectMultiCombobox({ projects, value, onChange, className, all
                 <Checkbox checked={value.length === 0} className="mr-2" />
                 <span className="font-medium">{allLabel}</span>
               </CommandItem>
-              {projects.map((p) => (
+              {sortedProjects.map((p) => (
                 <CommandItem key={p.id} value={`${p.code ?? ""} ${p.name}`} onSelect={() => toggle(p.id)}>
                   <Checkbox checked={selectedSet.has(p.id)} className="mr-2" />
                   <span className="truncate">{fmt(p)}</span>

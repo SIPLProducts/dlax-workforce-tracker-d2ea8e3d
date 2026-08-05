@@ -90,7 +90,7 @@ export function ProjectCombobox({
                   {allLabel}
                 </CommandItem>
               )}
-              {projects.map((p) => {
+              {sortedProjects.map((p) => {
                 const label = formatLabel(p);
                 return (
                   <CommandItem
