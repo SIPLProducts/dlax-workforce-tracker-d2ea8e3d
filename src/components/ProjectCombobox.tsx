@@ -39,11 +39,16 @@ export function ProjectCombobox({
 }: Props) {
   const [open, setOpen] = useState(false);
 
+  const sortedProjects = useMemo(
+    () => [...projects].sort((a, b) => a.name.localeCompare(b.name)),
+    [projects]
+  );
+
   const selected =
     includeAllOption && value === "all"
       ? allLabel
-      : projects.find((p) => p.id === value)
-      ? formatLabel(projects.find((p) => p.id === value)!)
+      : sortedProjects.find((p) => p.id === value)
+      ? formatLabel(sortedProjects.find((p) => p.id === value)!)
       : "";
 
   return (

@@ -25,6 +25,10 @@ const fmt = (p: ProjectMultiOption) => [p.code && `[${p.code}]`, p.name].filter(
 
 export function ProjectMultiCombobox({ projects, value, onChange, className, allLabel = "All Projects" }: Props) {
   const [open, setOpen] = useState(false);
+  const sortedProjects = useMemo(
+    () => [...projects].sort((a, b) => a.name.localeCompare(b.name)),
+    [projects]
+  );
   const selectedSet = new Set(value);
 
   const label =
