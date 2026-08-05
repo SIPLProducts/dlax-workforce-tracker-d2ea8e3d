@@ -113,6 +113,15 @@ function ApprovalStatusSelect({ value, onChange, className }: { value: ApprovalS
   );
 }
 
+// Alphabetical project ordering: by code when present, else by name (case-insensitive, natural).
+const projectSortKey = (p: any) => (p?.code || p?.name || "").toString();
+const cmpAlpha = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+export const compareProjects = (a: any, b: any) =>
+  cmpAlpha(projectSortKey(a), projectSortKey(b)) ||
+  cmpAlpha((a?.name || "").toString(), (b?.name || "").toString());
+
+
 function ReportsPage() {
   const [tab, setTab] = useState("daily");
   
