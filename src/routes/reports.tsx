@@ -752,7 +752,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
         }
         return { ...p, dayVals, weekAvgs, monthTotal };
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort(compareProjects);
 
     // Grand totals per column (avg across all approved entries that week, ignoring empty days)
     const colTotals: Record<string, number | null> = {};
