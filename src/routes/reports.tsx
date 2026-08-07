@@ -1217,6 +1217,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                       <th rowSpan={2} className="border px-2 py-1 align-middle">S.No</th>
                       <th rowSpan={2} className="border px-2 py-1 align-middle">SC Code</th>
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-left">Name of the Contractor</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-left">Nature of Work</th>
                       {matrix.days.map((d, i) => (
                         <th key={i} colSpan={2} className="border px-2 py-1 text-center">{format(d, "EEE dd.MM")}</th>
                       ))}
