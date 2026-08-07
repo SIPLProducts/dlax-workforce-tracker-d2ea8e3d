@@ -4,12 +4,14 @@ export type WeeklyContractorRow = {
   contractorId: string;
   code: string;
   name: string;
+  nature: string;
   days: { ir: number; nmr: number }[]; // length = N
   totalIR: number;
   totalNMR: number;
   totalWeek: number;
   perWeek: number; // per-day average = total / N
 };
+
 
 export type WeeklyMatrix = {
   project: { id: string; code?: string | null; name: string };
