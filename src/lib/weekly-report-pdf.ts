@@ -125,7 +125,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
   const totalW = pageW - marginX * 2;
   const cellW = totalW / 4;
 
-  const labels = ["Prepared By", "GJS - Incharge", "Accounts - Incharge", "Project Incharge"];
+  const labels = ["Prepared By", "QS - Incharge", "Accounts - Incharge", "Project Incharge"];
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   labels.forEach((label, i) => {
