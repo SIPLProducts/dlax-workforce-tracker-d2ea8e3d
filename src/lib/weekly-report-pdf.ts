@@ -47,6 +47,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
       { content: "S.No", rowSpan: 2 },
       { content: "SC Code", rowSpan: 2 },
       { content: "Name of the Contractor", rowSpan: 2 },
+      { content: "Nature of Work", rowSpan: 2 },
       ...dayLabels.map((lbl) => ({ content: lbl, colSpan: 2 })),
       { content: "Total IR", rowSpan: 2 },
       { content: "Total NMR", rowSpan: 2 },
@@ -62,6 +63,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
     String(i + 1),
     r.code || "",
     r.name,
+    r.nature || "",
     ...r.days.flatMap((d) => [fmt(d.ir), fmt(d.nmr)]),
     fmt(r.totalIR),
     fmt(r.totalNMR),
@@ -70,7 +72,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
   ]);
 
   const foot = [[
-    { content: "Totals", colSpan: 3, styles: { halign: "right", fontStyle: "bold" as const } },
+    { content: "Totals", colSpan: 4, styles: { halign: "right", fontStyle: "bold" as const } },
     ...m.totals.days.flatMap((d) => [fmt(d.ir), fmt(d.nmr)]),
     fmt(m.totals.totalIR),
     fmt(m.totals.totalNMR),
@@ -88,12 +90,14 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
     headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: "bold", lineWidth: 0.1, lineColor: [0, 0, 0] },
     footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: "bold", lineWidth: 0.1, lineColor: [0, 0, 0] },
     columnStyles: {
-      0: { cellWidth: 10 },
-      1: { cellWidth: 18 },
-      2: { cellWidth: 46, halign: "left" },
+      0: { cellWidth: 9 },
+      1: { cellWidth: 16 },
+      2: { cellWidth: 38, halign: "left" },
+      3: { cellWidth: 24, halign: "left" },
     },
     theme: "grid",
   });
+
 
   doc.save(filename);
 }
