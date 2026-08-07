@@ -36,7 +36,7 @@ export function buildWeeklyMatrix(input: {
     entry_date: string;
     headcount: number | null;
     contractor_id: string | null;
-    contractors?: { id: string; company_name: string; contractor_code: string | null } | null;
+    contractors?: { id: string; company_name: string; contractor_code: string | null; nature_of_work?: string | null } | null;
     departments?: { name: string } | null;
   }>;
 }): WeeklyMatrix {
