@@ -61,6 +61,11 @@ function projectSortKey(p: DlrProject) {
   return p.code ? `[${p.code}] ${p.name}` : p.name;
 }
 
+function projectLabel(p: DlrProject) {
+  return p.name || p.code || "";
+}
+
+
 function buildProjectDataRow(
   p: DlrProject,
   sno: number,
@@ -84,7 +89,7 @@ function buildProjectDataRow(
 
   const d = blank();
   d[0] = sno;
-  d[1] = projectSortKey(p);
+  d[1] = projectLabel(p);
   let subTotal = 0;
   let nmrTotal = 0;
   bands.catCols.forEach((c, i) => {

@@ -133,7 +133,7 @@ export function buildSummaryMatrixWorkbook(input: SummaryMatrixInput): XLSX.Work
     for (const p of grouped.get(g)!) {
       sno++;
       set(r, 0, num(sno, { alignment: { horizontal: "center", vertical: "center" }, numFmt: "0" }));
-      set(r, 1, txt(p.code ? `[${p.code}] ${p.name}` : p.name, { alignment: { horizontal: "left", vertical: "center", wrapText: true } }));
+      set(r, 1, txt(p.name || p.code || "", { alignment: { horizontal: "left", vertical: "center", wrapText: true } }));
       columns.forEach((col, i) => {
         const c = 2 + i;
         if (col.kind === "day") {
