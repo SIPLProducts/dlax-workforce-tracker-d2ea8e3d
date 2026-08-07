@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DlrMatrix } from "@/lib/dlr-daily";
 
 export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
@@ -23,49 +24,75 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
   }
   const hasData = matrix.cells.length > matrix.headerRows;
 
+  // Measure header row heights so each header row can be pinned at its own offset.
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
+  const [tops, setTops] = useState<number[]>([0, 0, 0, 0]);
+
+  const measure = () => {
+    const heights = rowRefs.current.map((el) => el?.offsetHeight ?? 0);
+    const next: number[] = [];
+    let acc = 0;
+    for (let i = 0; i < heights.length; i++) {
+      next.push(acc);
+      acc += heights[i];
+    }
+    setTops((prev) => (prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next));
+  };
+
+  useLayoutEffect(measure);
+
+  useEffect(() => {
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const cellBase = "border-b border-r border-border px-2 py-1";
-  const headBase = `${cellBase} bg-muted`;
+  const headBase = `${cellBase} bg-muted sticky`;
   const col0 = "sticky left-0 w-16 min-w-16 max-w-16";
   const col1 = "sticky left-16 w-44 min-w-44 max-w-44";
+  const top = (i: number) => ({ top: tops[i] ?? 0 });
 
   return (
     <div className="border rounded-md overflow-auto max-h-[70vh] relative">
       <table className="border-separate border-spacing-0 text-xs w-full">
-        <thead className="sticky top-0 z-30">
-          <tr>
+        <thead>
+          <tr ref={(el) => { rowRefs.current[0] = el; }}>
             <th
               colSpan={NUM}
-              className={`${headBase} text-center font-bold whitespace-pre-line border-l border-t`}
+              style={top(0)}
+              className={`${headBase} z-30 text-center font-bold whitespace-pre-line border-l border-t`}
             >
               {matrix.cells[0][0]}
             </th>
           </tr>
-          <tr>
-            <th rowSpan={3} className={`${headBase} ${col0} z-40 align-middle border-l`}>Sl.No.</th>
-            <th rowSpan={3} className={`${headBase} ${col1} z-40 align-middle`}>Name of the Project</th>
+          <tr ref={(el) => { rowRefs.current[1] = el; }}>
+            <th rowSpan={3} style={top(1)} className={`${headBase} ${col0} z-40 align-middle border-l`}>Sl.No.</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} ${col1} z-40 align-middle`}>Name of the Project</th>
             {b.depts.map((d, i) => (
-              <th key={i} colSpan={d.categories.length} className={`${headBase} text-center`}>{d.name}</th>
+              <th key={i} colSpan={d.categories.length} style={top(1)} className={`${headBase} z-20 text-center`}>{d.name}</th>
             ))}
-            <th colSpan={2} className={`${headBase} text-center`}>Total Labour</th>
-            <th rowSpan={3} className={`${headBase} align-middle text-center`}>Total</th>
-            <th rowSpan={3} className={`${headBase} align-middle text-center`}>Security</th>
-            <th rowSpan={3} className={`${headBase} align-middle`}>Remarks</th>
+            <th colSpan={2} style={top(1)} className={`${headBase} z-20 text-center`}>Total Labour</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} z-20 align-middle text-center`}>Total</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} z-20 align-middle text-center`}>Security</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} z-20 align-middle`}>Remarks</th>
           </tr>
-          <tr>
+          <tr ref={(el) => { rowRefs.current[2] = el; }}>
             {b.catCols.map((_c, i) => (
-              <th key={`p-${i}`} className={headBase} />
+              <th key={`p-${i}`} style={top(2)} className={`${headBase} z-20`} />
             ))}
-            <th className={headBase} />
-            <th className={headBase} />
+            <th style={top(2)} className={`${headBase} z-20`} />
+            <th style={top(2)} className={`${headBase} z-20`} />
           </tr>
-          <tr>
+          <tr ref={(el) => { rowRefs.current[3] = el; }}>
             {b.catCols.map((c) => (
-              <th key={c.id} className={`${headBase} text-center min-w-24`}>{c.name}</th>
+              <th key={c.id} style={top(3)} className={`${headBase} z-20 text-center min-w-24`}>{c.name}</th>
             ))}
-            <th className={`${headBase} text-center min-w-28`}>Sub Contractors/ Job Work</th>
-            <th className={`${headBase} text-center min-w-20`}>NMR</th>
+            <th style={top(3)} className={`${headBase} z-20 text-center min-w-28`}>Sub Contractors/ Job Work</th>
+            <th style={top(3)} className={`${headBase} z-20 text-center min-w-20`}>NMR</th>
           </tr>
         </thead>
+
 
         <tbody>
           {matrix.cells.slice(matrix.headerRows).map((row, idx) => {
