@@ -1237,7 +1237,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                   <tbody>
                     {matrix.rows.length === 0 && (
                       <tr>
-                        <td colSpan={3 + N * 2 + 4} className="border text-center py-6 text-muted-foreground">
+                        <td colSpan={4 + N * 2 + 4} className="border text-center py-6 text-muted-foreground">
                           No entries for this project in the selected range.
                         </td>
                       </tr>
