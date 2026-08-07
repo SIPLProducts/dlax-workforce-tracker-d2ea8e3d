@@ -1247,6 +1247,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                         <td className="border px-2 py-1 text-center">{i + 1}</td>
                         <td className="border px-2 py-1 text-center">{r.code}</td>
                         <td className="border px-2 py-1">{r.name}</td>
+                        <td className="border px-2 py-1">{r.nature}</td>
                         {r.days.flatMap((d, j) => [
                           <td key={`ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>,
                           <td key={`nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>,
