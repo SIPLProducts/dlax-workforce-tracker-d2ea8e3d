@@ -124,11 +124,6 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
   }
   const totalW = pageW - marginX * 2;
   const cellW = totalW / 4;
-  doc.setLineWidth(0.3);
-  doc.rect(marginX, sigY, totalW, sigH);
-  for (let i = 1; i < 4; i++) {
-    doc.line(marginX + cellW * i, sigY, marginX + cellW * i, sigY + sigH);
-  }
 
   const labels = ["Prepared By", "GJS - Incharge", "Accounts - Incharge", "Project Incharge"];
   doc.setFont("helvetica", "bold");
@@ -139,8 +134,9 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
 
   doc.setLineWidth(0.2);
   for (let i = 0; i < 4; i++) {
-    doc.line(marginX + cellW * i + 3, sigY + 18, marginX + cellW * (i + 1) - 3, sigY + 18);
+    doc.line(marginX + cellW * i + 3, sigY + 18, marginX + cellW * (i + 1) - 6, sigY + 18);
   }
+
 
 
   doc.save(filename);
