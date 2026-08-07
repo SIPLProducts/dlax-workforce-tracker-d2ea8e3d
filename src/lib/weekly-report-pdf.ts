@@ -26,7 +26,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  const projLabel = m.project.code ? `[${m.project.code}] ${m.project.name}` : m.project.name;
+  const projLabel = m.project.name || m.project.code || "";
   doc.text(`Name of the Project: ${projLabel}`, marginX + 2, bandY + 7);
   doc.text(`Date: ${weeklyDateRangeLabel(m)}`, marginX + 2, bandY + 14);
 
