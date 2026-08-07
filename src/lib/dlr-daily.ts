@@ -61,6 +61,11 @@ function projectSortKey(p: DlrProject) {
   return p.code ? `[${p.code}] ${p.name}` : p.name;
 }
 
+function projectLabel(p: DlrProject) {
+  return p.name || p.code || "";
+}
+
+
 function buildProjectDataRow(
   p: DlrProject,
   sno: number,
