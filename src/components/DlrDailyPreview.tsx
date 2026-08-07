@@ -24,48 +24,49 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
   const hasData = matrix.cells.length > matrix.headerRows;
 
   const cellBase = "border-b border-r border-border px-2 py-1";
-  const headBase = `${cellBase} bg-muted sticky`;
+  const headBase = `${cellBase} bg-muted`;
   const col0 = "sticky left-0 w-16 min-w-16 max-w-16";
   const col1 = "sticky left-16 w-44 min-w-44 max-w-44";
 
   return (
     <div className="border rounded-md overflow-auto max-h-[70vh] relative">
       <table className="border-separate border-spacing-0 text-xs w-full">
-        <thead>
+        <thead className="sticky top-0 z-30">
           <tr>
             <th
               colSpan={NUM}
-              className={`${headBase} top-0 z-30 h-10 text-center font-bold whitespace-pre-line border-l border-t`}
+              className={`${headBase} text-center font-bold whitespace-pre-line border-l border-t`}
             >
               {matrix.cells[0][0]}
             </th>
           </tr>
           <tr>
-            <th rowSpan={3} className={`${headBase} ${col0} top-10 z-40 align-middle border-l`}>Sl.No.</th>
-            <th rowSpan={3} className={`${headBase} ${col1} top-10 z-40 align-middle`}>Name of the Project</th>
+            <th rowSpan={3} className={`${headBase} ${col0} z-40 align-middle border-l`}>Sl.No.</th>
+            <th rowSpan={3} className={`${headBase} ${col1} z-40 align-middle`}>Name of the Project</th>
             {b.depts.map((d, i) => (
-              <th key={i} colSpan={d.categories.length} className={`${headBase} top-10 z-20 h-8 text-center`}>{d.name}</th>
+              <th key={i} colSpan={d.categories.length} className={`${headBase} text-center`}>{d.name}</th>
             ))}
-            <th colSpan={2} className={`${headBase} top-10 z-20 text-center`}>Total Labour</th>
-            <th rowSpan={3} className={`${headBase} top-10 z-20 align-middle text-center`}>Total</th>
-            <th rowSpan={3} className={`${headBase} top-10 z-20 align-middle text-center`}>Security</th>
-            <th rowSpan={3} className={`${headBase} top-10 z-20 align-middle`}>Remarks</th>
+            <th colSpan={2} className={`${headBase} text-center`}>Total Labour</th>
+            <th rowSpan={3} className={`${headBase} align-middle text-center`}>Total</th>
+            <th rowSpan={3} className={`${headBase} align-middle text-center`}>Security</th>
+            <th rowSpan={3} className={`${headBase} align-middle`}>Remarks</th>
           </tr>
           <tr>
             {b.catCols.map((_c, i) => (
-              <th key={`p-${i}`} className={`${headBase} top-[72px] z-20 h-6`} />
+              <th key={`p-${i}`} className={headBase} />
             ))}
-            <th className={`${headBase} top-[72px] z-20`} />
-            <th className={`${headBase} top-[72px] z-20`} />
+            <th className={headBase} />
+            <th className={headBase} />
           </tr>
           <tr>
             {b.catCols.map((c) => (
-              <th key={c.id} className={`${headBase} top-[96px] z-20 text-center min-w-24`}>{c.name}</th>
+              <th key={c.id} className={`${headBase} text-center min-w-24`}>{c.name}</th>
             ))}
-            <th className={`${headBase} top-[96px] z-20 text-center min-w-28`}>Sub Contractors/ Job Work</th>
-            <th className={`${headBase} top-[96px] z-20 text-center min-w-20`}>NMR</th>
+            <th className={`${headBase} text-center min-w-28`}>Sub Contractors/ Job Work</th>
+            <th className={`${headBase} text-center min-w-20`}>NMR</th>
           </tr>
         </thead>
+
         <tbody>
           {matrix.cells.slice(matrix.headerRows).map((row, idx) => {
             const ri = idx + matrix.headerRows;
