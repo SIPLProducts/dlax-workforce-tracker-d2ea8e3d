@@ -97,7 +97,7 @@ function ProjectMultiSelect({
       : value.length === 1
       ? (() => {
           const p = projects.find((x) => x.id === value[0]);
-          return p ? [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ") : "1 project selected";
+          return p ? p.name : "1 project selected";
         })()
       : `${value.length} projects selected`;
 
@@ -130,7 +130,7 @@ function ProjectMultiSelect({
                 <span className="font-medium">All Projects</span>
               </CommandItem>
               {projects.map((p) => {
-                const lbl = [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ");
+                const lbl = p.name;
                 return (
                   <CommandItem
                     key={p.id}
@@ -391,7 +391,7 @@ function DashboardContent() {
     return Array.from(m.entries())
       .map(([id, total]) => {
         const p = projectMap.get(id);
-        return { id, name: p ? [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ") : "—", total };
+        return { id, name: p ? p.name : "—", total };
       })
       .sort((a, b) => b.total - a.total).slice(0, 5);
   }, [rows, projectMap]);
@@ -452,7 +452,7 @@ function DashboardContent() {
       const projectsOf = ids
         .map((id) => {
           const p = projectMap.get(id);
-          return { id, label: p ? `${p.code ? `[${p.code}] ` : ""}${p.name}` : "—" };
+          return { id, label: p ? p.name : "—" };
         })
         .sort((a, b2) => a.label.localeCompare(b2.label));
       return { ...b, total, entries: rowsOf.length, projects: projectsOf };
@@ -667,7 +667,7 @@ function DashboardContent() {
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {projectsWithoutToday.map((p: any) => {
-                const label = `${p.code ? `[${p.code}] ` : ""}${p.name}`;
+                const label = p.name;
                 return (
                   <button
                     key={p.id}
@@ -986,7 +986,7 @@ function DrillDialog({
                   {sorted.map((r) => {
                     const other = drill?.type === "project"
                       ? contractorMap.get(r.contractor_id)?.company_name
-                      : (() => { const p = projectMap.get(r.project_id); return p ? [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ") : "—"; })();
+                      : (() => { const p = projectMap.get(r.project_id); return p ? p.name : "—"; })();
                     return (
                       <TableRow key={r.id ?? `${r.entry_date}-${r.contractor_id}-${r.department_id}-${r.category_id}`}>
                         <TableCell className="font-mono text-xs">{format(new Date(r.entry_date), "dd MMM yyyy")}</TableCell>

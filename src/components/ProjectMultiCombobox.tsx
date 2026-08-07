@@ -21,7 +21,7 @@ interface Props {
   allLabel?: string;
 }
 
-const fmt = (p: ProjectMultiOption) => [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ");
+const fmt = (p: ProjectMultiOption) => p.name;
 
 export function ProjectMultiCombobox({ projects, value, onChange, className, allLabel = "All Projects" }: Props) {
   const [open, setOpen] = useState(false);
