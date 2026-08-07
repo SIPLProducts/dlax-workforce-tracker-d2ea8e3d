@@ -57,23 +57,27 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
 
   // Table
   const N = m.days.length;
-  const dayLabels = m.days.map((d) => format(d, "EEE\ndd.MM"));
+  const dayLabels = m.days.map((d) => format(d, "EEE dd.MM"));
   const head = [
     [
       { content: "S.No", rowSpan: 2 },
       { content: "SC Code", rowSpan: 2 },
       { content: "Name of the Contractor", rowSpan: 2 },
       { content: "Nature of Work", rowSpan: 2 },
-      ...dayLabels.map((lbl) => ({ content: lbl, colSpan: 2 })),
+      ...dayLabels.map((lbl) => ({ content: lbl, colSpan: 2, styles: { fontSize: 5.5, cellPadding: 0.5 } })),
       { content: "Total IR", rowSpan: 2 },
       { content: "Total NMR", rowSpan: 2 },
       { content: "Total Labour", rowSpan: 2 },
       { content: `Per Day Avg (Total/${N})`, rowSpan: 2 },
     ],
     [
-      ...m.days.flatMap(() => [{ content: "IR" }, { content: "NMR" }]),
+      ...m.days.flatMap(() => [
+        { content: "IR", styles: { fontSize: 5.5, cellPadding: 0.5 } },
+        { content: "NMR", styles: { fontSize: 5.5, cellPadding: 0.5 } },
+      ]),
     ],
   ];
+
 
   const body = m.rows.map((r, i) => [
     String(i + 1),
@@ -96,6 +100,13 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
     m.totals.perWeek ? m.totals.perWeek.toString() : "",
   ]];
 
+  // Narrow, fixed width for each IR/NMR day column so the date header stays on one line
+  const fixedW = 9 + 16 + 38 + 24 + 4 * 15; // leading columns + four total columns
+  const availableW = pageW - marginX * 2 - fixedW;
+  const dayW = Math.max(5, Math.min(7.5, availableW / (N * 2)));
+  const dayColumnStyles: Record<number, { cellWidth: number }> = {};
+  for (let i = 0; i < N * 2; i++) dayColumnStyles[4 + i] = { cellWidth: dayW };
+
   autoTable(doc, {
     head: head as any,
     body,
@@ -110,6 +121,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
       1: { cellWidth: 16 },
       2: { cellWidth: 38, halign: "left" },
       3: { cellWidth: 24, halign: "left" },
+      ...dayColumnStyles,
     },
     theme: "grid",
   });
