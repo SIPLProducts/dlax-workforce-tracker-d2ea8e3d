@@ -1202,9 +1202,12 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                   <div className="font-bold text-base">KPC PROJECTS LTD</div>
                   <div className="font-semibold mt-1">WEEKLY LABOUR REPORT</div>
                 </div>
-                <div className="text-right">
-                  <div className="inline-block border rounded px-3 py-1 font-bold text-lg">KPC</div>
+                <div className="flex md:justify-end items-center">
+                  <div className="inline-flex items-center border rounded px-3 py-1">
+                    <KpcLogo variant="on-light" className="h-6" />
+                  </div>
                 </div>
+
               </div>
 
               <div className="overflow-auto border rounded-md">
