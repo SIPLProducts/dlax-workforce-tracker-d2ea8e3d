@@ -114,6 +114,32 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
     theme: "grid",
   });
 
+  // "Prepared By" / signature band
+  const pageH = doc.internal.pageSize.getHeight();
+  const sigH = 24;
+  let sigY = ((doc as any).lastAutoTable?.finalY ?? bandY + bandH) + 6;
+  if (sigY + sigH > pageH - 8) {
+    doc.addPage();
+    sigY = 12;
+  }
+  const sigW = (pageW - marginX * 2) / 2;
+  doc.setLineWidth(0.3);
+  doc.rect(marginX, sigY, sigW * 2, sigH);
+  doc.line(marginX + sigW, sigY, marginX + sigW, sigY + sigH);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text("Prepared By", marginX + 3, sigY + 6);
+  doc.text("Signature", marginX + sigW + 3, sigY + 6);
+
+  doc.setLineWidth(0.2);
+  doc.line(marginX + 3, sigY + 17, marginX + sigW - 3, sigY + 17);
+  doc.line(marginX + sigW + 3, sigY + 17, marginX + sigW * 2 - 3, sigY + 17);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.text("Name / Designation", marginX + 3, sigY + 21);
+  doc.text("Date:", marginX + sigW + 3, sigY + 21);
 
   doc.save(filename);
 }
