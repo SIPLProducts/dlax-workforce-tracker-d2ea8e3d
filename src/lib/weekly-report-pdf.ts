@@ -3,6 +3,8 @@ import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import type { WeeklyMatrix } from "./weekly-report";
 import { weeklyDateRangeLabel } from "./weekly-report";
+import { KPC_LOGO_DATA_URL, KPC_LOGO_W, KPC_LOGO_H } from "./kpc-logo-data";
+
 
 const fmt = (n: number) => (n ? n.toLocaleString() : "");
 
