@@ -818,7 +818,7 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
       }
       for (const p of grouped.get(g)!) {
         sno++;
-        const row: any[] = [sno, p.code ? `[${p.code}] ${p.name}` : p.name];
+        const row: any[] = [sno, p.name || p.code || ""];
         for (const c of matrix.columns) {
           if (c.kind === "day") row.push(p.dayVals[c.key] || 0);
           else if (c.kind === "avg") row.push(p.weekAvgs[c.key] ?? "");
