@@ -1204,7 +1204,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-left">Name of the Contractor</th>
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-left">Nature of Work</th>
                       {matrix.days.map((d, i) => (
-                        <th key={i} colSpan={2} className="border px-2 py-1 text-center">{format(d, "EEE dd.MM")}</th>
+                        <th key={i} colSpan={2} className="border px-1 py-1 text-center text-[10px] whitespace-nowrap">{format(d, "EEE dd.MM")}</th>
                       ))}
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total IR</th>
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-center">Total NMR</th>
@@ -1214,8 +1214,8 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
 
                     <tr>
                       {matrix.days.flatMap((_, i) => [
-                        <th key={`ir-${i}`} className="border px-2 py-1 text-center">IR</th>,
-                        <th key={`nmr-${i}`} className="border px-2 py-1 text-center">NMR</th>,
+                        <th key={`ir-${i}`} className="border px-1 py-1 text-center text-[10px] whitespace-nowrap">IR</th>,
+                        <th key={`nmr-${i}`} className="border px-1 py-1 text-center text-[10px] whitespace-nowrap">NMR</th>,
                       ])}
                     </tr>
                   </thead>
