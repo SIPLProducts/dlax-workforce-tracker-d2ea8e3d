@@ -1101,7 +1101,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
       const end = format(toDate, "yyyy-MM-dd");
       let q = supabase
         .from("daily_manpower")
-        .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code), departments(name)")
+        .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code, nature_of_work), departments(name)")
         .eq("project_id", projectId)
         .gte("entry_date", start)
         .lte("entry_date", end);
@@ -1217,6 +1217,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                       <th rowSpan={2} className="border px-2 py-1 align-middle">S.No</th>
                       <th rowSpan={2} className="border px-2 py-1 align-middle">SC Code</th>
                       <th rowSpan={2} className="border px-2 py-1 align-middle text-left">Name of the Contractor</th>
+                      <th rowSpan={2} className="border px-2 py-1 align-middle text-left">Nature of Work</th>
                       {matrix.days.map((d, i) => (
                         <th key={i} colSpan={2} className="border px-2 py-1 text-center">{format(d, "EEE dd.MM")}</th>
                       ))}
@@ -1236,7 +1237,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                   <tbody>
                     {matrix.rows.length === 0 && (
                       <tr>
-                        <td colSpan={3 + N * 2 + 4} className="border text-center py-6 text-muted-foreground">
+                        <td colSpan={4 + N * 2 + 4} className="border text-center py-6 text-muted-foreground">
                           No entries for this project in the selected range.
                         </td>
                       </tr>
@@ -1246,6 +1247,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                         <td className="border px-2 py-1 text-center">{i + 1}</td>
                         <td className="border px-2 py-1 text-center">{r.code}</td>
                         <td className="border px-2 py-1">{r.name}</td>
+                        <td className="border px-2 py-1">{r.nature}</td>
                         {r.days.flatMap((d, j) => [
                           <td key={`ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>,
                           <td key={`nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>,
@@ -1258,7 +1260,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                     ))}
                     {matrix.rows.length > 0 && (
                       <tr className="bg-muted font-semibold">
-                        <td colSpan={3} className="border px-2 py-1 text-right">Totals</td>
+                        <td colSpan={4} className="border px-2 py-1 text-right">Totals</td>
                         {matrix.totals.days.flatMap((d, j) => [
                           <td key={`t-ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>,
                           <td key={`t-nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>,

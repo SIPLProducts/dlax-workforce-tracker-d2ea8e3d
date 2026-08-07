@@ -4,12 +4,14 @@ export type WeeklyContractorRow = {
   contractorId: string;
   code: string;
   name: string;
+  nature: string;
   days: { ir: number; nmr: number }[]; // length = N
   totalIR: number;
   totalNMR: number;
   totalWeek: number;
   perWeek: number; // per-day average = total / N
 };
+
 
 export type WeeklyMatrix = {
   project: { id: string; code?: string | null; name: string };
@@ -34,7 +36,7 @@ export function buildWeeklyMatrix(input: {
     entry_date: string;
     headcount: number | null;
     contractor_id: string | null;
-    contractors?: { id: string; company_name: string; contractor_code: string | null } | null;
+    contractors?: { id: string; company_name: string; contractor_code: string | null; nature_of_work?: string | null } | null;
     departments?: { name: string } | null;
   }>;
 }): WeeklyMatrix {
@@ -58,6 +60,7 @@ export function buildWeeklyMatrix(input: {
         contractorId: r.contractor_id,
         code: r.contractors.contractor_code || "",
         name: r.contractors.company_name,
+        nature: r.contractors.nature_of_work || "",
         days: Array.from({ length: N }, () => ({ ir: 0, nmr: 0 })),
         totalIR: 0,
         totalNMR: 0,
