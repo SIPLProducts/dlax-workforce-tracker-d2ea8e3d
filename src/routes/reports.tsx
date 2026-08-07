@@ -1259,6 +1259,21 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                   </tbody>
                 </table>
               </div>
+
+              {matrix.rows.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 border rounded-md text-sm">
+                  <div className="p-3 border-b sm:border-b-0 sm:border-r">
+                    <div className="font-semibold">Prepared By</div>
+                    <div className="mt-10 border-t border-foreground/60" />
+                    <div className="mt-1 text-xs text-muted-foreground">Name / Designation</div>
+                  </div>
+                  <div className="p-3">
+                    <div className="font-semibold">Signature</div>
+                    <div className="mt-10 border-t border-foreground/60" />
+                    <div className="mt-1 text-xs text-muted-foreground">Date:</div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
