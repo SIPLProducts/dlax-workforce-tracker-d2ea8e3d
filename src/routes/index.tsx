@@ -657,6 +657,35 @@ function DashboardContent() {
         </CardContent>
       </Card>
 
+      {/* Alerts */}
+      {projectsWithoutToday.length > 0 && (
+        <Card className="border-l-4 border-l-amber-500">
+          <CardHeader className="flex-row items-center gap-2 pb-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <CardTitle className="text-base">No entry on {todayLabel} — {projectsWithoutToday.length} project(s)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {projectsWithoutToday.map((p: any) => {
+                const label = `${p.code ? `[${p.code}] ` : ""}${p.name}`;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setDrill({ type: "project", id: p.id, label })}
+                    className="focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
+                  >
+                    <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted transition-colors">
+                      {label}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={statusProjectsOpen} onOpenChange={setStatusProjectsOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
