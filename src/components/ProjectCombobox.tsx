@@ -24,7 +24,7 @@ interface Props {
   formatLabel?: (p: ProjectOption) => string;
 }
 
-const defaultFormat = (p: ProjectOption) => `${p.code ? `${p.code} — ` : ""}${p.name}`;
+const defaultFormat = (p: ProjectOption) => p.name;
 
 export function ProjectCombobox({
   value,
