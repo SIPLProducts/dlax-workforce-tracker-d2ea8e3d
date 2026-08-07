@@ -1262,7 +1262,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
 
               {matrix.rows.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-sm pt-2">
-                  {["Prepared By", "GJS - Incharge", "Accounts - Incharge", "Project Incharge"].map((label) => (
+                  {["Prepared By", "QS - Incharge", "Accounts - Incharge", "Project Incharge"].map((label) => (
                     <div key={label} className="p-1">
                       <div className="font-semibold">{label}</div>
                       <div className="mt-10 border-t border-foreground/60" />
