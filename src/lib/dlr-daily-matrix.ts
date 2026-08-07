@@ -86,7 +86,8 @@ function buildSingleDlrMatrixSheet(matrix: DlrMatrix, projectGroup?: string | nu
 
   // Row 4 kept blank (reference has a sub-descriptor line the app has no data for)
 
-  // Data row(s) starting at row 5 (index 5). Group header first if applicable.
+  // Data rows starting at row 5 (index 5). Walk every row of the matrix so all
+  // projects (and their project-group bands) land on this single sheet.
   let r = 5;
   if (projectGroup) {
     set(r, 0, txt("", { fill: FILL_GROUP, font: FONT_B }));
@@ -96,30 +97,56 @@ function buildSingleDlrMatrixSheet(matrix: DlrMatrix, projectGroup?: string | nu
     r++;
   }
 
-  // Pull the single project row from the matrix (matrix.cells[matrix.dataRow])
-  const dataRow = matrix.cells[matrix.dataRow] || [];
-  const projectName = dataRow[1] as string;
-  const remarks = dataRow[b.remarksCol] as string;
+  const colTotals: number[] = Array(NUM).fill(0);
+  const dataRowIdxs: number[] = [];
+  let sno = 1;
 
-  set(r, 0, num(1, { alignment: { horizontal: "center", vertical: "center" }, numFmt: "0" }));
-  set(r, 1, txt(projectName || "", { alignment: { horizontal: "left", vertical: "center", wrapText: true } }));
+  for (let mr = matrix.headerRows; mr < matrix.cells.length; mr++) {
+    const row = matrix.cells[mr] || [];
+    if (matrix.sectionRows.includes(mr)) {
+      set(r, 0, txt("", { fill: FILL_GROUP, font: FONT_B }));
+      set(r, 1, txt(String(row[1] ?? ""), { fill: FILL_GROUP, font: FONT_B, alignment: { horizontal: "left", vertical: "center" } }));
+      for (let c = 2; c < NUM; c++) blank(r, c, { fill: FILL_GROUP });
+      merges.push({ s: { r, c: 1 }, e: { r, c: NUM - 1 } });
+      r++;
+      continue;
+    }
 
-  // Category headcounts
-  let subTotal = 0;
-  let nmrTotal = 0;
-  b.catCols.forEach((cc, i) => {
-    const v = Number(dataRow[b.catStart + i] || 0);
-    set(r, catStart + i, num(v));
-    const dept = b.depts.find((d) => (cc.deptId && d.id ? d.id === cc.deptId : d.name === cc.deptName));
-    if (dept?.isNmr) nmrTotal += v; else subTotal += v;
-  });
+    set(r, 0, num(sno++, { alignment: { horizontal: "center", vertical: "center" }, numFmt: "0" }));
+    set(r, 1, txt(String(row[1] ?? ""), { alignment: { horizontal: "left", vertical: "center", wrapText: true } }));
 
-  set(r, subLeaf, num(subTotal, { fill: FILL_TOTALS, font: FONT_B }));
-  set(r, nmrLeaf, num(nmrTotal, { fill: FILL_TOTALS, font: FONT_B }));
-  set(r, totalCol, num(subTotal + nmrTotal, { fill: FILL_TOTALS, font: FONT_B }));
-  set(r, securityCol, num(0));
-  set(r, remarksCol, txt(remarks || "", { alignment: { horizontal: "left", vertical: "center", wrapText: true } }));
-  r++;
+    let subTotal = 0;
+    let nmrTotal = 0;
+    b.catCols.forEach((cc, i) => {
+      const v = Number(row[b.catStart + i] || 0);
+      set(r, catStart + i, num(v));
+      colTotals[catStart + i] += v;
+      if (cc.isNmr) nmrTotal += v; else subTotal += v;
+    });
+
+    set(r, subLeaf, num(subTotal, { fill: FILL_TOTALS, font: FONT_B }));
+    set(r, nmrLeaf, num(nmrTotal, { fill: FILL_TOTALS, font: FONT_B }));
+    set(r, totalCol, num(subTotal + nmrTotal, { fill: FILL_TOTALS, font: FONT_B }));
+    set(r, securityCol, num(0));
+    set(r, remarksCol, txt(String(row[b.remarksCol] ?? ""), { alignment: { horizontal: "left", vertical: "center", wrapText: true } }));
+
+    colTotals[subLeaf] += subTotal;
+    colTotals[nmrLeaf] += nmrTotal;
+    colTotals[totalCol] += subTotal + nmrTotal;
+    dataRowIdxs.push(r);
+    r++;
+  }
+
+  // Grand total row
+  if (dataRowIdxs.length > 0) {
+    set(r, 0, txt("", { fill: FILL_TOTALS, font: FONT_B }));
+    set(r, 1, txt("Total", { fill: FILL_TOTALS, font: FONT_B, alignment: { horizontal: "left", vertical: "center" } }));
+    for (let c = catStart; c <= totalCol; c++) set(r, c, num(colTotals[c], { fill: FILL_TOTALS, font: FONT_B }));
+    set(r, securityCol, num(0, { fill: FILL_TOTALS, font: FONT_B }));
+    set(r, remarksCol, txt("", { fill: FILL_TOTALS, font: FONT_B }));
+    r++;
+  }
+
 
   ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r - 1, c: NUM - 1 } });
   ws["!merges"] = merges;
