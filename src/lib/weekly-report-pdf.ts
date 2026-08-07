@@ -114,32 +114,34 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
     theme: "grid",
   });
 
-  // "Prepared By" / signature band
+  // Signature band
   const pageH = doc.internal.pageSize.getHeight();
-  const sigH = 24;
+  const sigH = 22;
   let sigY = ((doc as any).lastAutoTable?.finalY ?? bandY + bandH) + 6;
   if (sigY + sigH > pageH - 8) {
     doc.addPage();
     sigY = 12;
   }
-  const sigW = (pageW - marginX * 2) / 2;
+  const totalW = pageW - marginX * 2;
+  const cellW = totalW / 4;
   doc.setLineWidth(0.3);
-  doc.rect(marginX, sigY, sigW * 2, sigH);
-  doc.line(marginX + sigW, sigY, marginX + sigW, sigY + sigH);
+  doc.rect(marginX, sigY, totalW, sigH);
+  for (let i = 1; i < 4; i++) {
+    doc.line(marginX + cellW * i, sigY, marginX + cellW * i, sigY + sigH);
+  }
 
+  const labels = ["Prepared By", "GJS - Incharge", "Accounts - Incharge", "Project Incharge"];
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("Prepared By", marginX + 3, sigY + 6);
-  doc.text("Signature", marginX + sigW + 3, sigY + 6);
+  labels.forEach((label, i) => {
+    doc.text(label, marginX + cellW * i + 3, sigY + 6);
+  });
 
   doc.setLineWidth(0.2);
-  doc.line(marginX + 3, sigY + 17, marginX + sigW - 3, sigY + 17);
-  doc.line(marginX + sigW + 3, sigY + 17, marginX + sigW * 2 - 3, sigY + 17);
+  for (let i = 0; i < 4; i++) {
+    doc.line(marginX + cellW * i + 3, sigY + 18, marginX + cellW * (i + 1) - 3, sigY + 18);
+  }
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.text("Name / Designation", marginX + 3, sigY + 21);
-  doc.text("Date:", marginX + sigW + 3, sigY + 21);
 
   doc.save(filename);
 }
