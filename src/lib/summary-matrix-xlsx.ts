@@ -78,41 +78,49 @@ export function buildSummaryMatrixWorkbook(input: SummaryMatrixInput): XLSX.Work
   for (let c = 1; c < totalCols; c++) blank(1, c, { font: FONT_SUB, fill: FILL_HEADER });
   merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } });
 
-  // Rows 2-3: header band
+  // Rows 2-4: header band (2 = group band, 3 = day number, 4 = month)
   const H_STYLE = { font: FONT_B, alignment: { horizontal: "center", vertical: "center", wrapText: true }, fill: FILL_HEADER };
   set(2, 0, txt("S.No", H_STYLE));
   set(3, 0, txt("", H_STYLE));
-  merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } });
+  set(4, 0, txt("", H_STYLE));
+  merges.push({ s: { r: 2, c: 0 }, e: { r: 4, c: 0 } });
 
   set(2, 1, txt("Project Name", H_STYLE));
   set(3, 1, txt("", H_STYLE));
-  merges.push({ s: { r: 2, c: 1 }, e: { r: 3, c: 1 } });
+  set(4, 1, txt("", H_STYLE));
+  merges.push({ s: { r: 2, c: 1 }, e: { r: 4, c: 1 } });
 
   // "Manpower deployed at site" across all day/avg cols
   set(2, 2, txt("Manpower deployed at site", H_STYLE));
   for (let c = 3; c < 2 + columns.length; c++) blank(2, c, H_STYLE);
   merges.push({ s: { r: 2, c: 2 }, e: { r: 2, c: 2 + columns.length - 1 } });
 
-  // Row 3: day / avg leaves
+  // Rows 3-4: day number + month / avg leaves
   columns.forEach((col, i) => {
     const c = 2 + i;
     if (col.kind === "day") {
       set(3, c, { v: Number(format(col.date, "d")), t: "n", s: { ...H_STYLE, border: ALL_BORDERS } });
+      set(4, c, txt(format(col.date, "MMM").toUpperCase(), { ...H_STYLE, border: ALL_BORDERS }));
     } else if (col.kind === "avg") {
       set(3, c, txt(`Average per Week-${col.week}`, { ...H_STYLE, fill: FILL_AVG, border: ALL_BORDERS }));
+      set(4, c, txt("", { ...H_STYLE, fill: FILL_AVG, border: ALL_BORDERS }));
+      merges.push({ s: { r: 3, c }, e: { r: 4, c } });
     } else {
       set(3, c, txt(`Total labour for the month of ${monthLabel}`, { ...H_STYLE, fill: FILL_MONTH, border: ALL_BORDERS }));
+      set(4, c, txt("", { ...H_STYLE, fill: FILL_MONTH, border: ALL_BORDERS }));
+      merges.push({ s: { r: 3, c }, e: { r: 4, c } });
     }
   });
 
-  // Month-total header col already placed above if present; ensure standalone month col handled below
   // Remarks header (merged vertical)
   set(2, remarksCol, txt("Remarks", H_STYLE));
   set(3, remarksCol, txt("", H_STYLE));
-  merges.push({ s: { r: 2, c: remarksCol }, e: { r: 3, c: remarksCol } });
+  set(4, remarksCol, txt("", H_STYLE));
+  merges.push({ s: { r: 2, c: remarksCol }, e: { r: 4, c: remarksCol } });
 
   // Body rows: group by project_group
-  let r = 4;
+  let r = 5;
+
   const grouped = new Map<string, SummaryProjectRow[]>();
   for (const p of projectRows) {
     const g = p.group || "";
@@ -177,11 +185,12 @@ export function buildSummaryMatrixWorkbook(input: SummaryMatrixInput): XLSX.Work
   ws["!cols"] = cols;
 
   // Row heights
-  const rows: XLSX.RowInfo[] = [{ hpt: 36 }, { hpt: 24 }, { hpt: 22 }, { hpt: 26 }];
+  const rows: XLSX.RowInfo[] = [{ hpt: 36 }, { hpt: 24 }, { hpt: 22 }, { hpt: 20 }, { hpt: 16 }];
   ws["!rows"] = rows;
 
   // Freeze panes
-  (ws as any)["!views"] = [{ state: "frozen", xSplit: 2, ySplit: 4 }];
+  (ws as any)["!views"] = [{ state: "frozen", xSplit: 2, ySplit: 5 }];
+
 
   // Page setup
   (ws as any)["!pageSetup"] = { orientation: "landscape", fitToWidth: 1, fitToHeight: 0 };
