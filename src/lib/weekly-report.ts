@@ -60,6 +60,7 @@ export function buildWeeklyMatrix(input: {
         contractorId: r.contractor_id,
         code: r.contractors.contractor_code || "",
         name: r.contractors.company_name,
+        nature: r.contractors.nature_of_work || "",
         days: Array.from({ length: N }, () => ({ ir: 0, nmr: 0 })),
         totalIR: 0,
         totalNMR: 0,
