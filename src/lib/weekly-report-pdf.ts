@@ -36,8 +36,22 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
   doc.setFontSize(11);
   doc.text("WEEKLY LABOUR REPORT", col2X + (col3X - col2X) / 2, bandY + 15, { align: "center" });
 
-  doc.setFontSize(18);
-  doc.text("KPC", col3X + col3W / 2, bandY + 12, { align: "center" });
+  // KPC logo in the right-hand header cell, scaled to fit with padding
+  const pad = 3;
+  const maxW = col3W - pad * 2;
+  const maxH = bandH - pad * 2;
+  const scale = Math.min(maxW / KPC_LOGO_W, maxH / KPC_LOGO_H);
+  const logoW = KPC_LOGO_W * scale;
+  const logoH = KPC_LOGO_H * scale;
+  doc.addImage(
+    KPC_LOGO_DATA_URL,
+    "PNG",
+    col3X + (col3W - logoW) / 2,
+    bandY + (bandH - logoH) / 2,
+    logoW,
+    logoH,
+  );
+
 
   // Table
   const N = m.days.length;
