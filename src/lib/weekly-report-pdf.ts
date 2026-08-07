@@ -100,6 +100,13 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
     m.totals.perWeek ? m.totals.perWeek.toString() : "",
   ]];
 
+  // Narrow, fixed width for each IR/NMR day column so the date header stays on one line
+  const fixedW = 9 + 16 + 38 + 24 + 4 * 15; // leading columns + four total columns
+  const availableW = pageW - marginX * 2 - fixedW;
+  const dayW = Math.max(5, Math.min(7.5, availableW / (N * 2)));
+  const dayColumnStyles: Record<number, { cellWidth: number }> = {};
+  for (let i = 0; i < N * 2; i++) dayColumnStyles[4 + i] = { cellWidth: dayW };
+
   autoTable(doc, {
     head: head as any,
     body,
