@@ -185,11 +185,12 @@ export function buildSummaryMatrixWorkbook(input: SummaryMatrixInput): XLSX.Work
   ws["!cols"] = cols;
 
   // Row heights
-  const rows: XLSX.RowInfo[] = [{ hpt: 36 }, { hpt: 24 }, { hpt: 22 }, { hpt: 26 }];
+  const rows: XLSX.RowInfo[] = [{ hpt: 36 }, { hpt: 24 }, { hpt: 22 }, { hpt: 20 }, { hpt: 16 }];
   ws["!rows"] = rows;
 
   // Freeze panes
-  (ws as any)["!views"] = [{ state: "frozen", xSplit: 2, ySplit: 4 }];
+  (ws as any)["!views"] = [{ state: "frozen", xSplit: 2, ySplit: 5 }];
+
 
   // Page setup
   (ws as any)["!pageSetup"] = { orientation: "landscape", fitToWidth: 1, fitToHeight: 0 };
