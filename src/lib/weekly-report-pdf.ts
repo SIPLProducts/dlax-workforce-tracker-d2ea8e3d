@@ -57,23 +57,27 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
 
   // Table
   const N = m.days.length;
-  const dayLabels = m.days.map((d) => format(d, "EEE\ndd.MM"));
+  const dayLabels = m.days.map((d) => format(d, "EEE dd.MM"));
   const head = [
     [
       { content: "S.No", rowSpan: 2 },
       { content: "SC Code", rowSpan: 2 },
       { content: "Name of the Contractor", rowSpan: 2 },
       { content: "Nature of Work", rowSpan: 2 },
-      ...dayLabels.map((lbl) => ({ content: lbl, colSpan: 2 })),
+      ...dayLabels.map((lbl) => ({ content: lbl, colSpan: 2, styles: { fontSize: 5.5, cellPadding: 0.5 } })),
       { content: "Total IR", rowSpan: 2 },
       { content: "Total NMR", rowSpan: 2 },
       { content: "Total Labour", rowSpan: 2 },
       { content: `Per Day Avg (Total/${N})`, rowSpan: 2 },
     ],
     [
-      ...m.days.flatMap(() => [{ content: "IR" }, { content: "NMR" }]),
+      ...m.days.flatMap(() => [
+        { content: "IR", styles: { fontSize: 5.5, cellPadding: 0.5 } },
+        { content: "NMR", styles: { fontSize: 5.5, cellPadding: 0.5 } },
+      ]),
     ],
   ];
+
 
   const body = m.rows.map((r, i) => [
     String(i + 1),
