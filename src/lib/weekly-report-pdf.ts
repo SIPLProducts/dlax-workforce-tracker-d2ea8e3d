@@ -114,6 +114,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
       1: { cellWidth: 16 },
       2: { cellWidth: 38, halign: "left" },
       3: { cellWidth: 24, halign: "left" },
+      ...dayColumnStyles,
     },
     theme: "grid",
   });
