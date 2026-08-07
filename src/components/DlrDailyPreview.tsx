@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DlrMatrix } from "@/lib/dlr-daily";
 
 export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
@@ -10,56 +11,109 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
     return String(v);
   };
 
+  // Category-wise totals across all project rows (skip header + group band rows)
+  const colTotals: number[] = Array(NUM).fill(0);
+  for (let r = matrix.headerRows; r < matrix.cells.length; r++) {
+    if (matrix.sectionRows.includes(r)) continue;
+    const row = matrix.cells[r] || [];
+    for (let c = 2; c < NUM; c++) {
+      if (c === b.remarksCol) continue;
+      const v = Number(row[c] || 0);
+      if (!Number.isNaN(v)) colTotals[c] += v;
+    }
+  }
+  const hasData = matrix.cells.length > matrix.headerRows;
+
+  // Measure header row heights so each header row can be pinned at its own offset.
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
+  const [tops, setTops] = useState<number[]>([0, 0, 0, 0]);
+
+  const measure = () => {
+    const heights = rowRefs.current.map((el) => el?.offsetHeight ?? 0);
+    const next: number[] = [];
+    let acc = 0;
+    for (let i = 0; i < heights.length; i++) {
+      next.push(acc);
+      acc += heights[i];
+    }
+    setTops((prev) => (prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next));
+  };
+
+  useLayoutEffect(measure);
+
+  useEffect(() => {
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const cellBase = "border-b border-r border-border px-2 py-1";
+  const headBase = `${cellBase} bg-muted sticky`;
+  const col0 = "sticky left-0 w-16 min-w-16 max-w-16";
+  const col1 = "sticky left-16 w-44 min-w-44 max-w-44";
+  const top = (i: number) => ({ top: tops[i] ?? 0 });
+
   return (
-    <div className="overflow-auto border rounded-md">
-      <table className="border-collapse text-xs w-full">
+    <div className="border rounded-md overflow-auto max-h-[70vh] relative">
+      <table className="border-separate border-spacing-0 text-xs w-full">
         <thead>
-          <tr>
-            <th colSpan={NUM} className="border bg-muted text-center font-bold py-2 whitespace-pre-line">
+          <tr ref={(el) => { rowRefs.current[0] = el; }}>
+            <th
+              colSpan={NUM}
+              style={top(0)}
+              className={`${headBase} z-30 text-center font-bold whitespace-pre-line border-l border-t`}
+            >
               {matrix.cells[0][0]}
             </th>
           </tr>
-          <tr>
-            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle">Sl.No.</th>
-            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle">Name of the Project</th>
+          <tr ref={(el) => { rowRefs.current[1] = el; }}>
+            <th rowSpan={3} style={top(1)} className={`${headBase} ${col0} z-40 align-middle border-l`}>Sl.No.</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} ${col1} z-40 align-middle`}>Name of the Project</th>
             {b.depts.map((d, i) => (
-              <th key={i} colSpan={d.categories.length} className="border bg-muted px-2 py-1 text-center">{d.name}</th>
+              <th key={i} colSpan={d.categories.length} style={top(1)} className={`${headBase} z-20 text-center`}>{d.name}</th>
             ))}
-            <th colSpan={2} className="border bg-muted px-2 py-1 text-center">Total Labour</th>
-            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle text-center">Total</th>
-            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle text-center">Security</th>
-            <th rowSpan={3} className="border bg-muted px-2 py-1 align-middle">Remarks</th>
+            <th colSpan={2} style={top(1)} className={`${headBase} z-20 text-center`}>Total Labour</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} z-20 align-middle text-center`}>Total</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} z-20 align-middle text-center`}>Security</th>
+            <th rowSpan={3} style={top(1)} className={`${headBase} z-20 align-middle`}>Remarks</th>
           </tr>
-          <tr>
+          <tr ref={(el) => { rowRefs.current[2] = el; }}>
             {b.catCols.map((_c, i) => (
-              <th key={`p-${i}`} className="border bg-muted px-2 py-1" />
+              <th key={`p-${i}`} style={top(2)} className={`${headBase} z-20`} />
             ))}
-            <th className="border bg-muted px-2 py-1" />
-            <th className="border bg-muted px-2 py-1" />
+            <th style={top(2)} className={`${headBase} z-20`} />
+            <th style={top(2)} className={`${headBase} z-20`} />
           </tr>
-          <tr>
+          <tr ref={(el) => { rowRefs.current[3] = el; }}>
             {b.catCols.map((c) => (
-              <th key={c.id} className="border bg-muted px-2 py-1 text-center">{c.name}</th>
+              <th key={c.id} style={top(3)} className={`${headBase} z-20 text-center min-w-24`}>{c.name}</th>
             ))}
-            <th className="border bg-muted px-2 py-1 text-center">Sub Contractors/ Job Work</th>
-            <th className="border bg-muted px-2 py-1 text-center">NMR</th>
+            <th style={top(3)} className={`${headBase} z-20 text-center min-w-28`}>Sub Contractors/ Job Work</th>
+            <th style={top(3)} className={`${headBase} z-20 text-center min-w-20`}>NMR</th>
           </tr>
         </thead>
+
+
         <tbody>
           {matrix.cells.slice(matrix.headerRows).map((row, idx) => {
             const ri = idx + matrix.headerRows;
             if (matrix.sectionRows.includes(ri)) {
               return (
                 <tr key={ri}>
-                  <td className="border px-2 py-1 font-semibold bg-accent/20"></td>
-                  <td colSpan={NUM - 1} className="border px-2 py-1 font-semibold bg-accent/20">{row[1]}</td>
+                  <td className={`${cellBase} ${col0} z-10 font-semibold bg-accent/20 border-l`}></td>
+                  <td colSpan={NUM - 1} className={`${cellBase} font-semibold bg-accent/20`}>{row[1]}</td>
                 </tr>
               );
             }
             return (
               <tr key={ri}>
                 {row.map((v, ci) => (
-                  <td key={ci} className={`border px-2 py-1 ${ci >= 2 && ci !== b.remarksCol ? "text-right tabular-nums" : ""}`}>
+                  <td
+                    key={ci}
+                    className={`${cellBase} bg-background ${ci === 0 ? `${col0} z-10 border-l` : ci === 1 ? `${col1} z-10` : ""} ${
+                      ci >= 2 && ci !== b.remarksCol ? "text-right tabular-nums" : ""
+                    }`}
+                  >
                     {fmtNum(v)}
                   </td>
                 ))}
@@ -67,6 +121,24 @@ export function DlrDailyPreview({ matrix }: { matrix: DlrMatrix }) {
             );
           })}
         </tbody>
+        {hasData && (
+          <tfoot>
+            <tr>
+              <td className={`${cellBase} ${col0} sticky bottom-0 z-30 bg-muted font-bold border-l`}></td>
+              <td className={`${cellBase} ${col1} sticky bottom-0 z-30 bg-muted font-bold`}>Total</td>
+              {Array.from({ length: NUM - 2 }, (_, i) => i + 2).map((ci) => (
+                <td
+                  key={ci}
+                  className={`${cellBase} sticky bottom-0 z-20 bg-muted font-bold ${
+                    ci === b.remarksCol ? "" : "text-right tabular-nums"
+                  }`}
+                >
+                  {ci === b.remarksCol ? "" : fmtNum(colTotals[ci])}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
