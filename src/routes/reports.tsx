@@ -1101,7 +1101,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
       const end = format(toDate, "yyyy-MM-dd");
       let q = supabase
         .from("daily_manpower")
-        .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code), departments(name)")
+        .select("headcount, entry_date, contractor_id, contractors(id, company_name, contractor_code, nature_of_work), departments(name)")
         .eq("project_id", projectId)
         .gte("entry_date", start)
         .lte("entry_date", end);
