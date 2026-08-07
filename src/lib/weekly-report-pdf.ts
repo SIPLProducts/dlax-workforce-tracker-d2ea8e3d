@@ -102,7 +102,7 @@ export function downloadWeeklyReportPdf(m: WeeklyMatrix, filename: string) {
     foot: foot as any,
     startY: bandY + bandH + 3,
     margin: { left: marginX, right: marginX },
-    styles: { fontSize: 7.5, cellPadding: 1.2, halign: "center", valign: "middle", lineWidth: 0.1, lineColor: [0, 0, 0] },
+    styles: { fontSize: 7.5, cellPadding: 1.2, halign: "center", valign: "middle", lineWidth: 0.1, lineColor: [0, 0, 0], textColor: 0 },
     headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: "bold", lineWidth: 0.1, lineColor: [0, 0, 0] },
     footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: "bold", lineWidth: 0.1, lineColor: [0, 0, 0] },
     columnStyles: {
