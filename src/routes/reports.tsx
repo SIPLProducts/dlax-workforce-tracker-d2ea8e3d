@@ -551,18 +551,10 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
   }, [selectedProjects, date, rows, departments, departmentIds]);
 
   const matrixItems = useMemo(() => {
-    if (!matrix || selectedProjects.length === 0) return [];
-    return selectedProjects.map((p) => ({
-      matrix: getDlrDailyMatrix({
-        projects: [p],
-        date,
-        rows: rowsByProject.get(p.id) || [],
-        departments,
-        departmentIds,
-      }),
-      projectGroup: p.project_group,
-    }));
-  }, [matrix, selectedProjects, date, rowsByProject, departments, departmentIds]);
+    if (!matrix) return [];
+    return [{ matrix }];
+  }, [matrix]);
+
 
   const fileBase = projectId === "all"
     ? `DLR-AllProjects-${format(date, "dd-MM-yyyy")}`
