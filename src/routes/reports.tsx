@@ -237,7 +237,7 @@ function ReportsPage() {
   };
 
   const byDepartment = useMemo(() => groupBy((r) => getName(r.departments)), [filtered]);
-  const byProject = useMemo(() => groupBy((r) => r.projects?.code ? `[${r.projects.code}] ${getName(r.projects)}` : getName(r.projects)), [filtered]);
+  const byProject = useMemo(() => groupBy((r) => getName(r.projects)), [filtered]);
   const byContractor = useMemo(() => groupBy((r) => getName(r.contractors)), [filtered]);
   const byCategory = useMemo(() => groupBy((r) => getName(r.worker_categories)), [filtered]);
 
@@ -341,7 +341,7 @@ function ReportsPage() {
                   projects={visibleProjects}
                   includeAllOption
                   className="w-full sm:w-[220px]"
-                  formatLabel={(p) => [p.code && `[${p.code}]`, p.name, p.project_group && `— ${p.project_group}`].filter(Boolean).join(" ")}
+                  formatLabel={(p) => p.name}
                 />
               </div>
               <div className="space-y-1 min-w-0">
@@ -585,7 +585,7 @@ function DlrTab({ projects, approvalStatus, setApprovalStatus }: { projects: any
                 includeAllOption
                 allLabel="All Projects"
                 className="w-full"
-                formatLabel={(p) => [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
+                formatLabel={(p) => p.name}
               />
             </div>
             <div className="space-y-1 min-w-0">
@@ -1010,9 +1010,6 @@ function SummaryTab({ projects, approvalStatus, setApprovalStatus }: { projects:
                           <tr key={p.id} className="group">
                             <td className={cn("sticky left-0 z-20 w-14 border-r border-b border-border px-3 py-2.5 text-center text-xs tabular-nums text-muted-foreground", stickyBg)}>{sno}</td>
                             <td className={cn("sticky left-14 z-20 min-w-[240px] border-r border-b border-border px-3 py-2.5 whitespace-nowrap shadow-[1px_0_0_0_hsl(var(--border))]", stickyBg)}>
-                              {p.code ? (
-                                <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground mr-2 align-middle">{p.code}</span>
-                              ) : null}
                               <span className="font-medium text-foreground align-middle">{p.name}</span>
                             </td>
                             {matrix.columns.map((c) => {
@@ -1143,7 +1140,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                 onChange={setProjectId}
                 projects={projects}
                 className="w-full"
-                formatLabel={(p) => [p.code && `[${p.code}]`, p.name].filter(Boolean).join(" ")}
+                formatLabel={(p) => p.name}
               />
             </div>
             <div className="space-y-1 min-w-0">
@@ -1197,7 +1194,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 border rounded-md p-3 text-sm">
                 <div>
                   <div className="font-semibold">Name of the Project:</div>
-                  <div className="text-muted-foreground">{project?.code ? `[${project.code}] ${project.name}` : project?.name}</div>
+                  <div className="text-muted-foreground">{project?.name}</div>
                   <div className="mt-1 font-semibold">Date:</div>
                   <div className="text-muted-foreground">{weeklyDateRangeLabel(matrix)}</div>
                 </div>
