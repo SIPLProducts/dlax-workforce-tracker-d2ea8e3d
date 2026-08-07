@@ -1260,7 +1260,7 @@ function WeeklyTab({ projects, approvalStatus, setApprovalStatus }: { projects: 
                     ))}
                     {matrix.rows.length > 0 && (
                       <tr className="bg-muted font-semibold">
-                        <td colSpan={3} className="border px-2 py-1 text-right">Totals</td>
+                        <td colSpan={4} className="border px-2 py-1 text-right">Totals</td>
                         {matrix.totals.days.flatMap((d, j) => [
                           <td key={`t-ir-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.ir)}</td>,
                           <td key={`t-nmr-${j}`} className="border px-2 py-1 text-right tabular-nums">{fmt(d.nmr)}</td>,
